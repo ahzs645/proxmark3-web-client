@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Proxmark3 WebAssembly Build Artifacts
+*.o
+*.a
+*.bc
+*.wasm
+*.js.mem
+*.js.symbols
+proxmark3-webassembly/client/proxmark3.js
+proxmark3-webassembly/client/proxmark3.worker.js
+proxmark3-webassembly/client/obj/
+proxmark3-webassembly/client/deps/
