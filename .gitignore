@@ -36,4 +36,5 @@ proxmark3-webassembly/client/obj/
 proxmark3-webassembly/client/deps/
 
 # Unignore public WASM files (needed for deployment)
-!public/wasm/
+!public/wasm/proxmark3.wasm
+!public/wasm/proxmark3.js
