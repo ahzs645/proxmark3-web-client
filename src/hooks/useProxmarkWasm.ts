@@ -169,14 +169,14 @@ export function useProxmarkWasm({
     globalModule = module;
 
     // Check if script already exists
-    const existingScript = document.querySelector('script[src="/wasm/proxmark3.js"]');
+    const existingScript = document.querySelector('script[src="wasm/proxmark3.js"]');
     if (existingScript) {
       return;
     }
 
     // Load the WASM JavaScript
     const script = document.createElement('script');
-    script.src = `/wasm/proxmark3.js?t=${Date.now()}`;
+    script.src = `wasm/proxmark3.js?t=${Date.now()}`;
     script.async = true;
     script.onerror = () => {
       const err = new Error('Failed to load WASM module');
