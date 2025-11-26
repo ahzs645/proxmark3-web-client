@@ -321,7 +321,7 @@ export class PM3WebUSB {
 const pm3WebUSB = new PM3WebUSB();
 
 // Expose to window for debugging/legacy access
-// @ts-expect-error Window extension
+
 window.pm3WebUSB = pm3WebUSB;
 
 export default pm3WebUSB;
