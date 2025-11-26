@@ -1,0 +1,3 @@
+[submodule "proxmark3-webassembly"]
+	path = proxmark3-webassembly
+	url = /Users/ahmadjalil/Github/proxmark3wasm
