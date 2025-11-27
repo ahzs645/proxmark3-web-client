@@ -1,6 +1,3 @@
-[submodule "proxmark3-webassembly"]
-	path = proxmark3-webassembly
-	url = https://github.com/ahzs645/proxmark3wasm.git
 [submodule "proxmark3wasm"]
 	path = proxmark3wasm
 	url = https://github.com/ahzs645/proxmark3wasm
