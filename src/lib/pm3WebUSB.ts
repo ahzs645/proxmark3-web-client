@@ -2,8 +2,9 @@
 
 // Shared Ring Buffer Logic
 export class UartShared {
-  private heapU8!: Uint8Array;
-  private heapU32!: Uint32Array;
+  // Store the module reference to get fresh heap views on each operation
+  // This is CRITICAL because ALLOW_MEMORY_GROWTH can reallocate the heap
+  private module: any = null;
 
   private capacity!: number;
 
@@ -20,11 +21,21 @@ export class UartShared {
   private stdinTailIdx!: number;
   private stdinBufByteOffset!: number;
 
+  // Get fresh heap views - must be called on every operation due to memory growth
+  private getHeap(): { heapU8: Uint8Array; heapU32: Uint32Array } | null {
+    if (!this.module) return null;
+    // Always get fresh references from module - they auto-update on memory growth
+    const heapU8 = this.module.HEAPU8;
+    const heapU32 = this.module.HEAPU32;
+    if (!heapU8 || !heapU32) return null;
+    return { heapU8, heapU32 };
+  }
+
   init(module: any) {
     console.log('UartShared.init called with module keys:', Object.keys(module));
 
-    // Try to find exports in module or module.asm
-    // const exports = module.asm || module;
+    // Store module reference for later heap access
+    this.module = module;
 
     let heapU8 = module.HEAPU8;
     if (!heapU8 && module.wasmMemory) {
@@ -50,8 +61,6 @@ export class UartShared {
       return;
     }
 
-    this.heapU8 = heapU8;
-    this.heapU32 = new Uint32Array(this.heapU8.buffer);
     this.capacity = module._pm3_uart_rb_capacity ? module._pm3_uart_rb_capacity() : getExport('pm3_uart_rb_capacity')();
 
     // RX (Main -> Worker)
@@ -90,40 +99,37 @@ export class UartShared {
   // ... (pushRx and popTx remain the same)
 
   pushStdin(char: number) {
-    // console.log('pushStdin called', char);
-    if (!this.heapU8 || this.stdinHeadIdx === undefined) {
-      // console.warn('pushStdin: heap or stdinHeadIdx missing');
+    const heap = this.getHeap();
+    if (!heap || this.stdinHeadIdx === undefined) {
       return;
     }
 
+    const { heapU8, heapU32 } = heap;
     const cap = this.capacity;
-    let head = Atomics.load(this.heapU32, this.stdinHeadIdx) >>> 0;
-    const tail = Atomics.load(this.heapU32, this.stdinTailIdx) >>> 0;
-
-    // console.log('pushStdin state', { head, tail, cap });
+    let head = Atomics.load(heapU32, this.stdinHeadIdx) >>> 0;
+    const tail = Atomics.load(heapU32, this.stdinTailIdx) >>> 0;
 
     let used = (head - tail) >>> 0;
     let free = cap - used;
 
     if (free > 0) {
       const headIdx = (head % cap) | 0;
-      this.heapU8[this.stdinBufByteOffset + headIdx] = char;
+      heapU8[this.stdinBufByteOffset + headIdx] = char;
 
       head = (head + 1) >>> 0;
-      Atomics.store(this.heapU32, this.stdinHeadIdx, head);
-      // console.log('pushStdin stored', char, 'new head', head);
-    } else {
-      // console.warn('pushStdin: buffer full');
+      Atomics.store(heapU32, this.stdinHeadIdx, head);
     }
   }
 
 
   pushRx(src: Uint8Array) {
-    if (!this.heapU8) return;
+    const heap = this.getHeap();
+    if (!heap) return;
 
+    const { heapU8, heapU32 } = heap;
     const cap = this.capacity;
-    let head = Atomics.load(this.heapU32, this.rxHeadIdx) >>> 0;
-    const tail = Atomics.load(this.heapU32, this.rxTailIdx) >>> 0;
+    let head = Atomics.load(heapU32, this.rxHeadIdx) >>> 0;
+    const tail = Atomics.load(heapU32, this.rxTailIdx) >>> 0;
 
     let used = (head - tail) >>> 0;
     let free = cap - used;
@@ -135,21 +141,21 @@ export class UartShared {
       const first = Math.min(toWrite, cap - headIdx);
 
       // Copy first segment
-      this.heapU8.set(
+      heapU8.set(
         src.subarray(srcOff, srcOff + first),
         this.rxBufByteOffset + headIdx
       );
 
       // Wrap-around part if needed
       if (toWrite > first) {
-        this.heapU8.set(
+        heapU8.set(
           src.subarray(srcOff + first, srcOff + toWrite),
           this.rxBufByteOffset
         );
       }
 
       head = (head + toWrite) >>> 0;
-      Atomics.store(this.heapU32, this.rxHeadIdx, head);
+      Atomics.store(heapU32, this.rxHeadIdx, head);
 
       srcOff += toWrite;
       used += toWrite;
@@ -162,11 +168,13 @@ export class UartShared {
   }
 
   popTx(maxBytes: number, out: Uint8Array): number {
-    if (!this.heapU8) return 0;
+    const heap = this.getHeap();
+    if (!heap) return 0;
 
+    const { heapU8, heapU32 } = heap;
     const cap = this.capacity;
-    const head = Atomics.load(this.heapU32, this.txHeadIdx) >>> 0;
-    let tail = Atomics.load(this.heapU32, this.txTailIdx) >>> 0;
+    const head = Atomics.load(heapU32, this.txHeadIdx) >>> 0;
+    let tail = Atomics.load(heapU32, this.txTailIdx) >>> 0;
 
     let available = (head - tail) >>> 0;
     if (available === 0) return 0;
@@ -176,7 +184,7 @@ export class UartShared {
     const first = Math.min(available, cap - tailIdx);
 
     out.set(
-      this.heapU8.subarray(
+      heapU8.subarray(
         this.txBufByteOffset + tailIdx,
         this.txBufByteOffset + tailIdx + first
       ),
@@ -185,7 +193,7 @@ export class UartShared {
 
     if (available > first) {
       out.set(
-        this.heapU8.subarray(
+        heapU8.subarray(
           this.txBufByteOffset,
           this.txBufByteOffset + (available - first)
         ),
@@ -194,7 +202,7 @@ export class UartShared {
     }
 
     tail = (tail + available) >>> 0;
-    Atomics.store(this.heapU32, this.txTailIdx, tail);
+    Atomics.store(heapU32, this.txTailIdx, tail);
 
     return available;
   }

@@ -9,8 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyCachePanel';
-import { Activity, Cpu, Send, Sparkles, Trash2, Usb } from 'lucide-react';
+import { MifareEditorPanel } from '@/components/panels/MifareEditorPanel';
+import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
+import { CardMemoryMap } from '@/components/panels/CardMemoryMap';
+import { Activity, Cpu, Send, Sparkles, Trash2, Usb, CreditCard, FileCode2, Edit3 } from 'lucide-react';
 
 export type ConnectionMode = 'serial' | 'wasm';
 
@@ -24,6 +28,7 @@ function App() {
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('wasm');
+  const [activeTab, setActiveTab] = useState<string>('connect');
   const [quickCommand, setQuickCommand] = useState('hf search');
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -342,6 +347,7 @@ function App() {
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
         onCommand={handleCommand}
+        onStopOperation={wasmState.sendBreak}
         theme={theme}
         onThemeChange={setTheme}
         canRunCommands={canRunCommands}
@@ -352,140 +358,191 @@ function App() {
         onCacheDelete={handleCacheDelete}
         onCacheSync={syncCacheToFS}
         cachePathPrefix={CACHE_PATH_PREFIX}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4 p-4 overflow-hidden">
-        {/* Left Panel - Tag Info & History */}
-        <div className="flex flex-col gap-4 min-h-0">
-          <TagInfoPanel
-            tagInfo={tagInfo}
-            onRefresh={handleRefreshTag}
-            onCopyUid={handleCopyUid}
-          />
+      {activeTab === 'workbench' ? (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Tabs defaultValue="memory" className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-4 pt-3 border-b bg-card/50">
+              <TabsList className="h-9">
+                <TabsTrigger value="memory" className="text-xs gap-1.5">
+                  <CreditCard className="h-3 w-3" />
+                  Memory Map
+                </TabsTrigger>
+                <TabsTrigger value="editor" className="text-xs gap-1.5">
+                  <Edit3 className="h-3 w-3" />
+                  Block Editor
+                </TabsTrigger>
+                <TabsTrigger value="hex" className="text-xs gap-1.5">
+                  <FileCode2 className="h-3 w-3" />
+                  Hex Viewer
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          <Card className="flex-1 overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Recent Commands
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-auto">
-              <div className="space-y-1">
-                {commandHistory.slice(-12).reverse().map((cmd, i) => (
-                  <div
-                    key={i}
-                    className="text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer"
-                    onClick={() => handleCommand(cmd)}
-                  >
-                    {cmd}
-                  </div>
-                ))}
-                {commandHistory.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No commands yet</p>
-                )}
+            <TabsContent value="memory" className="flex-1 p-4 overflow-auto m-0">
+              <CardMemoryMap
+                onCommand={handleCommand}
+                disabled={!canRunCommands}
+              />
+            </TabsContent>
+
+            <TabsContent value="editor" className="flex-1 p-4 overflow-auto m-0">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full">
+                <MifareEditorPanel
+                  onCommand={handleCommand}
+                  cacheItems={cachedAssets}
+                  disabled={!canRunCommands}
+                />
+                <HexAsciiViewer dumps={cachedAssets} />
               </div>
-            </CardContent>
-          </Card>
+            </TabsContent>
 
-          {serialState.deviceInfo && (
-            <Card>
-              <CardContent className="py-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Device</span>
-                  <Badge variant="outline" className="text-xs">
-                    {serialState.deviceInfo.vendorId?.toString(16).toUpperCase()}:
-                    {serialState.deviceInfo.productId?.toString(16).toUpperCase()}
-                  </Badge>
+            <TabsContent value="hex" className="flex-1 p-4 overflow-auto m-0">
+              <div className="h-full max-w-4xl mx-auto">
+                <HexAsciiViewer dumps={cachedAssets} />
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4 p-4 overflow-hidden">
+          {/* Left Panel - Tag Info & History */}
+          <div className="flex flex-col gap-4 min-h-0">
+            <TagInfoPanel
+              tagInfo={tagInfo}
+              onRefresh={handleRefreshTag}
+              onCopyUid={handleCopyUid}
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+            />
+
+            <Card className="flex-1 overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Recent Commands
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-auto">
+                <div className="space-y-1">
+                  {commandHistory.slice(-12).reverse().map((cmd, i) => (
+                    <div
+                      key={i}
+                      className="text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() => handleCommand(cmd)}
+                    >
+                      {cmd}
+                    </div>
+                  ))}
+                  {commandHistory.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No commands yet</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          )}
-        </div>
 
-        {/* Main Terminal */}
-        <div className="flex flex-col gap-3 min-w-0 min-h-0">
-          <Card className="flex-1 overflow-hidden">
-            <CardHeader className="pb-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <span>Terminal</span>
-                  <Badge variant={connectionMode === 'wasm' ? 'success' : 'secondary'}>
-                    {connectionMode === 'wasm' ? 'WASM passthrough' : 'Serial shell'}
-                  </Badge>
-                  {canRunCommands ? (
-                    <Badge variant="outline">Live</Badge>
-                  ) : (
-                    <Badge variant="warning">Offline</Badge>
-                  )}
-                </CardTitle>
-                <div className="flex items-center gap-2">
+            {serialState.deviceInfo && (
+              <Card>
+                <CardContent className="py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Device</span>
+                    <Badge variant="outline" className="text-xs">
+                      {serialState.deviceInfo.vendorId?.toString(16).toUpperCase()}:
+                      {serialState.deviceInfo.productId?.toString(16).toUpperCase()}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Main Terminal */}
+          <div className="flex flex-col gap-3 min-w-0 min-h-0">
+            <Card className="flex-1 overflow-hidden">
+              <CardHeader className="pb-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <span>Terminal</span>
+                    <Badge variant={connectionMode === 'wasm' ? 'success' : 'secondary'}>
+                      {connectionMode === 'wasm' ? 'WASM passthrough' : 'Serial shell'}
+                    </Badge>
+                    {canRunCommands ? (
+                      <Badge variant="outline">Live</Badge>
+                    ) : (
+                      <Badge variant="warning">Offline</Badge>
+                    )}
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCommand('help')}
+                    >
+                      Help
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => terminalRef.current?.clear()}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={quickCommand}
+                    onChange={(e) => setQuickCommand(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && runQuickCommand()}
+                    placeholder="Send raw pm3 commands (hf mf autopwn --1k -f /pm3-cache/mfc_default_keys)"
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={runQuickCommand}>
+                    <Send className="h-3 w-3 mr-1" />
+                    Send
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setQuickCommand('hf mf autopwn --1k')}
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Autopwn
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleCommand('help')}
+                    onClick={() => setQuickCommand('hw tune')}
                   >
-                    Help
+                    Tune
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={() => terminalRef.current?.clear()}
+                    variant="ghost"
+                    onClick={() => setQuickCommand('hf iclass dump --ki 0')}
                   >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Clear
+                    iCLASS
                   </Button>
                 </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  value={quickCommand}
-                  onChange={(e) => setQuickCommand(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runQuickCommand()}
-                  placeholder="Send raw pm3 commands (hf mf autopwn --1k -f /pm3-cache/mfc_default_keys)"
-                  className="flex-1"
+              </CardHeader>
+              <CardContent className="flex-1 p-0 overflow-hidden">
+                <Terminal
+                  ref={terminalRef}
+                  onCommand={handleCommand}
+                  onInput={handleTerminalInput}
+                  rawMode={connectionMode === 'wasm'}
+                  className="h-full"
                 />
-                <Button size="sm" onClick={runQuickCommand}>
-                  <Send className="h-3 w-3 mr-1" />
-                  Send
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setQuickCommand('hf mf autopwn --1k')}
-                >
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  Autopwn
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setQuickCommand('hw tune')}
-                >
-                  Tune
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setQuickCommand('hf iclass dump --ki 0')}
-                >
-                  iCLASS
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 p-0 overflow-hidden">
-              <Terminal
-                ref={terminalRef}
-                onCommand={handleCommand}
-                onInput={handleTerminalInput}
-                rawMode={connectionMode === 'wasm'}
-                className="h-full"
-              />
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Status Bar */}
       <div className="h-8 bg-card border-t border-border px-4 flex items-center justify-between text-xs text-muted-foreground">

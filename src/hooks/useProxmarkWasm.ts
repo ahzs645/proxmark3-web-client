@@ -206,6 +206,13 @@ export function useProxmarkWasm({
     uartShared.pushStdin(char.charCodeAt(0));
   }, [isReady]);
 
+  // Send break signal (Ctrl+C) to stop current operation
+  const sendBreak = useCallback(() => {
+    if (!isReady) return;
+    // ASCII 3 = ETX (End of Text) = Ctrl+C
+    uartShared.pushStdin(3);
+  }, [isReady]);
+
   // Connect to physical device via WebUSB
   const connectDevice = useCallback(async (): Promise<boolean> => {
     if (!window.pm3WebUSB) {
@@ -240,6 +247,7 @@ export function useProxmarkWasm({
     error,
     sendCommand,
     sendInput,
+    sendBreak,
     connectDevice,
     disconnectDevice,
   };

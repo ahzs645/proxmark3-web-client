@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Book,
   ListChecks,
+  StopCircle,
 } from 'lucide-react';
 import type { ConnectionStatus } from '@/hooks/useWebSerial';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -36,6 +37,7 @@ interface RibbonToolbarProps {
   onConnect: () => void;
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
+  onStopOperation?: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   canRunCommands?: boolean;
@@ -46,6 +48,8 @@ interface RibbonToolbarProps {
   onCacheDelete: (id: string) => void;
   onCacheSync: () => void;
   cachePathPrefix?: string;
+  activeTab: string;
+  onTabChange: (value: string) => void;
 }
 
 interface RibbonButtonProps {
@@ -71,6 +75,30 @@ function RibbonButton({ icon, label, onClick, disabled, variant = 'ghost' }: Rib
   );
 }
 
+// Compact mini button for dense layouts
+interface MiniButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'default' | 'secondary' | 'outline' | 'ghost';
+}
+
+function MiniButton({ icon, label, onClick, disabled, variant = 'outline' }: MiniButtonProps) {
+  return (
+    <Button
+      variant={variant}
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      className="h-7 px-2 text-xs gap-1"
+    >
+      {icon}
+      {label}
+    </Button>
+  );
+}
+
 function RibbonGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col">
@@ -84,11 +112,26 @@ function RibbonGroup({ title, children }: { title: string; children: React.React
   );
 }
 
+// Compact group for mini buttons
+function CompactGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 shrink-0">
+      <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+        {title}
+      </div>
+      <div className="flex gap-1">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function RibbonToolbar({
   connectionStatus,
   onConnect,
   onDisconnect,
   onCommand,
+  onStopOperation,
   theme,
   onThemeChange,
   canRunCommands = false,
@@ -99,13 +142,17 @@ export function RibbonToolbar({
   onCacheDelete,
   onCacheSync,
   cachePathPrefix,
+  activeTab,
+  onTabChange,
 }: RibbonToolbarProps) {
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
+  // Use canRunCommands for enabling command buttons (works for both Serial and WASM modes)
+  const commandsEnabled = canRunCommands;
 
   return (
-    <div className="border-b border-border bg-card">
-      <Tabs defaultValue="connect" className="w-full">
+    <div className="border-b border-border bg-card sticky top-0 z-50">
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
         <div className="flex items-center px-2 border-b border-border">
           <TabsList className="h-9 bg-transparent">
             <TabsTrigger value="connect" className="text-xs">Connect</TabsTrigger>
@@ -114,9 +161,23 @@ export function RibbonToolbar({
             <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
             <TabsTrigger value="tools" className="text-xs">Tools</TabsTrigger>
             <TabsTrigger value="actions" className="text-xs">Shortcuts</TabsTrigger>
+            <TabsTrigger value="workbench" className="text-xs">Workbench</TabsTrigger>
           </TabsList>
 
           <div className="ml-auto flex items-center gap-2 pr-2">
+            {/* Stop Operation Button - Always visible when commands can run */}
+            {onStopOperation && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onStopOperation}
+                disabled={!commandsEnabled}
+                className="h-7 px-3 text-xs gap-1.5"
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            )}
             <Badge variant={isConnected ? 'success' : 'secondary'}>
               {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Disconnected'}
             </Badge>
@@ -141,7 +202,7 @@ export function RibbonToolbar({
                   onDisconnect();
                   setTimeout(onConnect, 500);
                 }}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
 
@@ -152,339 +213,129 @@ export function RibbonToolbar({
                 icon={<HelpCircle />}
                 label="Info"
                 onClick={() => onCommand('hw version')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Zap />}
                 label="Tune"
                 onClick={() => onCommand('hw tune')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Settings />}
                 label="Status"
                 onClick={() => onCommand('hw status')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
           </div>
         </TabsContent>
 
-        {/* HF Tab */}
+        {/* HF Tab - Compact Layout */}
         <TabsContent value="hf" className="m-0 p-2 ribbon-tab-content">
-          <div className="flex items-start gap-2">
-            <RibbonGroup title="Search">
-              <RibbonButton
-                icon={<Search />}
-                label="Search"
-                onClick={() => onCommand('hf search')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Radio />}
-                label="14A Info"
-                onClick={() => onCommand('hf 14a info')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Eye />}
-                label="Sniff"
-                onClick={() => onCommand('hf sniff')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Search">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Search" onClick={() => onCommand('hf search')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="14A Info" onClick={() => onCommand('hf 14a info')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Eye className="h-3 w-3" />} label="Sniff" onClick={() => onCommand('hf sniff')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="MIFARE Classic">
-              <RibbonButton
-                icon={<CreditCard />}
-                label="Info"
-                onClick={() => onCommand('hf mf info')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Key />}
-                label="Autopwn 1K"
-                onClick={() => onCommand('hf mf autopwn --1k')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Key />}
-                label="Autopwn 4K"
-                onClick={() => onCommand('hf mf autopwn --4k')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Download />}
-                label="Dump"
-                onClick={() => onCommand('hf mf dump')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Upload />}
-                label="Restore"
-                onClick={() => onCommand('hf mf restore')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('hf mf sim')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="MIFARE Classic">
+              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mf info')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Autopwn" onClick={() => onCommand('hf mf autopwn')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf mf dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Upload className="h-3 w-3" />} label="Restore" onClick={() => onCommand('hf mf restore')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf mf sim')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="Classic Attacks">
-              <RibbonButton
-                icon={<Zap />}
-                label="Hardnested"
-                onClick={() => onCommand('hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Key />}
-                label="Nested"
-                onClick={() => onCommand('hf mf nested 1 0 a FFFFFFFFFFFF')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Shield />}
-                label="Darkside"
-                onClick={() => onCommand('hf mf darkside')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<ListChecks />}
-                label="Chk Defaults"
-                onClick={() => onCommand('hf mf chk --1k -f mfc_default_keys')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="Attacks">
+              <MiniButton icon={<Zap className="h-3 w-3" />} label="Hardnested" onClick={() => onCommand('hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Nested" onClick={() => onCommand('hf mf nested 1 0 a FFFFFFFFFFFF')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Shield className="h-3 w-3" />} label="Darkside" onClick={() => onCommand('hf mf darkside')} disabled={!commandsEnabled} />
+              <MiniButton icon={<ListChecks className="h-3 w-3" />} label="Chk Keys" onClick={() => onCommand('hf mf chk --1k -f mfc_default_keys')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="MIFARE Ultralight">
-              <RibbonButton
-                icon={<CreditCard />}
-                label="Info"
-                onClick={() => onCommand('hf mfu info')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Download />}
-                label="Dump"
-                onClick={() => onCommand('hf mfu dump')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('hf mfu sim -t 7')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="Ultralight">
+              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mfu info')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf mfu dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf mfu sim -t 7')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="iClass">
-              <RibbonButton
-                icon={<Shield />}
-                label="Info"
-                onClick={() => onCommand('hf iclass info')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Download />}
-                label="Dump"
-                onClick={() => onCommand('hf iclass dump')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Key />}
-                label="Keys"
-                onClick={() => onCommand('hf iclass managekeys -p')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('hf iclass sim -t 3')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="iClass">
+              <MiniButton icon={<Shield className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf iclass info')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf iclass dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Keys" onClick={() => onCommand('hf iclass managekeys -p')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf iclass sim -t 3')} disabled={!commandsEnabled} />
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="DESFire">
+              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mfdes info')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Book className="h-3 w-3" />} label="List Apps" onClick={() => onCommand('hf mfdes lsapp')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Auth" onClick={() => onCommand('hf mfdes auth')} disabled={!commandsEnabled} />
+            </CompactGroup>
           </div>
         </TabsContent>
 
-        {/* LF Tab */}
+        {/* LF Tab - Compact Layout */}
         <TabsContent value="lf" className="m-0 p-2 ribbon-tab-content">
-          <div className="flex items-start gap-2">
-            <RibbonGroup title="Search">
-              <RibbonButton
-                icon={<Search />}
-                label="Search"
-                onClick={() => onCommand('lf search')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Wifi />}
-                label="Read"
-                onClick={() => onCommand('lf read')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Eye />}
-                label="Sniff"
-                onClick={() => onCommand('lf sniff')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Search">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Search" onClick={() => onCommand('lf search')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Wifi className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf read')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Eye className="h-3 w-3" />} label="Sniff" onClick={() => onCommand('lf sniff')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="EM4x">
-              <RibbonButton
-                icon={<Radio />}
-                label="Read"
-                onClick={() => onCommand('lf em 410x reader')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Copy />}
-                label="Clone"
-                onClick={() => onCommand('lf em 410x clone')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('lf em 410x sim')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="EM4x">
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf em 410x reader')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf em 410x clone')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf em 410x sim')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="HID">
-              <RibbonButton
-                icon={<CreditCard />}
-                label="Read"
-                onClick={() => onCommand('lf hid read')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Copy />}
-                label="Clone"
-                onClick={() => onCommand('lf hid clone')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('lf hid sim')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="HID">
+              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf hid read')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf hid clone')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf hid sim')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Zap className="h-3 w-3" />} label="Brute" onClick={() => onCommand('lf hid brute -w H10301 -f 101')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="HID Attack">
-              <RibbonButton
-                icon={<Zap />}
-                label="Brute"
-                onClick={() => onCommand('lf hid brute -w H10301 -f 101')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Eye />}
-                label="Demod"
-                onClick={() => onCommand('lf hid demod')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="T55xx">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Detect" onClick={() => onCommand('lf t55xx detect')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('lf t55xx dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Edit3 className="h-3 w-3" />} label="Write" onClick={() => onCommand('lf t55xx write')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Square className="h-3 w-3" />} label="Wipe" onClick={() => onCommand('lf t55xx wipe')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="T55xx">
-              <RibbonButton
-                icon={<Search />}
-                label="Detect"
-                onClick={() => onCommand('lf t55xx detect')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Download />}
-                label="Dump"
-                onClick={() => onCommand('lf t55xx dump')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Edit3 />}
-                label="Write"
-                onClick={() => onCommand('lf t55xx write')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Square />}
-                label="Wipe"
-                onClick={() => onCommand('lf t55xx wipe')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Radio />}
-                label="Config FSK"
-                onClick={() => onCommand('lf t55xx config --FSK')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="Indala">
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf indala read')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf indala clone')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf indala sim')} disabled={!commandsEnabled} />
+            </CompactGroup>
 
-            <Separator orientation="vertical" className="h-16" />
+            <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <RibbonGroup title="Indala">
-              <RibbonButton
-                icon={<Radio />}
-                label="Read"
-                onClick={() => onCommand('lf indala read')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Copy />}
-                label="Clone"
-                onClick={() => onCommand('lf indala clone')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Play />}
-                label="Sim"
-                onClick={() => onCommand('lf indala sim')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
-
-            <Separator orientation="vertical" className="h-16" />
-
-            <RibbonGroup title="Wiegand">
-              <RibbonButton
-                icon={<Book />}
-                label="List"
-                onClick={() => onCommand('wiegand list')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Download />}
-                label="Encode"
-                onClick={() => onCommand('wiegand encode --fc 101 --cn 1337')}
-                disabled={!isConnected}
-              />
-              <RibbonButton
-                icon={<Upload />}
-                label="Decode"
-                onClick={() => onCommand('wiegand decode --raw 2006f623ae')}
-                disabled={!isConnected}
-              />
-            </RibbonGroup>
+            <CompactGroup title="Wiegand">
+              <MiniButton icon={<Book className="h-3 w-3" />} label="List" onClick={() => onCommand('wiegand list')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Encode" onClick={() => onCommand('wiegand encode --fc 101 --cn 1337')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Upload className="h-3 w-3" />} label="Decode" onClick={() => onCommand('wiegand decode --raw 2006f623ae')} disabled={!commandsEnabled} />
+            </CompactGroup>
           </div>
         </TabsContent>
 
@@ -496,25 +347,25 @@ export function RibbonToolbar({
                 icon={<Search />}
                 label="Samples"
                 onClick={() => onCommand('data samples -n 40000')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Download />}
                 label="Save"
                 onClick={() => onCommand('data save -f trace.bin')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Upload />}
                 label="Load"
                 onClick={() => onCommand('data load -f trace.bin')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Square />}
                 label="Clear"
                 onClick={() => onCommand('data clear')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
 
@@ -525,13 +376,13 @@ export function RibbonToolbar({
                 icon={<Search />}
                 label="Autocorr"
                 onClick={() => onCommand('data autocorr')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Zap />}
                 label="Detect Clk"
                 onClick={() => onCommand('data detectclock')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
 
@@ -542,13 +393,13 @@ export function RibbonToolbar({
                 icon={<Download />}
                 label="bin→eml"
                 onClick={() => onCommand('script run data_mf_bin2eml -h')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Upload />}
                 label="eml→bin"
                 onClick={() => onCommand('script run data_mf_eml2bin -h')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
           </div>
@@ -562,19 +413,19 @@ export function RibbonToolbar({
                 icon={<Play />}
                 label="List Scripts"
                 onClick={() => onCommand('script list')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Play />}
                 label="UID Bruteforce"
                 onClick={() => onCommand('script run hf_mf_uidbruteforce -h')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Play />}
                 label="Format Card"
                 onClick={() => onCommand('script run hf_mf_format -h')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
 
@@ -585,19 +436,19 @@ export function RibbonToolbar({
                 icon={<Key />}
                 label="Load MFC"
                 onClick={() => onCommand('mem load -f mfc_default_keys --mfc')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Key />}
                 label="Load iClass"
                 onClick={() => onCommand('mem load -f iclass_default_keys --iclass')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
               <RibbonButton
                 icon={<Key />}
                 label="Load T55xx"
                 onClick={() => onCommand('mem load -f t55xx_default_pwds --t55xx')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
 
@@ -614,7 +465,7 @@ export function RibbonToolbar({
                 icon={<Settings />}
                 label="Prefs"
                 onClick={() => onCommand('prefs show')}
-                disabled={!isConnected}
+                disabled={!commandsEnabled}
               />
             </RibbonGroup>
           </div>
@@ -636,6 +487,13 @@ export function RibbonToolbar({
               syncing={cacheSyncing}
               cachePathPrefix={cachePathPrefix}
             />
+          </div>
+        </TabsContent>
+
+        {/* Workbench Tab */}
+        <TabsContent value="workbench" className="m-0 p-2 ribbon-tab-content">
+          <div className="text-xs text-muted-foreground px-2">
+            Workbench view is shown below. Use this tab to switch into the editor/inspector screen.
           </div>
         </TabsContent>
       </Tabs>

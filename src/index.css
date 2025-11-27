@@ -148,6 +148,78 @@ code, .font-mono, .xterm {
   min-height: 80px;
 }
 
+/* Table styles for memory map */
+table {
+  border-collapse: collapse;
+}
+
+/* Improved focus states */
+input:focus, textarea:focus, button:focus-visible {
+  outline: none;
+  ring: 2px;
+  ring-color: hsl(var(--primary));
+}
+
+/* Card hover effects */
+.card-interactive {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Hex byte highlighting animation */
+.hex-byte-highlight {
+  animation: pulse-highlight 0.3s ease-out;
+}
+
+@keyframes pulse-highlight {
+  0% { background-color: hsl(var(--primary) / 0.5); }
+  100% { background-color: hsl(var(--primary) / 0.2); }
+}
+
+/* Sector row dividers */
+.sector-divider {
+  border-top: 2px solid hsl(var(--border));
+}
+
+/* Status indicator animations */
+.status-pulse {
+  animation: status-pulse 2s infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Badge variants for RFID types */
+.badge-manufacturer {
+  background-color: hsl(142.1 76.2% 36.3% / 0.2);
+  color: hsl(142.1 76.2% 50%);
+  border-color: hsl(142.1 76.2% 36.3% / 0.4);
+}
+
+.badge-trailer {
+  background-color: hsl(38 92% 50% / 0.2);
+  color: hsl(38 92% 50%);
+  border-color: hsl(38 92% 50% / 0.4);
+}
+
+.badge-data {
+  background-color: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease-out;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -165,4 +237,13 @@ code, .font-mono, .xterm {
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--foreground));
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
 }
