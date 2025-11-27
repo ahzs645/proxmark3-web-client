@@ -2,7 +2,6 @@ import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { RibbonToolbar } from '@/components/ribbon/RibbonToolbar';
 import { Terminal, type TerminalHandle } from '@/components/terminal/Terminal';
 import { TagInfoPanel, type TagInfo } from '@/components/panels/TagInfoPanel';
-import { useWebSerial } from '@/hooks/useWebSerial';
 import { useProxmarkWasm } from '@/hooks/useProxmarkWasm';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +13,7 @@ import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyC
 import { MifareEditorPanel } from '@/components/panels/MifareEditorPanel';
 import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
 import { CardMemoryMap } from '@/components/panels/CardMemoryMap';
-import { Activity, Cpu, Send, Sparkles, Trash2, Usb, CreditCard, FileCode2, Edit3 } from 'lucide-react';
-
-export type ConnectionMode = 'serial' | 'wasm';
+import { Activity, Send, Sparkles, Trash2, CreditCard, FileCode2, Edit3 } from 'lucide-react';
 
 type CachedAssetWithData = CachedAsset & { base64: string };
 
@@ -27,7 +24,6 @@ function App() {
   const terminalRef = useRef<TerminalHandle>(null);
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
-  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('wasm');
   const [activeTab, setActiveTab] = useState<string>('connect');
   const [quickCommand, setQuickCommand] = useState('hf search');
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
@@ -193,61 +189,25 @@ function App() {
     setCachedAssets(prev => prev.filter(item => item.id !== id));
   }, []);
 
-  // Handle incoming serial data
-  const handleSerialData = useCallback((data: Uint8Array) => {
-    const text = new TextDecoder().decode(data);
-    terminalRef.current?.write(text);
-    parseTagInfo(text);
-  }, [parseTagInfo]);
-
-  const [serialState, serialActions] = useWebSerial(handleSerialData);
-
   // Handle command execution
   const handleCommand = useCallback((cmd: string) => {
     setCommandHistory(prev => [...prev.slice(-99), cmd]);
 
-    // Handle local commands (only in serial mode)
+    // Handle local clear command
     if (cmd === 'clear') {
       terminalRef.current?.clear();
       return;
     }
 
-    // Route to appropriate backend
-    if (connectionMode === 'wasm') {
-      // In WASM mode, pass ALL commands to the WASM client
-      if (wasmState.isReady) {
-        wasmState.sendCommand(cmd);
-      } else if (wasmState.isLoading) {
-        terminalRef.current?.writeln('\x1b[33mWASM client is still loading...\x1b[0m');
-      } else {
-        terminalRef.current?.writeln('\x1b[31mWASM client failed to load.\x1b[0m');
-      }
+    // Send command to WASM client
+    if (wasmState.isReady) {
+      wasmState.sendCommand(cmd);
+    } else if (wasmState.isLoading) {
+      terminalRef.current?.writeln('\x1b[33mWASM client is still loading...\x1b[0m');
     } else {
-      // Serial mode - handle local help
-      if (cmd === 'help') {
-        terminalRef.current?.writeln('\x1b[36mAvailable commands:\x1b[0m');
-        terminalRef.current?.writeln('  \x1b[33mhf search\x1b[0m    - Search for HF tags');
-        terminalRef.current?.writeln('  \x1b[33mhf 14a info\x1b[0m  - Get ISO14443A tag info');
-        terminalRef.current?.writeln('  \x1b[33mhf mf info\x1b[0m   - Get MIFARE info');
-        terminalRef.current?.writeln('  \x1b[33mhf mf autopwn\x1b[0m - Auto attack MIFARE');
-        terminalRef.current?.writeln('  \x1b[33mlf search\x1b[0m    - Search for LF tags');
-        terminalRef.current?.writeln('  \x1b[33mlf read\x1b[0m      - Read LF tag');
-        terminalRef.current?.writeln('  \x1b[33mhw version\x1b[0m   - Device version');
-        terminalRef.current?.writeln('  \x1b[33mhw tune\x1b[0m      - Antenna tuning');
-        terminalRef.current?.writeln('  \x1b[33mclear\x1b[0m        - Clear terminal');
-        return;
-      }
-
-      if (serialState.status === 'connected') {
-        const encoder = new TextEncoder();
-        serialActions.write(encoder.encode(cmd + '\r\n')).catch((err) => {
-          terminalRef.current?.writeln(`\x1b[31mError: ${err.message}\x1b[0m`);
-        });
-      } else {
-        terminalRef.current?.writeln('\x1b[33mNot connected. Use the Connect button or switch to WASM mode.\x1b[0m');
-      }
+      terminalRef.current?.writeln('\x1b[31mWASM client failed to load.\x1b[0m');
     }
-  }, [connectionMode, serialState.status, serialActions, wasmState]);
+  }, [wasmState]);
 
   const handleCacheUse = useCallback((asset: CachedAsset, template: string) => {
     const synced = syncCacheToFS();
@@ -271,41 +231,22 @@ function App() {
   }, [cachedAssets.length, wasmState.isReady, syncCacheToFS]);
 
   const handleConnect = useCallback(async () => {
-    if (connectionMode === 'wasm') {
-      // WASM mode - connect WebSerial first, then tell WASM to use it
-      terminalRef.current?.writeln('\x1b[36mConnecting to Proxmark3 via WebSerial...\x1b[0m');
-      terminalRef.current?.writeln('\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m');
-      const success = await wasmState.connectDevice();
-      if (success) {
-        terminalRef.current?.writeln('\x1b[32mWebSerial connected!\x1b[0m');
-        terminalRef.current?.writeln('\x1b[90mNow connecting WASM client to device...\x1b[0m');
-      } else {
-        terminalRef.current?.writeln('\x1b[31mWebSerial connection failed or cancelled.\x1b[0m');
-      }
-      return;
+    terminalRef.current?.writeln('\x1b[36mConnecting to Proxmark3 via WebSerial...\x1b[0m');
+    terminalRef.current?.writeln('\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m');
+    const success = await wasmState.connectDevice();
+    if (success) {
+      terminalRef.current?.writeln('\x1b[32mWebSerial connected!\x1b[0m');
+      terminalRef.current?.writeln('\x1b[90mNow connecting WASM client to device...\x1b[0m');
     } else {
-      // Serial mode
-      terminalRef.current?.writeln('\x1b[36mConnecting to Proxmark3...\x1b[0m');
-      const success = await serialActions.connect();
-      if (success) {
-        terminalRef.current?.writeln('\x1b[32mConnected successfully!\x1b[0m');
-        terminalRef.current?.writeln('\x1b[90mReady for commands.\x1b[0m');
-      } else {
-        terminalRef.current?.writeln(`\x1b[31mConnection failed: ${serialState.error}\x1b[0m`);
-      }
+      terminalRef.current?.writeln('\x1b[31mWebSerial connection failed or cancelled.\x1b[0m');
     }
-  }, [connectionMode, serialActions, serialState.error, wasmState]);
+  }, [wasmState]);
 
   const handleDisconnect = useCallback(async () => {
-    if (connectionMode === 'wasm') {
-      await wasmState.disconnectDevice();
-      terminalRef.current?.writeln('\x1b[33mWebUSB disconnected.\x1b[0m');
-    } else {
-      await serialActions.disconnect();
-      terminalRef.current?.writeln('\x1b[33mDisconnected.\x1b[0m');
-    }
+    await wasmState.disconnectDevice();
+    terminalRef.current?.writeln('\x1b[33mDisconnected.\x1b[0m');
     setTagInfo(null);
-  }, [connectionMode, serialActions, wasmState]);
+  }, [wasmState]);
 
   const handleCopyUid = useCallback(() => {
     if (tagInfo?.uid) {
@@ -318,18 +259,16 @@ function App() {
     handleCommand('hf 14a info');
   }, [handleCommand]);
 
-  // Handle terminal input in WASM raw mode
+  // Handle terminal input in raw mode
   const handleTerminalInput = useCallback((char: string) => {
-    if (connectionMode === 'wasm' && wasmState.isReady) {
+    if (wasmState.isReady) {
       wasmState.sendInput(char);
     }
-  }, [connectionMode, wasmState]);
+  }, [wasmState]);
 
   const canRunCommands = useMemo(() => {
-    return connectionMode === 'wasm'
-      ? wasmState.isReady
-      : serialState.status === 'connected';
-  }, [connectionMode, serialState.status, wasmState.isReady]);
+    return wasmState.isReady;
+  }, [wasmState.isReady]);
 
   const runQuickCommand = useCallback(() => {
     if (!quickCommand.trim()) return;
@@ -340,10 +279,7 @@ function App() {
     <div className="min-h-screen flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
       <RibbonToolbar
-        connectionStatus={connectionMode === 'wasm'
-          ? (wasmState.isDeviceConnected ? 'connected' : 'disconnected')
-          : serialState.status
-        }
+        connectionStatus={wasmState.isDeviceConnected ? 'connected' : 'disconnected'}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
         onCommand={handleCommand}
@@ -444,20 +380,6 @@ function App() {
                 </div>
               </CardContent>
             </Card>
-
-            {serialState.deviceInfo && (
-              <Card>
-                <CardContent className="py-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Device</span>
-                    <Badge variant="outline" className="text-xs">
-                      {serialState.deviceInfo.vendorId?.toString(16).toUpperCase()}:
-                      {serialState.deviceInfo.productId?.toString(16).toUpperCase()}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Main Terminal */}
@@ -467,13 +389,15 @@ function App() {
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <span>Terminal</span>
-                    <Badge variant={connectionMode === 'wasm' ? 'success' : 'secondary'}>
-                      {connectionMode === 'wasm' ? 'WASM passthrough' : 'Serial shell'}
-                    </Badge>
                     {canRunCommands ? (
-                      <Badge variant="outline">Live</Badge>
+                      <Badge variant="success">Ready</Badge>
+                    ) : wasmState.isLoading ? (
+                      <Badge variant="warning">Loading...</Badge>
                     ) : (
-                      <Badge variant="warning">Offline</Badge>
+                      <Badge variant="secondary">Offline</Badge>
+                    )}
+                    {wasmState.isDeviceConnected && (
+                      <Badge variant="outline">Device Connected</Badge>
                     )}
                   </CardTitle>
                   <div className="flex items-center gap-2">
@@ -535,7 +459,7 @@ function App() {
                   ref={terminalRef}
                   onCommand={handleCommand}
                   onInput={handleTerminalInput}
-                  rawMode={connectionMode === 'wasm'}
+                  rawMode={true}
                   className="h-full"
                 />
               </CardContent>
@@ -550,48 +474,17 @@ function App() {
           <span>Proxmark3 Web Client</span>
           <span>•</span>
           <span>
-            {connectionMode === 'wasm'
-              ? (wasmState.isLoading
-                ? 'Loading WASM...'
-                : wasmState.isReady
-                  ? (wasmState.isDeviceConnected ? 'WASM + Device Connected' : 'WASM Ready (Offline)')
-                  : 'WASM Error')
-              : (serialState.status === 'connected' ? 'Serial Connected' : 'Disconnected')
-            }
+            {wasmState.isLoading
+              ? 'Loading WASM...'
+              : wasmState.isReady
+                ? (wasmState.isDeviceConnected ? 'Device Connected' : 'WASM Ready (Offline)')
+                : 'WASM Error'}
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="mr-1">Mode:</span>
-          <Button
-            variant={connectionMode === 'serial' ? 'default' : 'outline'}
-            size="sm"
-            className="h-5 px-2 text-xs"
-            onClick={async () => {
-              if (connectionMode === 'wasm' && wasmState.isDeviceConnected) {
-                await wasmState.disconnectDevice();
-              }
-              setConnectionMode('serial');
-            }}
-          >
-            <Usb className="h-3 w-3 mr-1" />
-            Serial
-          </Button>
-          <Button
-            variant={connectionMode === 'wasm' ? 'default' : 'outline'}
-            size="sm"
-            className="h-5 px-2 text-xs"
-            onClick={async () => {
-              if (connectionMode === 'serial' && serialState.status === 'connected') {
-                await serialActions.disconnect();
-              }
-              setConnectionMode('wasm');
-            }}
-          >
-            <Cpu className="h-3 w-3 mr-1" />
-            WASM
-          </Button>
-          <span>| Commands: {commandHistory.length}</span>
-          <span>| Cache: {cachedAssets.length}</span>
+          <span>Commands: {commandHistory.length}</span>
+          <span>|</span>
+          <span>Cache: {cachedAssets.length}</span>
         </div>
       </div>
     </div>

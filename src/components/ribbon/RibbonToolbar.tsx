@@ -25,8 +25,9 @@ import {
   ListChecks,
   StopCircle,
 } from 'lucide-react';
-import type { ConnectionStatus } from '@/hooks/useWebSerial';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 import type { Theme } from '@/hooks/useTheme';
 import { CommandDeck } from '@/components/panels/CommandDeck';
 import { CheatSheetPanel } from '@/components/panels/CheatSheetPanel';
@@ -147,7 +148,6 @@ export function RibbonToolbar({
 }: RibbonToolbarProps) {
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
-  // Use canRunCommands for enabling command buttons (works for both Serial and WASM modes)
   const commandsEnabled = canRunCommands;
 
   return (
