@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -122,8 +123,13 @@ html, body, #root {
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family: "Space Grotesk", "SF Pro Display", "Segoe UI", sans-serif;
   font-feature-settings: "rlig" 1, "calt" 1;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+code, .font-mono, .xterm {
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
 }
 
 /* Terminal styles */
