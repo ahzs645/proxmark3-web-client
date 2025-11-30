@@ -21,7 +21,16 @@ import {
   Database,
   Search,
   HardDrive,
-  FileUp,
+  Wand2,
+  AlertTriangle,
+  Save,
+  Play,
+  Edit3,
+  Pencil,
+  Check,
+  X,
+  MoreVertical,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +42,7 @@ interface Block {
   data: string;
   kind: "manufacturer" | "data" | "trailer" | "page";
   label: string;
+  dirty?: boolean;
 }
 
 // PM3 JSON dump format
@@ -67,6 +77,8 @@ interface CardMemoryMapProps {
   initialData?: Block[];
   cachedDumps?: CachedDump[];
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
+  onDumpRename?: (id: string, newName: string) => void;
+  onDumpDelete?: (id: string) => void;
   activeDump?: CachedDump | null;
 }
 
@@ -176,6 +188,8 @@ export function CardMemoryMap({
   initialData,
   cachedDumps = [],
   onDumpLoad,
+  onDumpRename,
+  onDumpDelete,
   activeDump,
 }: CardMemoryMapProps) {
   const [blocks, setBlocks] = useState<Block[]>(
@@ -188,11 +202,20 @@ export function CardMemoryMap({
   );
   const [showKeys, setShowKeys] = useState(true);
   const [showEmptyBlocks, setShowEmptyBlocks] = useState(true);
-  const [editingBlock, setEditingBlock] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
   const [authKeyType, setAuthKeyType] = useState<"A" | "B">("A");
   const [searchFilter, setSearchFilter] = useState("");
+
+  // Trailer builder state
+  const [trailerKeyA, setTrailerKeyA] = useState("FFFFFFFFFFFF");
+  const [trailerKeyB, setTrailerKeyB] = useState("FFFFFFFFFFFF");
+  const [trailerAccess, setTrailerAccess] = useState("FF0780");
+  const [trailerGpb, setTrailerGpb] = useState("69");
+
+  // Rename state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [showCachePanel, setShowCachePanel] = useState(false);
 
   // Update blocks when activeDump changes
   useEffect(() => {
@@ -210,6 +233,29 @@ export function CardMemoryMap({
   const sectorKeys = useMemo(() => {
     return activeDump?.data?.SectorKeys || {};
   }, [activeDump]);
+
+  // Trailer preview
+  const trailerPreview = useMemo(() => {
+    const paddedA = trailerKeyA.padEnd(12, "F").slice(0, 12).toUpperCase();
+    const paddedB = trailerKeyB.padEnd(12, "F").slice(0, 12).toUpperCase();
+    const access = trailerAccess.padEnd(6, "0").slice(0, 6).toUpperCase();
+    const gpb = trailerGpb.padEnd(2, "0").slice(0, 2).toUpperCase();
+    return `${paddedA}${access}${gpb}${paddedB}`;
+  }, [trailerKeyA, trailerKeyB, trailerAccess, trailerGpb]);
+
+  const trailerPresets = [
+    { label: "Transport", keyA: "FFFFFFFFFFFF", keyB: "FFFFFFFFFFFF", access: "FF0780", gpb: "69" },
+    { label: "KeyB Protected", keyA: "FFFFFFFFFFFF", keyB: "FFFFFFFFFFFF", access: "7F0788", gpb: "69" },
+    { label: "Read-Only", keyA: "FFFFFFFFFFFF", keyB: "FFFFFFFFFFFF", access: "078F00", gpb: "69" },
+  ];
+
+  // Handle inline data change with dirty tracking
+  const handleDataChange = useCallback((blockIndex: number, value: string) => {
+    const sanitized = value.toUpperCase().replace(/[^A-F0-9]/gi, "").slice(0, 32);
+    setBlocks((prev) =>
+      prev.map((b) => (b.index === blockIndex ? { ...b, data: sanitized, dirty: true } : b))
+    );
+  }, []);
 
   // Handle JSON file upload
   const handleJsonUpload = useCallback(async (files: FileList | null) => {
@@ -295,22 +341,6 @@ export function CardMemoryMap({
   const handleAutopwn = useCallback(() => {
     onCommand(cardType === "classic-4k" ? "hf mf autopwn --4k" : "hf mf autopwn --1k");
   }, [onCommand, cardType]);
-
-  const startEditing = useCallback((block: Block) => {
-    setEditingBlock(block.index);
-    setEditValue(block.data.replace(/\s/g, ""));
-  }, []);
-
-  const saveEdit = useCallback(() => {
-    if (editingBlock === null) return;
-    setBlocks((prev) =>
-      prev.map((b) =>
-        b.index === editingBlock ? { ...b, data: editValue.toUpperCase() } : b
-      )
-    );
-    setEditingBlock(null);
-    setEditValue("");
-  }, [editingBlock, editValue]);
 
   const copyData = useCallback((data: string) => {
     navigator.clipboard.writeText(data.replace(/\s/g, ""));
@@ -415,7 +445,7 @@ export function CardMemoryMap({
             </div>
           )}
 
-          {/* Search and Cached Dumps */}
+          {/* Search and Cached Dumps Toggle */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
@@ -426,24 +456,153 @@ export function CardMemoryMap({
                 className="h-7 text-xs pl-7"
               />
             </div>
-            {cachedDumps.length > 0 && (
-              <div className="flex items-center gap-1">
-                <Database className="h-3 w-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground">Cached:</span>
-                {cachedDumps.slice(0, 3).map((d) => (
-                  <Button
-                    key={d.id}
-                    size="sm"
-                    variant={activeDump?.id === d.id ? "default" : "ghost"}
-                    onClick={() => onDumpLoad?.(d.data, d.name)}
-                    className="h-6 text-[10px] px-2"
-                  >
-                    {d.data.Card?.UID?.slice(0, 8) || d.name.slice(0, 12)}
-                  </Button>
-                ))}
-              </div>
-            )}
+            <Button
+              size="sm"
+              variant={showCachePanel ? "default" : "outline"}
+              onClick={() => setShowCachePanel(!showCachePanel)}
+              className="h-7 text-xs gap-1"
+            >
+              <Database className="h-3 w-3" />
+              Cached Cards
+              <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">
+                {cachedDumps.length}
+              </Badge>
+            </Button>
           </div>
+
+          {/* Expanded Cache Panel */}
+          {showCachePanel && (
+            <div className="border rounded-lg p-3 bg-secondary/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Saved Card Dumps</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowCachePanel(false)}
+                  className="h-5 w-5 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {cachedDumps.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4 text-center">
+                  No cached cards yet. Import a JSON dump to get started.
+                </p>
+              ) : (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {cachedDumps.map((dump) => (
+                    <div
+                      key={dump.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border transition-colors",
+                        activeDump?.id === dump.id
+                          ? "bg-primary/10 border-primary/30"
+                          : "bg-background hover:bg-secondary/50 border-transparent"
+                      )}
+                    >
+                      {/* Card Icon */}
+                      <CreditCard className="h-4 w-4 shrink-0 text-primary" />
+
+                      {/* Name / Rename */}
+                      {renamingId === dump.id ? (
+                        <div className="flex-1 flex items-center gap-1">
+                          <Input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            className="h-6 text-xs flex-1"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                onDumpRename?.(dump.id, renameValue);
+                                setRenamingId(null);
+                              }
+                              if (e.key === "Escape") {
+                                setRenamingId(null);
+                              }
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              onDumpRename?.(dump.id, renameValue);
+                              setRenamingId(null);
+                            }}
+                            className="h-5 w-5 p-0"
+                          >
+                            <Check className="h-3 w-3 text-green-500" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRenamingId(null)}
+                            className="h-5 w-5 p-0"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Card Info */}
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => onDumpLoad?.(dump.data, dump.name)}
+                          >
+                            <div className="text-xs font-medium truncate">
+                              {dump.name}
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                              {dump.data.Card?.UID && (
+                                <span className="font-mono">{dump.data.Card.UID}</span>
+                              )}
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {new Date(dump.cachedAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setRenamingId(dump.id);
+                                setRenameValue(dump.name);
+                              }}
+                              className="h-6 w-6 p-0"
+                              title="Rename"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => navigator.clipboard.writeText(dump.data.Card?.UID || "")}
+                              className="h-6 w-6 p-0"
+                              title="Copy UID"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onDumpDelete?.(dump.id)}
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardHeader>
 
         {/* Show welcome screen when no dump is loaded */}
@@ -652,16 +811,10 @@ export function CardMemoryMap({
                   {expandedSectors.has(sectorNum) &&
                     sectorBlocks.map((block) => {
                       const isSelected = selectedBlock === block.index;
-                      const isEditing = editingBlock === block.index;
                       const isTrailer = block.kind === "trailer";
                       const isManufacturer = block.kind === "manufacturer";
                       // Check if block is empty (all zeros)
                       const isEmpty = block.data.replace(/\s/g, "") === "00000000000000000000000000000000";
-                      const displayData = isTrailer && !showKeys
-                        ? block.data.replace(/[A-Fa-f0-9]{12}/g, (m, offset) =>
-                            offset < 12 || offset >= 20 ? "????????????" : m
-                          )
-                        : block.data;
 
                       return (
                         <tr
@@ -703,29 +856,16 @@ export function CardMemoryMap({
                             </div>
                           </td>
                           <td className="px-3 py-1.5 font-mono">
-                            {isEditing ? (
-                              <Input
-                                value={editValue}
-                                onChange={(e) =>
-                                  setEditValue(e.target.value.toUpperCase().replace(/[^A-F0-9]/gi, ""))
-                                }
-                                className="h-6 text-xs font-mono w-full"
-                                maxLength={32}
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") saveEdit();
-                                  if (e.key === "Escape") {
-                                    setEditingBlock(null);
-                                    setEditValue("");
-                                  }
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <span className="text-[11px] tracking-wider">
-                                {displayData.match(/.{1,2}/g)?.join(" ") || displayData}
-                              </span>
-                            )}
+                            <Input
+                              value={block.data}
+                              onChange={(e) => handleDataChange(block.index, e.target.value)}
+                              className={cn(
+                                "h-7 text-[11px] font-mono tracking-wider",
+                                block.dirty && "border-amber-500/50 bg-amber-500/5"
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                              maxLength={32}
+                            />
                           </td>
                           <td className="px-3 py-1.5 font-mono text-muted-foreground text-[11px]">
                             {hexToAscii(block.data)}
@@ -741,24 +881,29 @@ export function CardMemoryMap({
                                 className="h-6 w-6 p-0"
                                 onClick={() => handleRead(block.index)}
                                 disabled={disabled}
-                                title="Read"
+                                title="Read from card"
                               >
                                 <RefreshCw className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
+                                variant={block.dirty ? "default" : "ghost"}
+                                className={cn("h-6 w-6 p-0", block.dirty && "bg-amber-500 hover:bg-amber-600")}
+                                onClick={() => handleWrite(block.index, block.data)}
+                                disabled={disabled || block.data.replace(/\s/g, "").length !== 32}
+                                title="Write to card"
+                              >
+                                <Upload className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="ghost"
                                 className="h-6 w-6 p-0"
-                                onClick={() =>
-                                  isEditing ? saveEdit() : startEditing(block)
-                                }
-                                title={isEditing ? "Save" : "Edit"}
+                                onClick={() => onCommand(`hf mf eget ${block.index}`)}
+                                disabled={disabled}
+                                title="Get from emulator"
                               >
-                                {isEditing ? (
-                                  <Upload className="h-3 w-3" />
-                                ) : (
-                                  <Key className="h-3 w-3" />
-                                )}
+                                <Play className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
@@ -829,32 +974,144 @@ export function CardMemoryMap({
                 </div>
               </div>
 
-              {/* Trailer Breakdown */}
+              {/* Trailer Builder */}
               {trailerInfo && (
-                <div className="space-y-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                <div className="space-y-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
                   <div className="flex items-center gap-2 text-xs text-amber-400 font-medium">
-                    <Key className="h-3 w-3" />
-                    Sector Trailer
+                    <Wand2 className="h-3 w-3" />
+                    Sector Trailer Builder
                   </div>
+
+                  {/* Current Values */}
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Key A</span>
+                      <span className="text-muted-foreground">Current Key A</span>
                       <span className="font-mono text-amber-400">
                         {showKeys ? trailerInfo.keyA : "????????????"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Access Bits</span>
-                      <span className="font-mono text-purple-400">
-                        {trailerInfo.accessBits}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Key B</span>
+                      <span className="text-muted-foreground">Current Key B</span>
                       <span className="font-mono text-amber-400">
                         {showKeys ? trailerInfo.keyB : "????????????"}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Builder Inputs */}
+                  <div className="space-y-2 pt-2 border-t border-amber-500/20">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">New Key A</label>
+                        <Input
+                          value={trailerKeyA}
+                          onChange={(e) => setTrailerKeyA(e.target.value.toUpperCase().replace(/[^A-F0-9]/gi, ""))}
+                          className="h-7 text-xs font-mono"
+                          maxLength={12}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">New Key B</label>
+                        <Input
+                          value={trailerKeyB}
+                          onChange={(e) => setTrailerKeyB(e.target.value.toUpperCase().replace(/[^A-F0-9]/gi, ""))}
+                          className="h-7 text-xs font-mono"
+                          maxLength={12}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">Access Bits</label>
+                        <Input
+                          value={trailerAccess}
+                          onChange={(e) => setTrailerAccess(e.target.value.toUpperCase().replace(/[^A-F0-9]/gi, ""))}
+                          className="h-7 text-xs font-mono"
+                          maxLength={6}
+                          placeholder="FF0780"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground">GPB</label>
+                        <Input
+                          value={trailerGpb}
+                          onChange={(e) => setTrailerGpb(e.target.value.toUpperCase().replace(/[^A-F0-9]/gi, ""))}
+                          className="h-7 text-xs font-mono"
+                          maxLength={2}
+                          placeholder="69"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground">Preview</span>
+                    <div className="flex items-center gap-2 p-2 bg-background/50 rounded border border-amber-500/20">
+                      <code className="text-[10px] font-mono flex-1 text-amber-400 break-all">
+                        {trailerPreview.match(/.{1,2}/g)?.join(" ")}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyData(trailerPreview)}
+                        className="h-5 w-5 p-0"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Presets */}
+                  <div className="flex flex-wrap gap-1">
+                    {trailerPresets.map((preset) => (
+                      <Button
+                        key={preset.label}
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setTrailerKeyA(preset.keyA);
+                          setTrailerKeyB(preset.keyB);
+                          setTrailerAccess(preset.access);
+                          setTrailerGpb(preset.gpb);
+                        }}
+                        className="h-5 text-[9px] px-1.5"
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* Apply Button */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1 h-7 text-xs bg-amber-500 hover:bg-amber-600"
+                      onClick={() => {
+                        handleDataChange(selectedBlockData.index, trailerPreview);
+                      }}
+                    >
+                      <Edit3 className="h-3 w-3 mr-1" />
+                      Apply
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-7 text-xs"
+                      onClick={() => handleWrite(selectedBlockData.index, trailerPreview)}
+                      disabled={disabled}
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      Write
+                    </Button>
+                  </div>
+
+                  {/* Warning */}
+                  <div className="flex items-start gap-2 p-2 bg-red-500/10 rounded text-[9px] text-red-400">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span>
+                      Writing incorrect access bits can permanently lock the sector!
+                    </span>
                   </div>
                 </div>
               )}

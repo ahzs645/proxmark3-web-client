@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Select } from '@/components/ui/select';
 import {
   Usb,
   Radio,
@@ -133,6 +135,114 @@ function CompactGroup({ title, children }: { title: string; children: React.Reac
   );
 }
 
+// LF Card Type configurations
+const LF_CARD_TYPES = [
+  { value: 'em4x', label: 'EM4x' },
+  { value: 'hid', label: 'HID' },
+  { value: 't55xx', label: 'T55xx' },
+  { value: 'indala', label: 'Indala' },
+  { value: 'wiegand', label: 'Wiegand' },
+];
+
+interface LFCardOperation {
+  icon: string;
+  label: string;
+  command: string;
+  variant?: 'default' | 'outline';
+}
+
+const LF_CARD_OPERATIONS: Record<string, LFCardOperation[]> = {
+  em4x: [
+    { icon: 'radio', label: 'Read', command: 'lf em 410x reader' },
+    { icon: 'copy', label: 'Clone', command: 'lf em 410x clone' },
+    { icon: 'play', label: 'Sim', command: 'lf em 410x sim' },
+  ],
+  hid: [
+    { icon: 'creditcard', label: 'Read', command: 'lf hid read' },
+    { icon: 'copy', label: 'Clone', command: 'lf hid clone' },
+    { icon: 'play', label: 'Sim', command: 'lf hid sim' },
+    { icon: 'zap', label: 'Brute', command: 'lf hid brute -w H10301 -f 101' },
+  ],
+  t55xx: [
+    { icon: 'search', label: 'Detect', command: 'lf t55xx detect' },
+    { icon: 'download', label: 'Dump', command: 'lf t55xx dump' },
+    { icon: 'edit', label: 'Write', command: 'lf t55xx write' },
+    { icon: 'square', label: 'Wipe', command: 'lf t55xx wipe' },
+  ],
+  indala: [
+    { icon: 'radio', label: 'Read', command: 'lf indala read' },
+    { icon: 'copy', label: 'Clone', command: 'lf indala clone' },
+    { icon: 'play', label: 'Sim', command: 'lf indala sim' },
+  ],
+  wiegand: [
+    { icon: 'book', label: 'List', command: 'wiegand list' },
+    { icon: 'download', label: 'Encode', command: 'wiegand encode --fc 101 --cn 1337' },
+    { icon: 'upload', label: 'Decode', command: 'wiegand decode --raw 2006f623ae' },
+  ],
+};
+
+// HF Card Type configurations
+const HF_CARD_TYPES = [
+  { value: 'mfclassic', label: 'MIFARE Classic' },
+  { value: 'mfultralight', label: 'MIFARE Ultralight' },
+  { value: 'iclass', label: 'iClass' },
+  { value: 'desfire', label: 'DESFire' },
+  { value: 'attacks', label: 'Attacks' },
+];
+
+const HF_CARD_OPERATIONS: Record<string, LFCardOperation[]> = {
+  mfclassic: [
+    { icon: 'creditcard', label: 'Info', command: 'hf mf info' },
+    { icon: 'key', label: 'Autopwn', command: 'hf mf autopwn', variant: 'default' },
+    { icon: 'download', label: 'Dump', command: 'hf mf dump' },
+    { icon: 'upload', label: 'Restore', command: 'hf mf restore' },
+    { icon: 'play', label: 'Sim', command: 'hf mf sim' },
+  ],
+  mfultralight: [
+    { icon: 'creditcard', label: 'Info', command: 'hf mfu info' },
+    { icon: 'download', label: 'Dump', command: 'hf mfu dump' },
+    { icon: 'play', label: 'Sim', command: 'hf mfu sim -t 7' },
+  ],
+  iclass: [
+    { icon: 'shield', label: 'Info', command: 'hf iclass info' },
+    { icon: 'download', label: 'Dump', command: 'hf iclass dump' },
+    { icon: 'key', label: 'Keys', command: 'hf iclass managekeys -p' },
+    { icon: 'play', label: 'Sim', command: 'hf iclass sim -t 3' },
+  ],
+  desfire: [
+    { icon: 'creditcard', label: 'Info', command: 'hf mfdes info' },
+    { icon: 'book', label: 'List Apps', command: 'hf mfdes lsapp' },
+    { icon: 'key', label: 'Auth', command: 'hf mfdes auth' },
+  ],
+  attacks: [
+    { icon: 'zap', label: 'Hardnested', command: 'hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w' },
+    { icon: 'key', label: 'Nested', command: 'hf mf nested 1 0 a FFFFFFFFFFFF' },
+    { icon: 'shield', label: 'Darkside', command: 'hf mf darkside' },
+    { icon: 'listchecks', label: 'Chk Keys', command: 'hf mf chk --1k -f mfc_default_keys' },
+  ],
+};
+
+// Icon mapper for dynamic rendering
+function getIcon(iconName: string, className: string = 'h-3 w-3') {
+  const icons: Record<string, React.ReactNode> = {
+    radio: <Radio className={className} />,
+    copy: <Copy className={className} />,
+    play: <Play className={className} />,
+    creditcard: <CreditCard className={className} />,
+    zap: <Zap className={className} />,
+    search: <Search className={className} />,
+    download: <Download className={className} />,
+    upload: <Upload className={className} />,
+    edit: <Edit3 className={className} />,
+    square: <Square className={className} />,
+    book: <Book className={className} />,
+    key: <Key className={className} />,
+    shield: <Shield className={className} />,
+    listchecks: <ListChecks className={className} />,
+  };
+  return icons[iconName] || <Radio className={className} />;
+}
+
 export function RibbonToolbar({
   connectionStatus,
   onConnect,
@@ -157,6 +267,10 @@ export function RibbonToolbar({
   const isConnecting = connectionStatus === 'connecting';
   const commandsEnabled = canRunCommands;
 
+  // Card type selection state
+  const [selectedLFCardType, setSelectedLFCardType] = useState('em4x');
+  const [selectedHFCardType, setSelectedHFCardType] = useState('mfclassic');
+
   return (
     <div className="border-b border-border bg-card sticky top-0 z-50">
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
@@ -171,15 +285,11 @@ export function RibbonToolbar({
             <Separator orientation="vertical" className="h-5 mx-1" />
             <TabsTrigger value="memory" className="text-xs gap-1">
               <Layers className="h-3 w-3" />
-              Memory
-            </TabsTrigger>
-            <TabsTrigger value="editor" className="text-xs gap-1">
-              <Edit3 className="h-3 w-3" />
-              Editor
+              Memory Editor
             </TabsTrigger>
             <TabsTrigger value="hex" className="text-xs gap-1">
               <FileCode2 className="h-3 w-3" />
-              Hex
+              Hex Viewer
             </TabsTrigger>
           </TabsList>
 
@@ -250,9 +360,10 @@ export function RibbonToolbar({
           </div>
         </TabsContent>
 
-        {/* HF Tab - Compact Layout */}
+        {/* HF Tab - Card Type Dropdown */}
         <TabsContent value="hf" className="m-0 p-2 ribbon-tab-content">
-          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            {/* Search - Always visible (can detect card type) */}
             <CompactGroup title="Search">
               <MiniButton icon={<Search className="h-3 w-3" />} label="Search" onClick={() => onCommand('hf search')} disabled={!commandsEnabled} variant="default" />
               <MiniButton icon={<Radio className="h-3 w-3" />} label="14A Info" onClick={() => onCommand('hf 14a info')} disabled={!commandsEnabled} />
@@ -261,53 +372,41 @@ export function RibbonToolbar({
 
             <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <CompactGroup title="MIFARE Classic">
-              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mf info')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Key className="h-3 w-3" />} label="Autopwn" onClick={() => onCommand('hf mf autopwn')} disabled={!commandsEnabled} variant="default" />
-              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf mf dump')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Upload className="h-3 w-3" />} label="Restore" onClick={() => onCommand('hf mf restore')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf mf sim')} disabled={!commandsEnabled} />
-            </CompactGroup>
+            {/* Card Type Selector */}
+            <div className="flex flex-col gap-1 shrink-0">
+              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+                Card Type
+              </div>
+              <Select
+                value={selectedHFCardType}
+                onValueChange={setSelectedHFCardType}
+                options={HF_CARD_TYPES}
+                className="w-40"
+              />
+            </div>
 
             <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <CompactGroup title="Attacks">
-              <MiniButton icon={<Zap className="h-3 w-3" />} label="Hardnested" onClick={() => onCommand('hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Key className="h-3 w-3" />} label="Nested" onClick={() => onCommand('hf mf nested 1 0 a FFFFFFFFFFFF')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Shield className="h-3 w-3" />} label="Darkside" onClick={() => onCommand('hf mf darkside')} disabled={!commandsEnabled} />
-              <MiniButton icon={<ListChecks className="h-3 w-3" />} label="Chk Keys" onClick={() => onCommand('hf mf chk --1k -f mfc_default_keys')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="Ultralight">
-              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mfu info')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf mfu dump')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf mfu sim -t 7')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="iClass">
-              <MiniButton icon={<Shield className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf iclass info')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf iclass dump')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Key className="h-3 w-3" />} label="Keys" onClick={() => onCommand('hf iclass managekeys -p')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('hf iclass sim -t 3')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="DESFire">
-              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mfdes info')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Book className="h-3 w-3" />} label="List Apps" onClick={() => onCommand('hf mfdes lsapp')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Key className="h-3 w-3" />} label="Auth" onClick={() => onCommand('hf mfdes auth')} disabled={!commandsEnabled} />
+            {/* Dynamic Operations based on selected card type */}
+            <CompactGroup title={HF_CARD_TYPES.find(c => c.value === selectedHFCardType)?.label || 'Operations'}>
+              {HF_CARD_OPERATIONS[selectedHFCardType]?.map((op) => (
+                <MiniButton
+                  key={op.label}
+                  icon={getIcon(op.icon)}
+                  label={op.label}
+                  onClick={() => onCommand(op.command)}
+                  disabled={!commandsEnabled}
+                  variant={op.variant || 'outline'}
+                />
+              ))}
             </CompactGroup>
           </div>
         </TabsContent>
 
-        {/* LF Tab - Compact Layout */}
+        {/* LF Tab - Card Type Dropdown */}
         <TabsContent value="lf" className="m-0 p-2 ribbon-tab-content">
-          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            {/* Search - Always visible (can detect card type) */}
             <CompactGroup title="Search">
               <MiniButton icon={<Search className="h-3 w-3" />} label="Search" onClick={() => onCommand('lf search')} disabled={!commandsEnabled} variant="default" />
               <MiniButton icon={<Wifi className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf read')} disabled={!commandsEnabled} />
@@ -316,44 +415,33 @@ export function RibbonToolbar({
 
             <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <CompactGroup title="EM4x">
-              <MiniButton icon={<Radio className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf em 410x reader')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf em 410x clone')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf em 410x sim')} disabled={!commandsEnabled} />
-            </CompactGroup>
+            {/* Card Type Selector */}
+            <div className="flex flex-col gap-1 shrink-0">
+              <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+                Card Type
+              </div>
+              <Select
+                value={selectedLFCardType}
+                onValueChange={setSelectedLFCardType}
+                options={LF_CARD_TYPES}
+                className="w-32"
+              />
+            </div>
 
             <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <CompactGroup title="HID">
-              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf hid read')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf hid clone')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf hid sim')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Zap className="h-3 w-3" />} label="Brute" onClick={() => onCommand('lf hid brute -w H10301 -f 101')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="T55xx">
-              <MiniButton icon={<Search className="h-3 w-3" />} label="Detect" onClick={() => onCommand('lf t55xx detect')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('lf t55xx dump')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Edit3 className="h-3 w-3" />} label="Write" onClick={() => onCommand('lf t55xx write')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Square className="h-3 w-3" />} label="Wipe" onClick={() => onCommand('lf t55xx wipe')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="Indala">
-              <MiniButton icon={<Radio className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf indala read')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf indala clone')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Play className="h-3 w-3" />} label="Sim" onClick={() => onCommand('lf indala sim')} disabled={!commandsEnabled} />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="Wiegand">
-              <MiniButton icon={<Book className="h-3 w-3" />} label="List" onClick={() => onCommand('wiegand list')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Download className="h-3 w-3" />} label="Encode" onClick={() => onCommand('wiegand encode --fc 101 --cn 1337')} disabled={!commandsEnabled} />
-              <MiniButton icon={<Upload className="h-3 w-3" />} label="Decode" onClick={() => onCommand('wiegand decode --raw 2006f623ae')} disabled={!commandsEnabled} />
+            {/* Dynamic Operations based on selected card type */}
+            <CompactGroup title={LF_CARD_TYPES.find(c => c.value === selectedLFCardType)?.label || 'Operations'}>
+              {LF_CARD_OPERATIONS[selectedLFCardType]?.map((op) => (
+                <MiniButton
+                  key={op.label}
+                  icon={getIcon(op.icon)}
+                  label={op.label}
+                  onClick={() => onCommand(op.command)}
+                  disabled={!commandsEnabled}
+                  variant={op.variant || 'outline'}
+                />
+              ))}
             </CompactGroup>
           </div>
         </TabsContent>
@@ -509,7 +597,7 @@ export function RibbonToolbar({
           </div>
         </TabsContent>
 
-        {/* Memory Tab */}
+        {/* Memory Editor Tab */}
         <TabsContent value="memory" className="m-0 p-2 ribbon-tab-content">
           <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
             <CompactGroup title="Import">
@@ -571,7 +659,7 @@ export function RibbonToolbar({
 
             <Separator orientation="vertical" className="h-14 shrink-0" />
 
-            <CompactGroup title="Card Actions">
+            <CompactGroup title="Card Operations">
               <MiniButton
                 icon={<Key className="h-3 w-3" />}
                 label="Autopwn"
@@ -590,76 +678,6 @@ export function RibbonToolbar({
                 label="Restore"
                 onClick={() => onCommand('hf mf restore')}
                 disabled={!commandsEnabled}
-              />
-              <MiniButton
-                icon={<Play className="h-3 w-3" />}
-                label="Sim"
-                onClick={() => onCommand('hf mf sim --1k')}
-                disabled={!commandsEnabled}
-              />
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="Cache">
-              <MiniButton
-                icon={<RefreshCw className={cacheSyncing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />}
-                label="Sync"
-                onClick={onCacheSync}
-                disabled={!commandsEnabled || cacheSyncing}
-              />
-              <Badge variant="secondary" className="h-7 px-2 text-xs">
-                {cacheItems.length} files
-              </Badge>
-            </CompactGroup>
-          </div>
-        </TabsContent>
-
-        {/* Editor Tab */}
-        <TabsContent value="editor" className="m-0 p-2 ribbon-tab-content">
-          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
-            <CompactGroup title="Import">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
-              >
-                <Upload className="h-3 w-3" />
-                Files
-                <input
-                  type="file"
-                  accept=".bin,.dump,.eml,.dic,.json,.key"
-                  multiple
-                  onChange={(e) => {
-                    onCacheUpload(e.target.files);
-                    e.target.value = '';
-                  }}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-              </Button>
-            </CompactGroup>
-
-            <Separator orientation="vertical" className="h-14 shrink-0" />
-
-            <CompactGroup title="Block Operations">
-              <MiniButton
-                icon={<Download className="h-3 w-3" />}
-                label="Read Block"
-                onClick={() => onCommand('hf mf rdbl 0 a FFFFFFFFFFFF')}
-                disabled={!commandsEnabled}
-              />
-              <MiniButton
-                icon={<Upload className="h-3 w-3" />}
-                label="Write Block"
-                onClick={() => onCommand('hf mf wrbl')}
-                disabled={!commandsEnabled}
-              />
-              <MiniButton
-                icon={<Key className="h-3 w-3" />}
-                label="Autopwn"
-                onClick={() => onCommand('hf mf autopwn --1k')}
-                disabled={!commandsEnabled}
-                variant="default"
               />
             </CompactGroup>
 
@@ -680,10 +698,24 @@ export function RibbonToolbar({
               />
               <MiniButton
                 icon={<Play className="h-3 w-3" />}
-                label="Sim"
+                label="Simulate"
                 onClick={() => onCommand('hf mf sim --1k')}
                 disabled={!commandsEnabled}
               />
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Cache">
+              <MiniButton
+                icon={<RefreshCw className={cacheSyncing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />}
+                label="Sync"
+                onClick={onCacheSync}
+                disabled={!commandsEnabled || cacheSyncing}
+              />
+              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                {cacheItems.length} files
+              </Badge>
             </CompactGroup>
           </div>
         </TabsContent>

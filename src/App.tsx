@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyCachePanel';
-import { MifareEditorPanel } from '@/components/panels/MifareEditorPanel';
 import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
 import { CardMemoryMap, type PM3DumpJson, type CachedDump } from '@/components/panels/CardMemoryMap';
 import { Activity, Send, Sparkles, Trash2 } from 'lucide-react';
@@ -281,6 +280,26 @@ function App() {
     }
   }, [cachedDumps]);
 
+  // Handle renaming a cached dump
+  const handleDumpRename = useCallback((id: string, newName: string) => {
+    setCachedDumps(prev => prev.map(d =>
+      d.id === id ? { ...d, name: newName } : d
+    ));
+    terminalRef.current?.writeln(`\x1b[32mRenamed dump to: ${newName}\x1b[0m`);
+  }, []);
+
+  // Handle deleting a cached dump
+  const handleDumpDelete = useCallback((id: string) => {
+    const dump = cachedDumps.find(d => d.id === id);
+    setCachedDumps(prev => prev.filter(d => d.id !== id));
+    if (activeDumpId === id) {
+      setActiveDumpId(null);
+    }
+    if (dump) {
+      terminalRef.current?.writeln(`\x1b[33mDeleted dump: ${dump.name}\x1b[0m`);
+    }
+  }, [cachedDumps, activeDumpId]);
+
   const handleJsonUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -425,20 +444,10 @@ function App() {
             disabled={!canRunCommands}
             cachedDumps={cachedDumps}
             onDumpLoad={handleDumpLoad}
+            onDumpRename={handleDumpRename}
+            onDumpDelete={handleDumpDelete}
             activeDump={activeDump}
           />
-        </div>
-      ) : activeTab === 'editor' ? (
-        <div className="flex-1 p-4 overflow-hidden">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full">
-            <MifareEditorPanel
-              onCommand={handleCommand}
-              cacheItems={cachedAssets}
-              disabled={!canRunCommands}
-              cachePathPrefix={CACHE_PATH_PREFIX}
-            />
-            <HexAsciiViewer dumps={cachedAssets} />
-          </div>
         </div>
       ) : activeTab === 'hex' ? (
         <div className="flex-1 p-4 overflow-hidden">
