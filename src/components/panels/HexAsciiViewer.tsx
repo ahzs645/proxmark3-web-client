@@ -187,7 +187,7 @@ export function HexAsciiViewer({ dumps }: HexAsciiViewerProps) {
                   }}
                   className="h-6 text-[10px]"
                 >
-                  {d.name}
+                  {d.relativePath || d.name}
                 </Button>
               ))}
             </div>

@@ -8,17 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyCachePanel';
 import { MifareEditorPanel } from '@/components/panels/MifareEditorPanel';
 import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
-import { CardMemoryMap } from '@/components/panels/CardMemoryMap';
-import { Activity, Send, Sparkles, Trash2, CreditCard, FileCode2, Edit3 } from 'lucide-react';
+import { CardMemoryMap, type PM3DumpJson, type CachedDump } from '@/components/panels/CardMemoryMap';
+import { Activity, Send, Sparkles, Trash2 } from 'lucide-react';
 
 type CachedAssetWithData = CachedAsset & { base64: string };
 
 const CACHE_STORAGE_KEY = 'pm3-cache';
 const CACHE_PATH_PREFIX = '/pm3-cache';
+const DUMP_CACHE_KEY = 'pm3-dumps';
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
@@ -26,6 +26,24 @@ function App() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>('connect');
   const [quickCommand, setQuickCommand] = useState('hf search');
+
+  // Cached dumps with localStorage persistence
+  const [cachedDumps, setCachedDumps] = useState<CachedDump[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(DUMP_CACHE_KEY);
+      return raw ? JSON.parse(raw) as CachedDump[] : [];
+    } catch (e) {
+      console.error('Failed to parse cached dumps', e);
+      return [];
+    }
+  });
+  const [activeDumpId, setActiveDumpId] = useState<string | null>(null);
+
+  // Get the active dump from cached dumps
+  const activeDump = useMemo(() => {
+    return cachedDumps.find(d => d.id === activeDumpId) || null;
+  }, [cachedDumps, activeDumpId]);
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -102,8 +120,8 @@ function App() {
     }
   }, []);
 
-  const detectKind = useCallback((file: File): CachedAssetKind => {
-    const ext = file.name.toLowerCase();
+  const detectKind = useCallback((fileName: string): CachedAssetKind => {
+    const ext = fileName.toLowerCase();
     if (ext.endsWith('.dic') || ext.includes('key')) return 'keys';
     if (ext.endsWith('.bin') || ext.endsWith('.dump') || ext.endsWith('.eml')) return 'dump';
     if (ext.endsWith('.lua')) return 'script';
@@ -125,6 +143,22 @@ function App() {
     reader.readAsArrayBuffer(file);
   }), []);
 
+  const sanitizeRelativePath = useCallback((file: File): string => {
+    const withPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    const parts = withPath.split(/[\\/]/).filter(Boolean);
+    if (parts.length > 1) {
+      parts.shift(); // drop the top-level folder (e.g., "Card Export")
+    }
+    const withoutRoot = parts.join('/') || file.name;
+    // Avoid spaces/special chars that could break pm3 CLI parsing
+    const safe = withoutRoot.replace(/\s+/g, "_").replace(/[^A-Za-z0-9._/-]/g, "_");
+    return safe;
+  }, []);
+
+  const cachePathFor = useCallback((asset: CachedAsset) => {
+    return `${CACHE_PATH_PREFIX}/${asset.relativePath || asset.name}`;
+  }, []);
+
   const syncCacheToFS = useCallback(() => {
     if (!cachedAssets.length) return false;
     if (!wasmState.isReady) {
@@ -141,8 +175,38 @@ function App() {
     setIsSyncingCache(true);
     try {
       const pathInfo = FS.analyzePath ? FS.analyzePath(CACHE_PATH_PREFIX) : { exists: false };
-      if (!pathInfo?.exists && FS.mkdir) {
-        FS.mkdir(CACHE_PATH_PREFIX);
+      if (!pathInfo?.exists) {
+        if (FS.mkdirTree) {
+          FS.mkdirTree(CACHE_PATH_PREFIX);
+        } else if (FS.mkdir) {
+          FS.mkdir(CACHE_PATH_PREFIX);
+        }
+      }
+
+      const ensureDir = (targetPath: string) => {
+        const dirPath = targetPath.slice(0, targetPath.lastIndexOf('/'));
+        if (!dirPath || dirPath === CACHE_PATH_PREFIX) return;
+        const exists = FS.analyzePath ? FS.analyzePath(dirPath)?.exists : false;
+        if (exists) return;
+        if (FS.mkdirTree) {
+          FS.mkdirTree(dirPath);
+          return;
+        }
+        if (!FS.mkdir) return;
+        const parts = dirPath.split('/').filter(Boolean);
+        let current = '';
+        for (const part of parts) {
+          current += `/${part}`;
+          const currentPath = current;
+          const currentExists = FS.analyzePath ? FS.analyzePath(currentPath)?.exists : false;
+          if (!currentExists) {
+            try {
+              FS.mkdir(currentPath);
+            } catch {
+              // ignore
+            }
+          }
+        }
       }
 
       for (const asset of cachedAssets) {
@@ -152,7 +216,9 @@ function App() {
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
-        FS.writeFile(`${CACHE_PATH_PREFIX}/${asset.name}`, bytes, { flags: 'w+' });
+        const targetPath = cachePathFor(asset);
+        ensureDir(targetPath);
+        FS.writeFile(targetPath, bytes, { flags: 'w+' });
       }
       terminalRef.current?.writeln(`\x1b[32mSynced ${cachedAssets.length} cached files to ${CACHE_PATH_PREFIX}/\x1b[0m`);
       return true;
@@ -163,7 +229,7 @@ function App() {
     } finally {
       setIsSyncingCache(false);
     }
-  }, [cachedAssets, wasmState.isReady]);
+  }, [cachePathFor, cachedAssets, wasmState.isReady]);
 
   const handleCacheUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -171,10 +237,13 @@ function App() {
 
     for (const file of Array.from(files)) {
       const base64 = await fileToBase64(file);
+      const relativePath = sanitizeRelativePath(file);
+      const detectionName = relativePath.split('/').pop() || file.name;
       uploads.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${file.name}`,
         name: file.name,
-        kind: detectKind(file),
+        relativePath,
+        kind: detectKind(detectionName),
         size: file.size,
         base64,
         updatedAt: Date.now(),
@@ -183,11 +252,53 @@ function App() {
 
     setCachedAssets(prev => [...uploads, ...prev].slice(0, 30));
     setTimeout(syncCacheToFS, 50);
-  }, [detectKind, fileToBase64, syncCacheToFS]);
+  }, [detectKind, fileToBase64, sanitizeRelativePath, syncCacheToFS]);
 
   const handleCacheDelete = useCallback((id: string) => {
     setCachedAssets(prev => prev.filter(item => item.id !== id));
   }, []);
+
+  // Handle loading a dump (from file or cache)
+  const handleDumpLoad = useCallback((dump: PM3DumpJson, name: string) => {
+    // Check if already cached
+    const existing = cachedDumps.find(d => d.data.Card?.UID === dump.Card?.UID);
+    if (existing) {
+      setActiveDumpId(existing.id);
+    } else {
+      const newDump: CachedDump = {
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${name}`,
+        name,
+        data: dump,
+        cachedAt: Date.now(),
+      };
+      setCachedDumps(prev => [newDump, ...prev].slice(0, 10)); // Keep last 10
+      setActiveDumpId(newDump.id);
+    }
+    setActiveTab('memory'); // Switch to Memory tab
+    terminalRef.current?.writeln(`\x1b[32mLoaded dump: ${name}\x1b[0m`);
+    if (dump.Card?.UID) {
+      terminalRef.current?.writeln(`\x1b[36mCard UID: ${dump.Card.UID}\x1b[0m`);
+    }
+  }, [cachedDumps]);
+
+  const handleJsonUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    for (const file of Array.from(files)) {
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        try {
+          const parsed = JSON.parse(text) as PM3DumpJson;
+          if (parsed.blocks || parsed.Card) {
+            handleDumpLoad(parsed, file.name);
+            break;
+          }
+        } catch (e) {
+          terminalRef.current?.writeln(`\x1b[31mFailed to parse JSON: ${file.name}\x1b[0m`);
+        }
+      }
+    }
+  }, [handleDumpLoad]);
 
   // Handle command execution
   const handleCommand = useCallback((cmd: string) => {
@@ -211,18 +322,25 @@ function App() {
 
   const handleCacheUse = useCallback((asset: CachedAsset, template: string) => {
     const synced = syncCacheToFS();
-    const cmd = template.replace('{{path}}', `${CACHE_PATH_PREFIX}/${asset.name}`);
+    const cmd = template.replace('{{path}}', cachePathFor(asset));
     if (synced === false) {
       terminalRef.current?.writeln('\x1b[33mCache not synced yet; sending command anyway.\x1b[0m');
     }
     handleCommand(cmd);
-  }, [handleCommand, syncCacheToFS]);
+  }, [cachePathFor, handleCommand, syncCacheToFS]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(cachedAssets));
     }
   }, [cachedAssets]);
+
+  // Persist cached dumps to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DUMP_CACHE_KEY, JSON.stringify(cachedDumps));
+    }
+  }, [cachedDumps]);
 
   useEffect(() => {
     if (wasmState.isReady && cachedAssets.length) {
@@ -296,53 +414,37 @@ function App() {
         cachePathPrefix={CACHE_PATH_PREFIX}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onJsonUpload={handleJsonUpload}
       />
 
       {/* Main Content Area */}
-      {activeTab === 'workbench' ? (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Tabs defaultValue="memory" className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-4 pt-3 border-b bg-card/50">
-              <TabsList className="h-9">
-                <TabsTrigger value="memory" className="text-xs gap-1.5">
-                  <CreditCard className="h-3 w-3" />
-                  Memory Map
-                </TabsTrigger>
-                <TabsTrigger value="editor" className="text-xs gap-1.5">
-                  <Edit3 className="h-3 w-3" />
-                  Block Editor
-                </TabsTrigger>
-                <TabsTrigger value="hex" className="text-xs gap-1.5">
-                  <FileCode2 className="h-3 w-3" />
-                  Hex Viewer
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="memory" className="flex-1 p-4 overflow-auto m-0">
-              <CardMemoryMap
-                onCommand={handleCommand}
-                disabled={!canRunCommands}
-              />
-            </TabsContent>
-
-            <TabsContent value="editor" className="flex-1 p-4 overflow-auto m-0">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full">
-                <MifareEditorPanel
-                  onCommand={handleCommand}
-                  cacheItems={cachedAssets}
-                  disabled={!canRunCommands}
-                />
-                <HexAsciiViewer dumps={cachedAssets} />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="hex" className="flex-1 p-4 overflow-auto m-0">
-              <div className="h-full max-w-4xl mx-auto">
-                <HexAsciiViewer dumps={cachedAssets} />
-              </div>
-            </TabsContent>
-          </Tabs>
+      {activeTab === 'memory' ? (
+        <div className="flex-1 flex flex-col overflow-hidden p-4">
+          <CardMemoryMap
+            onCommand={handleCommand}
+            disabled={!canRunCommands}
+            cachedDumps={cachedDumps}
+            onDumpLoad={handleDumpLoad}
+            activeDump={activeDump}
+          />
+        </div>
+      ) : activeTab === 'editor' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full">
+            <MifareEditorPanel
+              onCommand={handleCommand}
+              cacheItems={cachedAssets}
+              disabled={!canRunCommands}
+              cachePathPrefix={CACHE_PATH_PREFIX}
+            />
+            <HexAsciiViewer dumps={cachedAssets} />
+          </div>
+        </div>
+      ) : activeTab === 'hex' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-4xl mx-auto">
+            <HexAsciiViewer dumps={cachedAssets} />
+          </div>
         </div>
       ) : (
         <div className="flex-1 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4 p-4 overflow-hidden">

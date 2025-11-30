@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,13 @@ import {
   ChevronDown,
   ChevronRight,
   Lock,
-  Unlock,
   RefreshCw,
+  FileJson,
+  FolderOpen,
+  Database,
+  Search,
+  HardDrive,
+  FileUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,12 +35,69 @@ interface Block {
   label: string;
 }
 
+// PM3 JSON dump format
+export interface PM3DumpJson {
+  Created?: string;
+  FileType?: string;
+  Card?: {
+    UID?: string;
+    ATQA?: string;
+    SAK?: string;
+  };
+  blocks?: Record<string, string>;
+  SectorKeys?: Record<string, {
+    KeyA?: string;
+    KeyB?: string;
+    AccessConditions?: string;
+    AccessConditionsText?: Record<string, string>;
+  }>;
+}
+
+export interface CachedDump {
+  id: string;
+  name: string;
+  data: PM3DumpJson;
+  cachedAt: number;
+}
+
 interface CardMemoryMapProps {
   onCommand: (cmd: string) => void;
   disabled?: boolean;
   cardType?: CardType;
   initialData?: Block[];
+  cachedDumps?: CachedDump[];
+  onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
+  activeDump?: CachedDump | null;
 }
+
+// Convert PM3 JSON dump to Block array
+const dumpToBlocks = (dump: PM3DumpJson): Block[] => {
+  if (!dump.blocks) return generateClassic1KData();
+
+  const blockNumbers = Object.keys(dump.blocks).map(Number).sort((a, b) => a - b);
+  const blocks: Block[] = [];
+
+  for (const index of blockNumbers) {
+    const sector = Math.floor(index / 4);
+    const blockInSector = index % 4;
+    const data = dump.blocks[index.toString()] || "00000000000000000000000000000000";
+
+    let kind: Block["kind"] = "data";
+    let label = "Data";
+
+    if (index === 0) {
+      kind = "manufacturer";
+      label = "Manufacturer";
+    } else if (blockInSector === 3) {
+      kind = "trailer";
+      label = "Sector Trailer";
+    }
+
+    blocks.push({ index, sector, data, kind, label });
+  }
+
+  return blocks;
+};
 
 // Demo data for Mifare Classic 1K
 const generateClassic1KData = (): Block[] => {
@@ -112,17 +174,61 @@ export function CardMemoryMap({
   disabled = false,
   cardType = "classic-1k",
   initialData,
+  cachedDumps = [],
+  onDumpLoad,
+  activeDump,
 }: CardMemoryMapProps) {
   const [blocks, setBlocks] = useState<Block[]>(
     initialData || (cardType === "ultralight" ? generateUltralightData() : generateClassic1KData())
   );
   const [selectedBlock, setSelectedBlock] = useState<number | null>(0);
-  const [expandedSectors, setExpandedSectors] = useState<Set<number>>(new Set([0, 1]));
-  const [showKeys, setShowKeys] = useState(false);
+  // Expand all 16 sectors by default
+  const [expandedSectors, setExpandedSectors] = useState<Set<number>>(
+    new Set(Array.from({ length: 16 }, (_, i) => i))
+  );
+  const [showKeys, setShowKeys] = useState(true);
+  const [showEmptyBlocks, setShowEmptyBlocks] = useState(true);
   const [editingBlock, setEditingBlock] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
   const [authKeyType, setAuthKeyType] = useState<"A" | "B">("A");
+  const [searchFilter, setSearchFilter] = useState("");
+
+  // Update blocks when activeDump changes
+  useEffect(() => {
+    if (activeDump?.data) {
+      setBlocks(dumpToBlocks(activeDump.data));
+      // Auto-set auth key from dump if available
+      const firstSectorKey = activeDump.data.SectorKeys?.["0"];
+      if (firstSectorKey?.KeyA && firstSectorKey.KeyA !== "????????????") {
+        setAuthKey(firstSectorKey.KeyA);
+      }
+    }
+  }, [activeDump]);
+
+  // Get sector keys from active dump
+  const sectorKeys = useMemo(() => {
+    return activeDump?.data?.SectorKeys || {};
+  }, [activeDump]);
+
+  // Handle JSON file upload
+  const handleJsonUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        try {
+          const parsed = JSON.parse(text) as PM3DumpJson;
+          if (parsed.blocks || parsed.Card) {
+            onDumpLoad?.(parsed, file.name);
+            break;
+          }
+        } catch (e) {
+          console.error("Failed to parse JSON:", e);
+        }
+      }
+    }
+  }, [onDumpLoad]);
 
   // Group blocks by sector
   const sectors = useMemo(() => {
@@ -133,6 +239,18 @@ export function CardMemoryMap({
     });
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [blocks]);
+
+  // Filtered sectors based on search
+  const filteredSectors = useMemo(() => {
+    if (!searchFilter) return sectors;
+    const filter = searchFilter.toUpperCase();
+    return sectors.filter(([_, sectorBlocks]) =>
+      sectorBlocks.some(b =>
+        b.data.toUpperCase().includes(filter) ||
+        hexToAscii(b.data).toUpperCase().includes(filter)
+      )
+    );
+  }, [sectors, searchFilter]);
 
   const selectedBlockData = useMemo(
     () => blocks.find((b) => b.index === selectedBlock) || null,
@@ -202,7 +320,7 @@ export function CardMemoryMap({
     <div className="flex flex-col lg:flex-row gap-4 h-full">
       {/* Memory Map Table */}
       <Card className="flex-1 flex flex-col overflow-hidden">
-        <CardHeader className="pb-2 border-b">
+        <CardHeader className="pb-2 border-b space-y-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-primary" />
@@ -216,6 +334,20 @@ export function CardMemoryMap({
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-2">
+              <label className="cursor-pointer">
+                <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                  <span>
+                    <FileJson className="h-3 w-3 mr-1" />
+                    Load JSON
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => handleJsonUpload(e.target.files)}
+                  className="hidden"
+                />
+              </label>
               <Button
                 size="sm"
                 variant="ghost"
@@ -223,7 +355,7 @@ export function CardMemoryMap({
                 className="h-7 text-xs"
               >
                 {showKeys ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
-                {showKeys ? "Hide Keys" : "Show Keys"}
+                Keys
               </Button>
               <Button
                 size="sm"
@@ -246,10 +378,198 @@ export function CardMemoryMap({
               </Button>
             </div>
           </div>
+
+          {/* Card Info Bar (shown when dump is loaded) */}
+          {activeDump?.data?.Card && (
+            <div className="flex flex-wrap items-center gap-3 p-2 bg-gradient-to-r from-primary/10 to-transparent rounded-lg">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" />
+                <span className="text-xs text-muted-foreground">UID:</span>
+                <code className="text-sm font-mono font-semibold text-primary">
+                  {activeDump.data.Card.UID}
+                </code>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => navigator.clipboard.writeText(activeDump.data.Card?.UID || "")}
+                  className="h-5 w-5 p-0"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              {activeDump.data.Card.ATQA && (
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">ATQA:</span>
+                  <code className="font-mono">{activeDump.data.Card.ATQA}</code>
+                </div>
+              )}
+              {activeDump.data.Card.SAK && (
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">SAK:</span>
+                  <code className="font-mono">{activeDump.data.Card.SAK}</code>
+                </div>
+              )}
+              <Badge variant="secondary" className="text-[10px] ml-auto">
+                {activeDump.name}
+              </Badge>
+            </div>
+          )}
+
+          {/* Search and Cached Dumps */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+              <Input
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Search blocks..."
+                className="h-7 text-xs pl-7"
+              />
+            </div>
+            {cachedDumps.length > 0 && (
+              <div className="flex items-center gap-1">
+                <Database className="h-3 w-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">Cached:</span>
+                {cachedDumps.slice(0, 3).map((d) => (
+                  <Button
+                    key={d.id}
+                    size="sm"
+                    variant={activeDump?.id === d.id ? "default" : "ghost"}
+                    onClick={() => onDumpLoad?.(d.data, d.name)}
+                    className="h-6 text-[10px] px-2"
+                  >
+                    {d.data.Card?.UID?.slice(0, 8) || d.name.slice(0, 12)}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </CardHeader>
 
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-xs">
+        {/* Show welcome screen when no dump is loaded */}
+        {!activeDump ? (
+          <CardContent className="flex-1 flex flex-col items-center justify-center p-8">
+            <div className="max-w-md text-center space-y-6">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <CreditCard className="h-8 w-8 text-primary" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Import Card Dump</h3>
+                <p className="text-sm text-muted-foreground">
+                  Load a Proxmark3 card dump to view and edit the memory contents, sector keys, and access conditions.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                {/* JSON Dump - Primary option */}
+                <label className="cursor-pointer">
+                  <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <FileJson className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm">PM3 JSON Dump</div>
+                      <div className="text-xs text-muted-foreground">
+                        hf-mf-*-dump.json files with UID, keys & blocks
+                      </div>
+                    </div>
+                    <Badge variant="default" className="shrink-0">Recommended</Badge>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => handleJsonUpload(e.target.files)}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Folder upload */}
+                <label className="cursor-pointer">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <FolderOpen className="h-4 w-4" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm">Import Folder</div>
+                      <div className="text-xs text-muted-foreground">
+                        Upload entire "Card Export" folder
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    // @ts-expect-error webkitdirectory is not standard
+                    webkitdirectory=""
+                    multiple
+                    onChange={(e) => {
+                      // Find JSON files in the folder
+                      const files = e.target.files;
+                      if (files) {
+                        for (const file of Array.from(files)) {
+                          if (file.name.endsWith('.json') && file.name.includes('dump')) {
+                            handleJsonUpload(files);
+                            break;
+                          }
+                        }
+                      }
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Binary files */}
+                <label className="cursor-pointer">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-secondary/50 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <HardDrive className="h-4 w-4" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm">Binary Dump</div>
+                      <div className="text-xs text-muted-foreground">
+                        .bin, .dump, .eml files (no keys)
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".bin,.dump,.eml"
+                    onChange={(e) => handleJsonUpload(e.target.files)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Cached dumps */}
+              {cachedDumps.length > 0 && (
+                <div className="pt-4 border-t">
+                  <div className="text-xs text-muted-foreground mb-2">Recently loaded:</div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {cachedDumps.slice(0, 5).map((d) => (
+                      <Button
+                        key={d.id}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onDumpLoad?.(d.data, d.name)}
+                        className="h-7 text-xs"
+                      >
+                        <CreditCard className="h-3 w-3 mr-1" />
+                        {d.data.Card?.UID?.slice(0, 8) || d.name.slice(0, 12)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground">
+                Tip: Use <code className="px-1 py-0.5 bg-secondary rounded">hf mf dump --json</code> to create a JSON dump from your Proxmark3
+              </p>
+            </div>
+          </CardContent>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-xs">
             <thead className="bg-secondary/50 sticky top-0">
               <tr className="border-b">
                 <th className="px-3 py-2 text-left font-medium w-16">Sec</th>
@@ -261,12 +581,24 @@ export function CardMemoryMap({
               </tr>
             </thead>
             <tbody>
-              {sectors.map(([sectorNum, sectorBlocks]) => (
+              {filteredSectors.map(([sectorNum, sectorBlocks]) => {
+                const keys = sectorKeys[sectorNum.toString()];
+                // Count empty data blocks (exclude trailer)
+                const emptyCount = sectorBlocks.filter(b =>
+                  b.kind === "data" && b.data.replace(/\s/g, "") === "00000000000000000000000000000000"
+                ).length;
+                const dataBlockCount = sectorBlocks.filter(b => b.kind === "data").length;
+                const hasData = emptyCount < dataBlockCount;
+
+                return (
                 <>
                   {/* Sector header row */}
                   <tr
                     key={`sector-${sectorNum}`}
-                    className="bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors"
+                    className={cn(
+                      "bg-secondary/30 cursor-pointer hover:bg-secondary/50 transition-colors",
+                      !hasData && "opacity-60"
+                    )}
                     onClick={() => toggleSector(sectorNum)}
                   >
                     <td colSpan={6} className="px-3 py-1.5">
@@ -280,7 +612,31 @@ export function CardMemoryMap({
                         <Badge variant="outline" className="text-[10px] h-4">
                           {sectorBlocks.length} blocks
                         </Badge>
-                        {sectorBlocks.some((b) => b.kind === "trailer") && (
+                        {emptyCount > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-4 bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                          >
+                            {emptyCount === dataBlockCount ? "All Empty" : `${emptyCount} empty`}
+                          </Badge>
+                        )}
+                        {showKeys && keys && (
+                          <>
+                            <div className="flex items-center gap-1 ml-2">
+                              <Key className="h-2.5 w-2.5 text-emerald-500" />
+                              <code className="text-[10px] font-mono text-emerald-400">
+                                {keys.KeyA}
+                              </code>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Key className="h-2.5 w-2.5 text-blue-500" />
+                              <code className="text-[10px] font-mono text-blue-400">
+                                {keys.KeyB}
+                              </code>
+                            </div>
+                          </>
+                        )}
+                        {sectorBlocks.some((b) => b.kind === "trailer") && !showKeys && (
                           <Badge
                             variant="secondary"
                             className="text-[10px] h-4 bg-amber-500/20 text-amber-400 border-amber-500/30"
@@ -298,6 +654,9 @@ export function CardMemoryMap({
                       const isSelected = selectedBlock === block.index;
                       const isEditing = editingBlock === block.index;
                       const isTrailer = block.kind === "trailer";
+                      const isManufacturer = block.kind === "manufacturer";
+                      // Check if block is empty (all zeros)
+                      const isEmpty = block.data.replace(/\s/g, "") === "00000000000000000000000000000000";
                       const displayData = isTrailer && !showKeys
                         ? block.data.replace(/[A-Fa-f0-9]{12}/g, (m, offset) =>
                             offset < 12 || offset >= 20 ? "????????????" : m
@@ -312,7 +671,8 @@ export function CardMemoryMap({
                             isSelected
                               ? "bg-primary/10"
                               : "hover:bg-secondary/30",
-                            isTrailer && "bg-amber-500/5"
+                            isTrailer && "bg-amber-500/5",
+                            isEmpty && !isTrailer && "opacity-50"
                           )}
                           onClick={() => setSelectedBlock(block.index)}
                         >
@@ -323,20 +683,24 @@ export function CardMemoryMap({
                             {block.index}
                           </td>
                           <td className="px-3 py-1.5">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[10px] h-4",
-                                block.kind === "manufacturer" &&
-                                  "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-                                block.kind === "trailer" &&
-                                  "bg-amber-500/20 text-amber-400 border-amber-500/30",
-                                block.kind === "data" &&
-                                  "bg-secondary text-secondary-foreground"
-                              )}
-                            >
-                              {block.label}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] h-4",
+                                  isManufacturer &&
+                                    "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+                                  isTrailer &&
+                                    "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                                  block.kind === "data" && !isEmpty &&
+                                    "bg-secondary text-secondary-foreground",
+                                  isEmpty && !isTrailer &&
+                                    "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                                )}
+                              >
+                                {isEmpty && !isTrailer && !isManufacturer ? "Empty" : block.label}
+                              </Badge>
+                            </div>
                           </td>
                           <td className="px-3 py-1.5 font-mono">
                             {isEditing ? (
@@ -411,10 +775,12 @@ export function CardMemoryMap({
                       );
                     })}
                 </>
-              ))}
+              );
+              })}
             </tbody>
           </table>
-        </div>
+          </div>
+        )}
       </Card>
 
       {/* Block Inspector */}

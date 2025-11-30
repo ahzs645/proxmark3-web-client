@@ -24,6 +24,11 @@ import {
   Book,
   ListChecks,
   StopCircle,
+  FileJson,
+  FileCode2,
+  FolderOpen,
+  Grid3X3,
+  Layers,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
@@ -45,12 +50,13 @@ interface RibbonToolbarProps {
   cacheItems: CachedAsset[];
   cacheSyncing?: boolean;
   onCacheUpload: (files: FileList | null) => void;
-  onCacheUse: (item: CachedAsset, template: string) => void;
-  onCacheDelete: (id: string) => void;
+  onCacheUse?: (item: CachedAsset, template: string) => void;
+  onCacheDelete?: (id: string) => void;
   onCacheSync: () => void;
   cachePathPrefix?: string;
   activeTab: string;
   onTabChange: (value: string) => void;
+  onJsonUpload?: (files: FileList | null) => void;
 }
 
 interface RibbonButtonProps {
@@ -145,6 +151,7 @@ export function RibbonToolbar({
   cachePathPrefix,
   activeTab,
   onTabChange,
+  onJsonUpload,
 }: RibbonToolbarProps) {
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
@@ -161,7 +168,19 @@ export function RibbonToolbar({
             <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
             <TabsTrigger value="tools" className="text-xs">Tools</TabsTrigger>
             <TabsTrigger value="actions" className="text-xs">Shortcuts</TabsTrigger>
-            <TabsTrigger value="workbench" className="text-xs">Workbench</TabsTrigger>
+            <Separator orientation="vertical" className="h-5 mx-1" />
+            <TabsTrigger value="memory" className="text-xs gap-1">
+              <Layers className="h-3 w-3" />
+              Memory
+            </TabsTrigger>
+            <TabsTrigger value="editor" className="text-xs gap-1">
+              <Edit3 className="h-3 w-3" />
+              Editor
+            </TabsTrigger>
+            <TabsTrigger value="hex" className="text-xs gap-1">
+              <FileCode2 className="h-3 w-3" />
+              Hex
+            </TabsTrigger>
           </TabsList>
 
           <div className="ml-auto flex items-center gap-2 pr-2">
@@ -490,10 +509,222 @@ export function RibbonToolbar({
           </div>
         </TabsContent>
 
-        {/* Workbench Tab */}
-        <TabsContent value="workbench" className="m-0 p-2 ribbon-tab-content">
-          <div className="text-xs text-muted-foreground px-2">
-            Workbench view is shown below. Use this tab to switch into the editor/inspector screen.
+        {/* Memory Tab */}
+        <TabsContent value="memory" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Import">
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
+              >
+                <FileJson className="h-3 w-3" />
+                JSON Dump
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={(e) => {
+                    onJsonUpload?.(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
+              >
+                <FolderOpen className="h-3 w-3" />
+                Folder
+                <input
+                  type="file"
+                  // @ts-expect-error webkitdirectory is not standard
+                  webkitdirectory=""
+                  multiple
+                  onChange={(e) => {
+                    onCacheUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
+              >
+                <Upload className="h-3 w-3" />
+                Files
+                <input
+                  type="file"
+                  accept=".bin,.dump,.eml,.dic,.json,.key"
+                  multiple
+                  onChange={(e) => {
+                    onCacheUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Card Actions">
+              <MiniButton
+                icon={<Key className="h-3 w-3" />}
+                label="Autopwn"
+                onClick={() => onCommand('hf mf autopwn --1k')}
+                disabled={!commandsEnabled}
+                variant="default"
+              />
+              <MiniButton
+                icon={<Download className="h-3 w-3" />}
+                label="Dump"
+                onClick={() => onCommand('hf mf dump')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Upload className="h-3 w-3" />}
+                label="Restore"
+                onClick={() => onCommand('hf mf restore')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Play className="h-3 w-3" />}
+                label="Sim"
+                onClick={() => onCommand('hf mf sim --1k')}
+                disabled={!commandsEnabled}
+              />
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Cache">
+              <MiniButton
+                icon={<RefreshCw className={cacheSyncing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />}
+                label="Sync"
+                onClick={onCacheSync}
+                disabled={!commandsEnabled || cacheSyncing}
+              />
+              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                {cacheItems.length} files
+              </Badge>
+            </CompactGroup>
+          </div>
+        </TabsContent>
+
+        {/* Editor Tab */}
+        <TabsContent value="editor" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Import">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
+              >
+                <Upload className="h-3 w-3" />
+                Files
+                <input
+                  type="file"
+                  accept=".bin,.dump,.eml,.dic,.json,.key"
+                  multiple
+                  onChange={(e) => {
+                    onCacheUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Block Operations">
+              <MiniButton
+                icon={<Download className="h-3 w-3" />}
+                label="Read Block"
+                onClick={() => onCommand('hf mf rdbl 0 a FFFFFFFFFFFF')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Upload className="h-3 w-3" />}
+                label="Write Block"
+                onClick={() => onCommand('hf mf wrbl')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Key className="h-3 w-3" />}
+                label="Autopwn"
+                onClick={() => onCommand('hf mf autopwn --1k')}
+                disabled={!commandsEnabled}
+                variant="default"
+              />
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Emulator">
+              <MiniButton
+                icon={<Download className="h-3 w-3" />}
+                label="Load"
+                onClick={() => onCommand('hf mf eload')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Upload className="h-3 w-3" />}
+                label="Save"
+                onClick={() => onCommand('hf mf esave')}
+                disabled={!commandsEnabled}
+              />
+              <MiniButton
+                icon={<Play className="h-3 w-3" />}
+                label="Sim"
+                onClick={() => onCommand('hf mf sim --1k')}
+                disabled={!commandsEnabled}
+              />
+            </CompactGroup>
+          </div>
+        </TabsContent>
+
+        {/* Hex Tab */}
+        <TabsContent value="hex" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Import">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1 relative overflow-hidden"
+              >
+                <Upload className="h-3 w-3" />
+                Files
+                <input
+                  type="file"
+                  accept=".bin,.dump,.eml,.dic,.json,.key"
+                  multiple
+                  onChange={(e) => {
+                    onCacheUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+              </Button>
+            </CompactGroup>
+
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+
+            <CompactGroup title="Cache">
+              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                {cacheItems.length} files
+              </Badge>
+              <MiniButton
+                icon={<RefreshCw className={cacheSyncing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />}
+                label="Sync"
+                onClick={onCacheSync}
+                disabled={!commandsEnabled || cacheSyncing}
+              />
+            </CompactGroup>
           </div>
         </TabsContent>
       </Tabs>

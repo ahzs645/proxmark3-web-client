@@ -35,6 +35,7 @@ interface MifareEditorPanelProps {
   onCommand: (cmd: string) => void;
   cacheItems: CachedAsset[];
   disabled?: boolean;
+  cachePathPrefix: string;
 }
 
 const demoRows: BlockRow[] = [
@@ -65,7 +66,7 @@ function hexToAscii(hex: string): string {
   return result;
 }
 
-export function MifareEditorPanel({ onCommand, cacheItems, disabled }: MifareEditorPanelProps) {
+export function MifareEditorPanel({ onCommand, cacheItems, disabled, cachePathPrefix }: MifareEditorPanelProps) {
   const [rows, setRows] = useState<BlockRow[]>(demoRows);
   const [key, setKey] = useState("FFFFFFFFFFFF");
   const [keyType, setKeyType] = useState<KeyType>("A");
@@ -82,6 +83,10 @@ export function MifareEditorPanel({ onCommand, cacheItems, disabled }: MifareEdi
 
   const dumpChoices = useMemo(() => cacheItems.filter((c) => c.kind === "dump"), [cacheItems]);
   const keyChoices = useMemo(() => cacheItems.filter((c) => c.kind === "keys"), [cacheItems]);
+  const resolvePath = useCallback(
+    (item: CachedAsset) => `${cachePathPrefix}/${item.relativePath || item.name}`,
+    [cachePathPrefix]
+  );
 
   const handleDataChange = useCallback((block: number, value: string) => {
     const sanitized = value.toUpperCase().replace(/[^A-F0-9]/gi, "").slice(0, 32);
@@ -221,11 +226,11 @@ export function MifareEditorPanel({ onCommand, cacheItems, disabled }: MifareEdi
                   key={d.id}
                   size="sm"
                   variant="ghost"
-                  onClick={() => onCommand(`hf mf eload -f ${d.name}`)}
+                  onClick={() => onCommand(`hf mf eload -f ${resolvePath(d)}`)}
                   disabled={disabled}
                   className="h-6 text-[10px]"
                 >
-                  {d.name}
+                  {d.relativePath || d.name}
                 </Button>
               ))}
               {keyChoices.slice(0, 2).map((k) => (
@@ -233,12 +238,12 @@ export function MifareEditorPanel({ onCommand, cacheItems, disabled }: MifareEdi
                   key={k.id}
                   size="sm"
                   variant="ghost"
-                  onClick={() => onCommand(`mem load -f ${k.name} --mfc`)}
+                  onClick={() => onCommand(`mem load -f ${resolvePath(k)} --mfc`)}
                   disabled={disabled}
                   className="h-6 text-[10px]"
                 >
                   <Key className="h-2.5 w-2.5 mr-1" />
-                  {k.name}
+                  {k.relativePath || k.name}
                 </Button>
               ))}
             </div>
