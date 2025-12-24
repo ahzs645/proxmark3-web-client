@@ -25,8 +25,6 @@ export function Select({
   className,
   disabled = false,
 }: SelectProps) {
-  const selectedOption = options.find((opt) => opt.value === value);
-
   return (
     <div className={cn('relative inline-block', className)}>
       <select

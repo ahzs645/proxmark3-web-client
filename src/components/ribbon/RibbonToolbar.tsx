@@ -29,7 +29,6 @@ import {
   FileJson,
   FileCode2,
   FolderOpen,
-  Grid3X3,
   Layers,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -588,8 +587,8 @@ export function RibbonToolbar({
             <KeyCachePanel
               items={cacheItems}
               onUpload={onCacheUpload}
-              onUse={onCacheUse}
-              onDelete={onCacheDelete}
+              onUse={onCacheUse!}
+              onDelete={onCacheDelete!}
               onSync={onCacheSync}
               syncing={cacheSyncing}
               cachePathPrefix={cachePathPrefix}

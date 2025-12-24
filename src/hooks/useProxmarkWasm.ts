@@ -59,6 +59,7 @@ interface UseProxmarkWasmReturn {
   error: Error | null;
   sendCommand: (command: string) => void;
   sendInput: (char: string) => void;
+  sendBreak: () => void;
   connectDevice: () => Promise<boolean>;
   disconnectDevice: () => Promise<void>;
 }

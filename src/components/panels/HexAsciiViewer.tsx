@@ -8,7 +8,6 @@ import {
   Copy,
   Trash2,
   FileCode2,
-  Columns,
   Grid3X3,
   ArrowUpDown,
 } from "lucide-react";

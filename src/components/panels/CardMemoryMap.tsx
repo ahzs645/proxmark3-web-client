@@ -23,13 +23,11 @@ import {
   HardDrive,
   Wand2,
   AlertTriangle,
-  Save,
   Play,
   Edit3,
   Pencil,
   Check,
   X,
-  MoreVertical,
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -157,19 +155,6 @@ function parseTrailer(data: string) {
   };
 }
 
-function renderHexByte(byte: string, highlight?: "key" | "access" | "data" | "uid") {
-  const colorMap = {
-    key: "text-amber-400",
-    access: "text-purple-400",
-    data: "text-foreground",
-    uid: "text-emerald-400",
-  };
-  return (
-    <span className={cn("font-mono", colorMap[highlight || "data"])}>
-      {byte}
-    </span>
-  );
-}
 
 function hexToAscii(hex: string): string {
   const clean = hex.replace(/\s/g, "");
@@ -201,7 +186,6 @@ export function CardMemoryMap({
     new Set(Array.from({ length: 16 }, (_, i) => i))
   );
   const [showKeys, setShowKeys] = useState(true);
-  const [showEmptyBlocks, setShowEmptyBlocks] = useState(true);
   const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
   const [authKeyType, setAuthKeyType] = useState<"A" | "B">("A");
   const [searchFilter, setSearchFilter] = useState("");

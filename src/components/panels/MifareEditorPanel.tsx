@@ -5,11 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { CachedAsset } from "./KeyCachePanel";
 import {
-  Edit3,
   Download,
   Upload,
   Play,
-  Save,
   Shield,
   Database,
   Wand2,

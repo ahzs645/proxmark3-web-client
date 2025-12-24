@@ -12,7 +12,6 @@ import {
   Play,
   Zap,
   Shield,
-  ChevronRight,
 } from 'lucide-react';
 
 export interface TagInfo {
