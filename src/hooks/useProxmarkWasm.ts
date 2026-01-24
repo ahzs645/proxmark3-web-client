@@ -51,6 +51,7 @@ interface UseProxmarkWasmReturn {
   sendCommand: (command: string) => void;
   sendInput: (char: string) => void;
   sendBreak: () => void;
+  hardReset: () => Promise<void>;
   connectDevice: (transportType?: TransportType, device?: TransportDevice) => Promise<boolean>;
   disconnectDevice: () => Promise<void>;
   // New transport-related returns
@@ -135,6 +136,18 @@ export function useProxmarkWasm({
     }
   }, []);
 
+  // Periodic flush timer to ensure output is shown even without newlines
+  useEffect(() => {
+    const flushInterval = setInterval(() => {
+      if (outputBufferRef.current) {
+        onOutputRef.current(outputBufferRef.current);
+        outputBufferRef.current = '';
+      }
+    }, 100); // Flush every 100ms
+
+    return () => clearInterval(flushInterval);
+  }, []);
+
   useEffect(() => {
     // Already loaded from previous mount
     if (wasmLoaded && globalModule) {
@@ -158,6 +171,15 @@ export function useProxmarkWasm({
         }
         return prefix + path;
       },
+      // Module.print/printErr handlers work better with pthreads
+      print: (text: string) => {
+        outputBufferRef.current += text + '\n';
+        flushOutput();
+      },
+      printErr: (text: string) => {
+        outputBufferRef.current += text + '\n';
+        flushOutput();
+      },
       preRun: function () {
         // stdin - returns characters from shared ring buffer (handled by C side now)
         function stdin(): number {
@@ -168,11 +190,15 @@ export function useProxmarkWasm({
         function stdout(code: number): void {
           if (code === 0x0A) { // newline
             outputBufferRef.current += '\r\n';
+            flushOutput();
+          } else if (code === 0x0D) { // carriage return - flush for progress updates
+            outputBufferRef.current += '\r';
+            flushOutput();
           } else {
             outputBufferRef.current += String.fromCharCode(code);
           }
-          // Flush on newline or when buffer gets large
-          if (code === 0x0A || outputBufferRef.current.length > 100) {
+          // Flush when buffer gets large
+          if (outputBufferRef.current.length > 80) {
             flushOutput();
           }
         }
@@ -251,6 +277,51 @@ export function useProxmarkWasm({
     uartShared.pushStdin(3);
   }, [isReady]);
 
+  // Hard reset - forcefully restart WASM by reloading the page
+  // This is the nuclear option when sendBreak doesn't work
+  const hardReset = useCallback(async (): Promise<void> => {
+    console.warn('[PM3] Hard reset requested - disconnecting and reloading...');
+
+    // First disconnect the device via transport manager
+    try {
+      await transportManager.disconnect();
+    } catch (e) {
+      console.error('Error disconnecting during hard reset:', e);
+    }
+    setIsDeviceConnected(false);
+
+    // Clear the ring buffers by resetting head/tail pointers
+    if (globalModule?.HEAPU32) {
+      const heapU32 = globalModule.HEAPU32;
+      const rxHeadPtr = globalModule._pm3_uart_rx_head_ptr?.();
+      const rxTailPtr = globalModule._pm3_uart_rx_tail_ptr?.();
+      const txHeadPtr = globalModule._pm3_uart_tx_head_ptr?.();
+      const txTailPtr = globalModule._pm3_uart_tx_tail_ptr?.();
+      const stdinHeadPtr = globalModule._pm3_uart_stdin_head_ptr?.();
+      const stdinTailPtr = globalModule._pm3_uart_stdin_tail_ptr?.();
+
+      if (rxHeadPtr && rxTailPtr) {
+        Atomics.store(heapU32, rxHeadPtr >> 2, 0);
+        Atomics.store(heapU32, rxTailPtr >> 2, 0);
+      }
+      if (txHeadPtr && txTailPtr) {
+        Atomics.store(heapU32, txHeadPtr >> 2, 0);
+        Atomics.store(heapU32, txTailPtr >> 2, 0);
+      }
+      if (stdinHeadPtr && stdinTailPtr) {
+        Atomics.store(heapU32, stdinHeadPtr >> 2, 0);
+        Atomics.store(heapU32, stdinTailPtr >> 2, 0);
+      }
+      console.log('[PM3] Ring buffers cleared');
+    }
+
+    // Give it a moment then reload
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Reload the page to fully reset WASM state
+    window.location.reload();
+  }, [transportManager]);
+
   // Connect to physical device via selected transport
   const connectDevice = useCallback(async (
     transportType?: TransportType,
@@ -287,6 +358,7 @@ export function useProxmarkWasm({
     sendCommand,
     sendInput,
     sendBreak,
+    hardReset,
     connectDevice,
     disconnectDevice,
     availableTransports,

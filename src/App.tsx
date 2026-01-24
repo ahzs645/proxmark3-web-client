@@ -13,6 +13,7 @@ import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
 import { CardMemoryMap, type PM3DumpJson, type CachedDump } from '@/components/panels/CardMemoryMap';
 import { Activity, Send, Sparkles, Trash2 } from 'lucide-react';
 import type { TransportType } from '@/lib/transports';
+import pm3WebUSB from '@/lib/pm3WebUSB';
 
 type CachedAssetWithData = CachedAsset & { base64: string };
 
@@ -369,6 +370,16 @@ function App() {
     }
   }, [cachedAssets.length, wasmState.isReady, syncCacheToFS]);
 
+  // Set up unresponsive device handler
+  useEffect(() => {
+    pm3WebUSB.onUnresponsive = () => {
+      terminalRef.current?.writeln('\x1b[33m[Warning] Device may be unresponsive. Try "Stop" or "Reset" button.\x1b[0m');
+    };
+    return () => {
+      pm3WebUSB.onUnresponsive = undefined;
+    };
+  }, []);
+
   const handleConnect = useCallback(async () => {
     const transportType = selectedTransport || wasmState.availableTransports[0]?.type || 'webserial';
     const transportName = transportType === 'tauri-bluetooth' ? 'Bluetooth' :
@@ -432,6 +443,7 @@ function App() {
         onDisconnect={handleDisconnect}
         onCommand={handleCommand}
         onStopOperation={wasmState.sendBreak}
+        onHardReset={wasmState.hardReset}
         theme={theme}
         onThemeChange={setTheme}
         canRunCommands={canRunCommands}

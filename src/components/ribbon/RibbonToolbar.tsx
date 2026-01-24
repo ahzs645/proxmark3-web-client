@@ -48,6 +48,7 @@ interface RibbonToolbarProps {
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
   onStopOperation?: () => void;
+  onHardReset?: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   canRunCommands?: boolean;
@@ -255,6 +256,7 @@ export function RibbonToolbar({
   onDisconnect,
   onCommand,
   onStopOperation,
+  onHardReset,
   theme,
   onThemeChange,
   canRunCommands = false,
@@ -311,9 +313,23 @@ export function RibbonToolbar({
                 onClick={onStopOperation}
                 disabled={!commandsEnabled}
                 className="h-7 px-3 text-xs gap-1.5"
+                title="Send Ctrl+C to stop current operation"
               >
                 <StopCircle className="h-3.5 w-3.5" />
                 Stop
+              </Button>
+            )}
+            {/* Hard Reset - Nuclear option when Stop doesn't work */}
+            {onHardReset && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onHardReset}
+                className="h-7 px-2 text-xs gap-1 text-orange-600 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-800 dark:hover:bg-orange-950"
+                title="Force reload if stuck (will disconnect)"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Reset
               </Button>
             )}
             <Badge variant={isConnected ? 'success' : 'secondary'}>

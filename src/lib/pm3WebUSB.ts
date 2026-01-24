@@ -218,6 +218,12 @@ export class PM3WebUSB {
   private readLoopRunning: boolean = false;
   private txLoopRunning: boolean = false;
 
+  // Health monitoring
+  private lastRxTime: number = 0;
+  private lastTxTime: number = 0;
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  public onUnresponsive?: () => void; // Callback when PM3 seems stuck
+
   async connect(): Promise<boolean> {
     if (!('serial' in navigator)) {
       console.error('WebSerial not supported in this browser');
@@ -231,6 +237,8 @@ export class PM3WebUSB {
       this.isConnected = true;
       this.readLoopRunning = true;
       this.txLoopRunning = true;
+      this.lastRxTime = Date.now();
+      this.lastTxTime = Date.now();
 
       // Initialize shared memory only when the WASM runtime is ready
       if (window.Module && window.Module.HEAPU8 && window.Module._pm3_uart_rx_head_ptr) {
@@ -239,6 +247,7 @@ export class PM3WebUSB {
 
       this.startReadLoop();
       this.startTxLoop();
+      this.startHealthCheck();
 
       return true;
     } catch (error) {
@@ -252,6 +261,12 @@ export class PM3WebUSB {
     this.readLoopRunning = false;
     this.txLoopRunning = false;
     this.isConnected = false;
+
+    // Stop health check
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
 
     if (this.reader) {
       await this.reader.cancel();
@@ -267,11 +282,41 @@ export class PM3WebUSB {
     }
   }
 
+  // Health check - detects when PM3 stops responding
+  private startHealthCheck() {
+    // Check every 5 seconds if we've sent data but received nothing back
+    this.healthCheckInterval = setInterval(() => {
+      if (!this.isConnected) return;
+
+      const now = Date.now();
+      const timeSinceRx = now - this.lastRxTime;
+      const timeSinceTx = now - this.lastTxTime;
+
+      // If we've sent data in the last 10 seconds but received nothing for 10+ seconds
+      // AND there's pending TX data in the WASM buffer, the PM3 might be stuck
+      if (timeSinceRx > 10000 && timeSinceTx < 10000) {
+        // Check if WASM is waiting for data
+        if (window.Module?.HEAPU32 && window.Module._pm3_uart_tx_head_ptr) {
+          const txHead = Atomics.load(window.Module.HEAPU32, window.Module._pm3_uart_tx_head_ptr() >> 2);
+          const txTail = Atomics.load(window.Module.HEAPU32, window.Module._pm3_uart_tx_tail_ptr!() >> 2);
+
+          // If no pending TX and no RX for 10+ seconds after sending, PM3 might be stuck
+          if (txHead === txTail) {
+            console.warn('[PM3] No response from device for 10+ seconds - device may be unresponsive');
+            this.onUnresponsive?.();
+          }
+        }
+      }
+    }, 5000);
+  }
+
   private async startReadLoop() {
     if (!this.device || !this.device.readable) return;
 
     try {
       this.reader = this.device.readable.getReader();
+      let lastActivity = Date.now();
+      let rxCount = 0;
 
       while (this.readLoopRunning && this.device && this.isConnected) {
         const { value, done } = await this.reader.read();
@@ -279,6 +324,15 @@ export class PM3WebUSB {
 
         if (value && value.length > 0) {
           uartShared.pushRx(value);
+          rxCount += value.length;
+          this.lastRxTime = Date.now(); // Track for health check
+          const now = Date.now();
+          // Log RX activity every second if there's traffic
+          if (now - lastActivity > 1000) {
+            console.debug(`[RX] ${rxCount} bytes received in last second`);
+            rxCount = 0;
+            lastActivity = now;
+          }
         }
       }
     } catch (error) {
@@ -296,14 +350,25 @@ export class PM3WebUSB {
     try {
       this.writer = this.device.writable.getWriter();
       const tmp = new Uint8Array(4096);
+      let lastActivity = Date.now();
+      let txCount = 0;
 
       while (this.txLoopRunning && this.device && this.isConnected) {
         const n = uartShared.popTx(tmp.length, tmp);
         if (n > 0) {
           await this.writer.write(tmp.subarray(0, n));
+          txCount += n;
+          this.lastTxTime = Date.now(); // Track for health check
+          const now = Date.now();
+          // Log TX activity every second if there's traffic
+          if (now - lastActivity > 1000) {
+            console.debug(`[TX] ${txCount} bytes sent in last second`);
+            txCount = 0;
+            lastActivity = now;
+          }
         } else {
-          // Sleep a bit to avoid busy-looping
-          await new Promise(resolve => setTimeout(resolve, 5));
+          // Reduced sleep for faster polling during key checks
+          await new Promise(resolve => setTimeout(resolve, 1));
         }
       }
     } catch (error) {
