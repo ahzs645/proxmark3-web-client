@@ -1,7 +1,7 @@
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-
-import { uartShared } from '../lib/pm3WebUSB'; // Adjusted path to match original structure
+import { uartShared } from '../lib/pm3WebUSB';
+import { getTransportManager, type TransportType, type TransportInfo, type TransportDevice } from '../lib/transports';
 
 interface WasmModule {
   ccall?: (ident: string, returnType: string | null, argTypes: string[], args: any[], opts?: any) => any;
@@ -28,25 +28,16 @@ interface WasmModule {
   HEAPU32?: Uint32Array;
 }
 
-// ... (keep existing code)
-
-
-
-// ... (keep existing code)
-
-// Send a complete command (with newline)
-
-
 declare global {
   interface Window {
     Module: WasmModule;
     proxmark3_main?: () => void;
     __PM3_WASM_LOADED__?: boolean;
-    pm3WebUSB?: any; // Add pm3WebUSB to Window interface
+    pm3WebUSB?: any; // Legacy - kept for backward compatibility
   }
 }
 
-interface UseProxmarkWasmOptions { // Renamed from UseProxmarkWasmProps in snippet to match original context
+interface UseProxmarkWasmOptions {
   onOutput: (text: string) => void;
   onReady?: () => void;
   onError?: (error: Error) => void;
@@ -60,14 +51,33 @@ interface UseProxmarkWasmReturn {
   sendCommand: (command: string) => void;
   sendInput: (char: string) => void;
   sendBreak: () => void;
-  connectDevice: () => Promise<boolean>;
+  connectDevice: (transportType?: TransportType, device?: TransportDevice) => Promise<boolean>;
   disconnectDevice: () => Promise<void>;
+  // New transport-related returns
+  availableTransports: TransportInfo[];
+  activeTransportType: TransportType | null;
 }
 
 // Global state to track if WASM is already loaded (survives React re-renders)
 let wasmLoadAttempted = false;
 let wasmLoaded = false;
 let globalModule: WasmModule | null = null;
+
+/**
+ * Get the device path for the WASM client based on transport type
+ */
+function getDevicePath(transportType: TransportType): string {
+  switch (transportType) {
+    case 'webserial':
+      return '/dev/webserial';
+    case 'tauri-serial':
+      return '/dev/tauriserial';
+    case 'tauri-bluetooth':
+      return '/dev/rfcomm0';
+    default:
+      return '/dev/webserial';
+  }
+}
 
 export function useProxmarkWasm({
   onOutput,
@@ -77,11 +87,20 @@ export function useProxmarkWasm({
   const [isLoading, setIsLoading] = useState(!wasmLoaded);
   const [isReady, setIsReady] = useState(wasmLoaded);
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
+  const [activeTransportType, setActiveTransportType] = useState<TransportType | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const outputBufferRef = useRef<string>('');
   const onOutputRef = useRef(onOutput);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+
+  // Get transport manager instance
+  const transportManager = useMemo(() => getTransportManager(), []);
+
+  // Get available transports
+  const availableTransports = useMemo(() => {
+    return transportManager.getAvailableTransports();
+  }, [transportManager]);
 
   // Keep refs updated
   useEffect(() => {
@@ -89,6 +108,24 @@ export function useProxmarkWasm({
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
   }, [onOutput, onReady, onError]);
+
+  // Set up transport event handlers
+  useEffect(() => {
+    transportManager.setEventHandlers({
+      onConnect: () => {
+        setIsDeviceConnected(true);
+        setActiveTransportType(transportManager.activeTransportType);
+      },
+      onDisconnect: () => {
+        setIsDeviceConnected(false);
+        setActiveTransportType(null);
+      },
+      onError: (err) => {
+        console.error('Transport error:', err);
+        onErrorRef.current?.(err);
+      },
+    });
+  }, [transportManager]);
 
   // Flush output buffer
   const flushOutput = useCallback(() => {
@@ -214,32 +251,33 @@ export function useProxmarkWasm({
     uartShared.pushStdin(3);
   }, [isReady]);
 
-  // Connect to physical device via WebUSB
-  const connectDevice = useCallback(async (): Promise<boolean> => {
-    if (!window.pm3WebUSB) {
-      console.error('WebUSB interface not initialized');
+  // Connect to physical device via selected transport
+  const connectDevice = useCallback(async (
+    transportType?: TransportType,
+    device?: TransportDevice
+  ): Promise<boolean> => {
+    // Use specified transport type or default
+    const selectedType = transportType || transportManager.getDefaultTransportType();
+    if (!selectedType) {
+      console.error('No transport available');
       return false;
     }
 
-    const connected = await window.pm3WebUSB.connect();
-    setIsDeviceConnected(connected);
+    const connected = await transportManager.connect(selectedType, device);
 
     if (connected && isReady) {
-      // Tell the WASM client to connect - uart_web.c will use the WebSerial connection
-      // Using synchronous EM_JS now, so no freeze issues
-      sendCommand('hw connect -p /dev/webserial');
+      // Tell the WASM client to connect with the appropriate device path
+      const devicePath = getDevicePath(selectedType);
+      sendCommand(`hw connect -p ${devicePath}`);
     }
 
     return connected;
-  }, [isReady, sendCommand]);
+  }, [isReady, sendCommand, transportManager]);
 
   // Disconnect from physical device
   const disconnectDevice = useCallback(async (): Promise<void> => {
-    if (window.pm3WebUSB) {
-      await window.pm3WebUSB.disconnect();
-    }
-    setIsDeviceConnected(false);
-  }, []);
+    await transportManager.disconnect();
+  }, [transportManager]);
 
   return {
     isLoading,
@@ -251,6 +289,8 @@ export function useProxmarkWasm({
     sendBreak,
     connectDevice,
     disconnectDevice,
+    availableTransports,
+    activeTransportType,
   };
 }
 
