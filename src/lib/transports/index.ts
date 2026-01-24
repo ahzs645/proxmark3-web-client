@@ -5,7 +5,5 @@
 export * from './types';
 export { WebSerialTransport } from './WebSerialTransport';
 export { TauriSerialTransport } from './TauriSerialTransport';
+export { TauriBluetoothTransport } from './TauriBluetoothTransport';
 export { TransportManager, getTransportManager } from './TransportManager';
-
-// Future exports for Tauri transports:
-// export { TauriBluetoothTransport } from './TauriBluetoothTransport';

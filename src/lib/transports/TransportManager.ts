@@ -6,6 +6,7 @@
 import type { Transport, TransportType, TransportInfo, TransportDevice, TransportEventHandlers } from './types';
 import { WebSerialTransport } from './WebSerialTransport';
 import { TauriSerialTransport } from './TauriSerialTransport';
+import { TauriBluetoothTransport } from './TauriBluetoothTransport';
 import { isTauri } from '../tauri';
 
 export class TransportManager {
@@ -34,11 +35,10 @@ export class TransportManager {
         this.transports.set('tauri-serial', tauriSerial);
       }
 
-      // TauriBluetoothTransport will be added in Phase 4
-      // const tauriBluetooth = new TauriBluetoothTransport();
-      // if (tauriBluetooth.isAvailable()) {
-      //   this.transports.set('tauri-bluetooth', tauriBluetooth);
-      // }
+      const tauriBluetooth = new TauriBluetoothTransport();
+      if (tauriBluetooth.isAvailable()) {
+        this.transports.set('tauri-bluetooth', tauriBluetooth);
+      }
     }
   }
 

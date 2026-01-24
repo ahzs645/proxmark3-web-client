@@ -30,8 +30,11 @@ import {
   FileCode2,
   FolderOpen,
   Layers,
+  Bluetooth,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { TransportSelector } from './TransportSelector';
+import type { TransportType, TransportInfo } from '@/lib/transports';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 import type { Theme } from '@/hooks/useTheme';
@@ -58,6 +61,10 @@ interface RibbonToolbarProps {
   activeTab: string;
   onTabChange: (value: string) => void;
   onJsonUpload?: (files: FileList | null) => void;
+  // Transport selection (for Tauri desktop)
+  availableTransports?: TransportInfo[];
+  selectedTransport?: TransportType | null;
+  onTransportChange?: (type: TransportType) => void;
 }
 
 interface RibbonButtonProps {
@@ -261,6 +268,9 @@ export function RibbonToolbar({
   activeTab,
   onTabChange,
   onJsonUpload,
+  availableTransports = [],
+  selectedTransport = null,
+  onTransportChange,
 }: RibbonToolbarProps) {
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
@@ -318,7 +328,10 @@ export function RibbonToolbar({
           <div className="flex items-start gap-2">
             <RibbonGroup title="Connection">
               <RibbonButton
-                icon={<Usb className={isConnected ? 'text-green-500' : ''} />}
+                icon={selectedTransport === 'tauri-bluetooth'
+                  ? <Bluetooth className={isConnected ? 'text-blue-500' : ''} />
+                  : <Usb className={isConnected ? 'text-green-500' : ''} />
+                }
                 label={isConnected ? 'Disconnect' : 'Connect'}
                 onClick={isConnected ? onDisconnect : onConnect}
                 variant={isConnected ? 'secondary' : 'default'}
@@ -333,6 +346,20 @@ export function RibbonToolbar({
                 disabled={!commandsEnabled}
               />
             </RibbonGroup>
+
+            {/* Transport Selector - only shown when multiple transports available */}
+            {availableTransports.length > 1 && onTransportChange && (
+              <>
+                <Separator orientation="vertical" className="h-16" />
+                <TransportSelector
+                  availableTransports={availableTransports}
+                  selectedTransport={selectedTransport}
+                  onTransportChange={onTransportChange}
+                  disabled={isConnecting}
+                  isConnected={isConnected}
+                />
+              </>
+            )}
 
             <Separator orientation="vertical" className="h-16" />
 

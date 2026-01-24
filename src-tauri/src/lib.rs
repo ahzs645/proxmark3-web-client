@@ -1,3 +1,4 @@
+mod bluetooth;
 mod serial;
 
 use tauri::Manager;
@@ -8,6 +9,8 @@ pub fn run() {
         .setup(|app| {
             // Initialize serial port state
             app.manage(serial::SerialState::new());
+            // Initialize Bluetooth state
+            app.manage(bluetooth::BluetoothState::new());
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -20,12 +23,21 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_platform,
+            // Serial commands
             serial::serial_list_ports,
             serial::serial_connect,
             serial::serial_disconnect,
             serial::serial_read,
             serial::serial_write,
             serial::serial_is_connected,
+            // Bluetooth commands
+            bluetooth::bt_list_devices,
+            bluetooth::bt_scan_devices,
+            bluetooth::bt_connect,
+            bluetooth::bt_disconnect,
+            bluetooth::bt_is_connected,
+            bluetooth::bt_read,
+            bluetooth::bt_write,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

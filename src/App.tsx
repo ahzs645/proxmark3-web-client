@@ -12,6 +12,7 @@ import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyC
 import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
 import { CardMemoryMap, type PM3DumpJson, type CachedDump } from '@/components/panels/CardMemoryMap';
 import { Activity, Send, Sparkles, Trash2 } from 'lucide-react';
+import type { TransportType } from '@/lib/transports';
 
 type CachedAssetWithData = CachedAsset & { base64: string };
 
@@ -25,6 +26,7 @@ function App() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>('connect');
   const [quickCommand, setQuickCommand] = useState('hf search');
+  const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(null);
 
   // Cached dumps with localStorage persistence
   const [cachedDumps, setCachedDumps] = useState<CachedDump[]>(() => {
@@ -368,16 +370,25 @@ function App() {
   }, [cachedAssets.length, wasmState.isReady, syncCacheToFS]);
 
   const handleConnect = useCallback(async () => {
-    terminalRef.current?.writeln('\x1b[36mConnecting to Proxmark3 via WebSerial...\x1b[0m');
-    terminalRef.current?.writeln('\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m');
-    const success = await wasmState.connectDevice();
+    const transportType = selectedTransport || wasmState.availableTransports[0]?.type || 'webserial';
+    const transportName = transportType === 'tauri-bluetooth' ? 'Bluetooth' :
+                          transportType === 'tauri-serial' ? 'Native Serial' : 'WebSerial';
+
+    terminalRef.current?.writeln(`\x1b[36mConnecting to Proxmark3 via ${transportName}...\x1b[0m`);
+    if (transportType === 'webserial') {
+      terminalRef.current?.writeln('\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m');
+    } else if (transportType === 'tauri-bluetooth') {
+      terminalRef.current?.writeln('\x1b[90mSearching for Proxmark3 X Bluetooth device...\x1b[0m');
+    }
+
+    const success = await wasmState.connectDevice(transportType);
     if (success) {
-      terminalRef.current?.writeln('\x1b[32mWebSerial connected!\x1b[0m');
+      terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
       terminalRef.current?.writeln('\x1b[90mNow connecting WASM client to device...\x1b[0m');
     } else {
-      terminalRef.current?.writeln('\x1b[31mWebSerial connection failed or cancelled.\x1b[0m');
+      terminalRef.current?.writeln(`\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`);
     }
-  }, [wasmState]);
+  }, [wasmState, selectedTransport]);
 
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
@@ -433,6 +444,9 @@ function App() {
         cachePathPrefix={CACHE_PATH_PREFIX}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        availableTransports={wasmState.availableTransports}
+        selectedTransport={selectedTransport || wasmState.activeTransportType}
+        onTransportChange={setSelectedTransport}
         onJsonUpload={handleJsonUpload}
       />
 

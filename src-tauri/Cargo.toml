@@ -28,9 +28,10 @@ serialport = "4.3"
 
 # Platform detection
 [target.'cfg(target_os = "macos")'.dependencies]
-# IOBluetooth bindings will be added in Phase 4
-# objc2 = "0.6"
-# block2 = "0.6"
+# IOBluetooth framework bindings
+objc2 = "0.6"
+objc2-foundation = "0.3"
+block2 = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # BlueZ bindings will be added in Phase 4
