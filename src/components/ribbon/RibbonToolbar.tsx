@@ -31,6 +31,10 @@ import {
   FolderOpen,
   Layers,
   Bluetooth,
+  Target,
+  Wand2,
+  Cpu,
+  Activity,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { TransportSelector } from './TransportSelector';
@@ -294,13 +298,39 @@ export function RibbonToolbar({
             <TabsTrigger value="tools" className="text-xs">Tools</TabsTrigger>
             <TabsTrigger value="actions" className="text-xs">Shortcuts</TabsTrigger>
             <Separator orientation="vertical" className="h-5 mx-1" />
+            <TabsTrigger value="attacks" className="text-xs gap-1">
+              <Target className="h-3 w-3" />
+              Attacks
+            </TabsTrigger>
+            <TabsTrigger value="magic" className="text-xs gap-1">
+              <Wand2 className="h-3 w-3" />
+              Magic
+            </TabsTrigger>
+            <TabsTrigger value="traffic" className="text-xs gap-1">
+              <Activity className="h-3 w-3" />
+              Traffic
+            </TabsTrigger>
+            <Separator orientation="vertical" className="h-5 mx-1" />
+            <TabsTrigger value="lfops" className="text-xs gap-1">
+              <Radio className="h-3 w-3" />
+              LF Ops
+            </TabsTrigger>
+            <TabsTrigger value="t55xx" className="text-xs gap-1">
+              <Cpu className="h-3 w-3" />
+              T55xx
+            </TabsTrigger>
+            <Separator orientation="vertical" className="h-5 mx-1" />
             <TabsTrigger value="memory" className="text-xs gap-1">
               <Layers className="h-3 w-3" />
-              Memory Editor
+              Memory
             </TabsTrigger>
             <TabsTrigger value="hex" className="text-xs gap-1">
               <FileCode2 className="h-3 w-3" />
-              Hex Viewer
+              Hex
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs gap-1">
+              <Settings className="h-3 w-3" />
+              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -799,6 +829,115 @@ export function RibbonToolbar({
                 disabled={!commandsEnabled || cacheSyncing}
               />
             </CompactGroup>
+          </div>
+        </TabsContent>
+
+        {/* Attacks Tab - Panel-based, minimal ribbon */}
+        <TabsContent value="attacks" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Quick Attacks">
+              <MiniButton icon={<Zap className="h-3 w-3" />} label="Autopwn 1K" onClick={() => onCommand('hf mf autopwn --1k')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Zap className="h-3 w-3" />} label="Autopwn 4K" onClick={() => onCommand('hf mf autopwn --4k')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Shield className="h-3 w-3" />} label="Darkside" onClick={() => onCommand('hf mf darkside')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Check Keys" onClick={() => onCommand('hf mf chk --1k')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Use the panel below for advanced attack configuration
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Magic Card Tab */}
+        <TabsContent value="magic" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Detect">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Info" onClick={() => onCommand('hf mf info')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<CreditCard className="h-3 w-3" />} label="Gen1 Test" onClick={() => onCommand('hf 14a raw -a -k -b 7 40')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <CompactGroup title="Operations">
+              <MiniButton icon={<Wand2 className="h-3 w-3" />} label="View" onClick={() => onCommand('hf mf cview')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('hf mf dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Square className="h-3 w-3" />} label="Wipe" onClick={() => onCommand('hf mf cwipe')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Use the panel below for UID write and Block 0 operations
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Traffic Capture Tab */}
+        <TabsContent value="traffic" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="HF Sniff">
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="14A Sniff" onClick={() => onCommand('hf 14a sniff -c -r')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Shield className="h-3 w-3" />} label="iCLASS" onClick={() => onCommand('hf iclass sniff')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="15693" onClick={() => onCommand('hf 15 sniff')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <CompactGroup title="Trace">
+              <MiniButton icon={<ListChecks className="h-3 w-3" />} label="List 14A" onClick={() => onCommand('trace list -t 14a -1')} disabled={!commandsEnabled} />
+              <MiniButton icon={<ListChecks className="h-3 w-3" />} label="List iClass" onClick={() => onCommand('trace list -t iclass -1')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Square className="h-3 w-3" />} label="Clear" onClick={() => onCommand('trace clear')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Use the panel below for capture analysis
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* LF Operations Tab */}
+        <TabsContent value="lfops" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Basic">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Search" onClick={() => onCommand('lf search')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Zap className="h-3 w-3" />} label="Tune" onClick={() => onCommand('hw tune --lf')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf read -s 40000')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Eye className="h-3 w-3" />} label="Sniff" onClick={() => onCommand('lf sniff')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <CompactGroup title="Config">
+              <MiniButton icon={<Settings className="h-3 w-3" />} label="Status" onClick={() => onCommand('hw status')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="125kHz" onClick={() => onCommand('lf config -d 95')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="134kHz" onClick={() => onCommand('lf config -d 88')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Use the panel below for advanced frequency config
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* T55xx Tab */}
+        <TabsContent value="t55xx" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="T55xx">
+              <MiniButton icon={<Search className="h-3 w-3" />} label="Detect" onClick={() => onCommand('lf t55xx detect')} disabled={!commandsEnabled} variant="default" />
+              <MiniButton icon={<Download className="h-3 w-3" />} label="Dump" onClick={() => onCommand('lf t55xx dump')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Square className="h-3 w-3" />} label="Wipe" onClick={() => onCommand('lf t55xx wipe')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Key className="h-3 w-3" />} label="Chk Pwd" onClick={() => onCommand('lf t55xx chk')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <CompactGroup title="EM410x">
+              <MiniButton icon={<Radio className="h-3 w-3" />} label="Read" onClick={() => onCommand('lf em 410x reader')} disabled={!commandsEnabled} />
+              <MiniButton icon={<Copy className="h-3 w-3" />} label="Clone" onClick={() => onCommand('lf em 410x clone --id 0102030405')} disabled={!commandsEnabled} />
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Use the panel below for detailed operations
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <div className="text-xs text-muted-foreground">
+              Configure application settings, preferences, and data management in the panel below.
+            </div>
           </div>
         </TabsContent>
       </Tabs>

@@ -11,6 +11,12 @@ import { Input } from '@/components/ui/input';
 import { type CachedAsset, type CachedAssetKind } from '@/components/panels/KeyCachePanel';
 import { HexAsciiViewer } from '@/components/panels/HexAsciiViewer';
 import { CardMemoryMap, type PM3DumpJson, type CachedDump } from '@/components/panels/CardMemoryMap';
+import { MifareAttacksPanel } from '@/components/panels/MifareAttacksPanel';
+import { MagicCardPanel } from '@/components/panels/MagicCardPanel';
+import { LFOperationsPanel } from '@/components/panels/LFOperationsPanel';
+import { T55xxPanel } from '@/components/panels/T55xxPanel';
+import { TrafficCapturePanel } from '@/components/panels/TrafficCapturePanel';
+import { SettingsPanel } from '@/components/panels/SettingsPanel';
 import { Activity, Send, Sparkles, Trash2 } from 'lucide-react';
 import type { TransportType } from '@/lib/transports';
 import pm3WebUSB from '@/lib/pm3WebUSB';
@@ -479,6 +485,67 @@ function App() {
         <div className="flex-1 p-4 overflow-hidden">
           <div className="h-full max-w-4xl mx-auto">
             <HexAsciiViewer dumps={cachedAssets} />
+          </div>
+        </div>
+      ) : activeTab === 'attacks' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-2xl mx-auto">
+            <MifareAttacksPanel
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+              cachedAssets={cachedAssets}
+              cachePathPrefix={CACHE_PATH_PREFIX}
+            />
+          </div>
+        </div>
+      ) : activeTab === 'magic' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-2xl mx-auto">
+            <MagicCardPanel
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+              currentUid={tagInfo?.uid?.replace(/:/g, '')}
+              currentAtqa={tagInfo?.atqa?.replace(/\s/g, '')}
+              currentSak={tagInfo?.sak}
+            />
+          </div>
+        </div>
+      ) : activeTab === 'lfops' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-2xl mx-auto">
+            <LFOperationsPanel
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+            />
+          </div>
+        </div>
+      ) : activeTab === 't55xx' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-2xl mx-auto">
+            <T55xxPanel
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+            />
+          </div>
+        </div>
+      ) : activeTab === 'traffic' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-4xl mx-auto">
+            <TrafficCapturePanel
+              onCommand={handleCommand}
+              disabled={!canRunCommands}
+            />
+          </div>
+        </div>
+      ) : activeTab === 'settings' ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-xl mx-auto">
+            <SettingsPanel
+              theme={theme}
+              onThemeChange={setTheme}
+              cacheCount={cachedAssets.length}
+              onClearCache={() => setCachedAssets([])}
+            />
           </div>
         </div>
       ) : (
