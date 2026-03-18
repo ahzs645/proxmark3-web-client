@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:tauri": "tauri dev",
     "build": "tsc -b && vite build",
+    "build:pm3-wasm": "emmake make -C proxmark3wasm/client EMSCRIPTEN=1 SKIPREVENGTEST=1 SKIPREADLINE=1 proxmark3",
     "build:tauri": "tauri build",
     "lint": "eslint .",
     "preview": "vite preview",

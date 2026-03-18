@@ -26,12 +26,15 @@ function parseArgs(argv) {
     timeoutMs: Number(process.env.PM3_SMOKE_TIMEOUT_MS || 30000),
     startupDelayMs: Number(process.env.PM3_STARTUP_DELAY_MS || 500),
     settleMs: Number(process.env.PM3_SETTLE_MS || 1500),
+    advanceIdleMs: Number(process.env.PM3_ADVANCE_IDLE_MS || 1500),
     commands: [],
     expect: [],
     wasmDir: process.env.PM3_WASM_DIR || defaultWasmDir,
     autoQuit: true,
     quiet: false,
     debugSerial: process.env.PM3_DEBUG_SERIAL === '1',
+    waitForPrompt: process.env.PM3_WAIT_FOR_PROMPT === '1',
+    timings: process.env.PM3_TIMINGS === '1',
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -52,6 +55,9 @@ function parseArgs(argv) {
       case '--settle-ms':
         options.settleMs = Number(argv[++i] || fail('missing value for --settle-ms'));
         break;
+      case '--advance-idle-ms':
+        options.advanceIdleMs = Number(argv[++i] || fail('missing value for --advance-idle-ms'));
+        break;
       case '--wasm-dir':
         options.wasmDir = path.resolve(argv[++i] || fail('missing value for --wasm-dir'));
         break;
@@ -69,6 +75,12 @@ function parseArgs(argv) {
         break;
       case '--debug-serial':
         options.debugSerial = true;
+        break;
+      case '--wait-for-prompt':
+        options.waitForPrompt = true;
+        break;
+      case '--timings':
+        options.timings = true;
         break;
       case '--help':
       case '-h':
@@ -91,6 +103,9 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.settleMs) || options.settleMs < 0) {
     fail(`invalid settle delay: ${options.settleMs}`);
+  }
+  if (!Number.isFinite(options.advanceIdleMs) || options.advanceIdleMs < 0) {
+    fail(`invalid advance idle delay: ${options.advanceIdleMs}`);
   }
 
   if (!options.port) {
@@ -126,8 +141,12 @@ Options:
   --timeout-ms <n>           Hard timeout for the run. Default: 30000.
   --startup-delay-ms <n>     Delay before sending commands. Default: 500.
   --settle-ms <n>            Extra wait before exit after commands. Default: 1500.
+  --advance-idle-ms <n>      Idle time before advancing to the next command. Default: 1500.
   --wasm-dir <path>          Directory containing proxmark3.js/wasm. Default: public/wasm.
   --no-auto-quit             Do not append "quit" automatically.
+  --wait-for-prompt          Wait for the PM3 prompt before advancing commands. The initial
+                             "hw connect" still falls back to idle detection.
+  --timings                  Print per-command completion timings.
   --quiet                    Suppress live output, keep summary only.
   --debug-serial             Print TX/RX byte counts for the raw serial bridge.
   --help, -h                 Show this help.
@@ -167,6 +186,13 @@ function stripAnsi(text) {
   return String(text).replace(/\x1b\[[0-9;]*m/g, '');
 }
 
+function formatDuration(ms) {
+  if (ms < 1000) {
+    return `${ms} ms`;
+  }
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
 class WasmSmokeRunner {
   constructor(options) {
     this.options = options;
@@ -183,23 +209,37 @@ class WasmSmokeRunner {
     this.commandIndex = 0;
     this.awaitingPrompt = false;
     this.quitSent = false;
+    this.currentCommand = null;
   }
 
   log(kind, text) {
     const line = String(text);
     this.output.push(line);
     if (this.commandSent) {
-      if (this.quitSent && line.includes('program exited')) {
+      if (this.currentCommand && this.isQuitCommand(this.currentCommand.command) && line.includes('program exited')) {
+        this.completeCurrentCommand('exit');
         this.scheduleFinish();
       }
-      if (this.awaitingPrompt && this.isPromptLine(line)) {
+      if (this.awaitingPrompt && this.currentCommand && !this.isPromptLine(line)) {
+        this.currentCommand.sawNonPromptOutput = true;
+      }
+      if (
+        this.awaitingPrompt &&
+        this.currentCommand &&
+        this.isPromptLine(line) &&
+        this.currentCommand.sawNonPromptOutput
+      ) {
         if (this.commandAdvanceTimer) {
           clearTimeout(this.commandAdvanceTimer);
           this.commandAdvanceTimer = null;
         }
-        this.awaitingPrompt = false;
+        this.completeCurrentCommand('prompt');
         this.dispatchNextCommand();
-      } else if (this.awaitingPrompt) {
+      } else if (
+        this.awaitingPrompt &&
+        this.currentCommand?.allowIdleAdvance &&
+        this.currentCommand.sawNonPromptOutput
+      ) {
         this.scheduleCommandAdvance();
       }
     }
@@ -211,6 +251,48 @@ class WasmSmokeRunner {
 
   isPromptLine(line) {
     return stripAnsi(line).trimEnd().endsWith('pm3 -->');
+  }
+
+  isQuitCommand(command) {
+    return command.trim() === 'quit';
+  }
+
+  printRunner(text) {
+    const line = String(text);
+    this.output.push(line);
+    if (!this.options.quiet) {
+      console.log(line);
+    }
+  }
+
+  shouldUseIdleAdvance(commandText, sequence) {
+    if (this.isQuitCommand(commandText)) {
+      return false;
+    }
+    if (!this.options.waitForPrompt) {
+      return true;
+    }
+    return sequence === 1 && /^\s*hw\s+connect\b/i.test(commandText);
+  }
+
+  completeCurrentCommand(reason) {
+    if (!this.currentCommand) {
+      return;
+    }
+
+    const completed = this.currentCommand;
+    this.currentCommand = null;
+    this.awaitingPrompt = false;
+
+    if (this.commandAdvanceTimer) {
+      clearTimeout(this.commandAdvanceTimer);
+      this.commandAdvanceTimer = null;
+    }
+
+    if (this.options.timings) {
+      const elapsedMs = Date.now() - completed.startedAt;
+      this.printRunner(`[runner] command ${completed.sequence}/${this.options.commands.length} ${reason} after ${formatDuration(elapsedMs)}: ${completed.command}`);
+    }
   }
 
   scheduleFinish() {
@@ -229,10 +311,10 @@ class WasmSmokeRunner {
     this.commandAdvanceTimer = setTimeout(() => {
       this.commandAdvanceTimer = null;
       if (!this.finished && this.awaitingPrompt) {
-        this.awaitingPrompt = false;
+        this.completeCurrentCommand('idle');
         this.dispatchNextCommand();
       }
-    }, this.options.settleMs);
+    }, this.options.advanceIdleMs);
   }
 
   configurePort() {
@@ -464,22 +546,25 @@ class WasmSmokeRunner {
     if (this.commandIndex < this.options.commands.length) {
       const command = this.options.commands[this.commandIndex];
       this.commandIndex += 1;
+      this.currentCommand = {
+        sequence: this.commandIndex,
+        command,
+        startedAt: Date.now(),
+        allowIdleAdvance: this.shouldUseIdleAdvance(command, this.commandIndex),
+        sawNonPromptOutput: false,
+      };
       this.awaitingPrompt = true;
-      if (command.trim() === 'quit') {
+      if (this.isQuitCommand(command)) {
         this.quitSent = true;
+      }
+      if (this.options.timings) {
+        this.printRunner(`[runner] command ${this.commandIndex}/${this.options.commands.length} start: ${command}`);
       }
       this.pushStdin(`${command}\n`);
       return;
     }
 
-    if (this.options.autoQuit && !this.quitSent) {
-      this.awaitingPrompt = true;
-      this.quitSent = true;
-      this.pushStdin('quit\n');
-      return;
-    }
-
-    if (!this.options.autoQuit) {
+    if (!this.quitSent) {
       this.scheduleFinish();
     }
   }
@@ -492,6 +577,10 @@ class WasmSmokeRunner {
 
     if (reason) {
       this.log('err', reason);
+    }
+
+    if (this.currentCommand) {
+      this.completeCurrentCommand(reason ? 'stopped' : 'complete');
     }
 
     if (this.finishTimer) {

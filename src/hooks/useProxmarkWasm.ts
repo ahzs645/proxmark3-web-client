@@ -19,6 +19,12 @@ interface WasmModule {
   _pm3_uart_stdin_tail_ptr?: () => number;
   _pm3_uart_stdin_buf_ptr?: () => number;
   _pm3_uart_rb_capacity?: () => number;
+  _pm3_console?: (...args: any[]) => number;
+  _pm3_grabbed_output_get?: (...args: any[]) => number;
+  _pm3_get_current_dev?: () => number;
+  _pm3_web_exec?: (...args: any[]) => number;
+  _pm3_web_exec_opts?: (...args: any[]) => number;
+  _pm3_web_take_output?: () => number;
   preRun?: () => void;
   onRuntimeInitialized?: () => void;
   locateFile?: (path: string, prefix: string) => string;
@@ -64,6 +70,46 @@ let wasmLoadAttempted = false;
 let wasmLoaded = false;
 let globalModule: WasmModule | null = null;
 
+type WasmCommandExportName =
+  | 'pm3_console'
+  | 'pm3_get_current_dev'
+  | 'pm3_grabbed_output_get'
+  | 'pm3_web_exec'
+  | 'pm3_web_exec_opts'
+  | 'pm3_web_take_output';
+
+function hasExport(module: WasmModule | null, exportName: WasmCommandExportName): boolean {
+  if (!module) {
+    return false;
+  }
+
+  return typeof (module as Record<string, unknown>)[`_${exportName}`] === 'function';
+}
+
+function supportsStructuredCommandApi(module: WasmModule | null): boolean {
+  if (!module?.ccall) {
+    return false;
+  }
+
+  return hasExport(module, 'pm3_web_exec_opts')
+    || (hasExport(module, 'pm3_console') && hasExport(module, 'pm3_get_current_dev'));
+}
+
+function pushCommandToStdin(command: string): void {
+  for (let i = 0; i < command.length; i++) {
+    uartShared.pushStdin(command.charCodeAt(i));
+  }
+  uartShared.pushStdin('\n'.charCodeAt(0));
+}
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(typeof error === 'string' ? error : 'Unknown error');
+}
+
 /**
  * Get the device path for the WASM client based on transport type
  */
@@ -94,6 +140,10 @@ export function useProxmarkWasm({
   const onOutputRef = useRef(onOutput);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const commandQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const pendingDevicePathRef = useRef<string | null>(null);
+  const pendingDeviceConnectRef = useRef<Promise<void> | null>(null);
+  const isReadyRef = useRef(wasmLoaded);
 
   // Get transport manager instance
   const transportManager = useMemo(() => getTransportManager(), []);
@@ -108,7 +158,8 @@ export function useProxmarkWasm({
     onOutputRef.current = onOutput;
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
-  }, [onOutput, onReady, onError]);
+    isReadyRef.current = isReady;
+  }, [isReady, onOutput, onReady, onError]);
 
   // Set up transport event handlers
   useEffect(() => {
@@ -118,6 +169,7 @@ export function useProxmarkWasm({
         setActiveTransportType(transportManager.activeTransportType);
       },
       onDisconnect: () => {
+        pendingDevicePathRef.current = null;
         setIsDeviceConnected(false);
         setActiveTransportType(null);
       },
@@ -220,6 +272,11 @@ export function useProxmarkWasm({
     module.onRuntimeInitialized = () => {
       // Initialize the shared UART buffers as soon as the runtime is ready
       uartShared.init(module);
+      console.info(
+        supportsStructuredCommandApi(module)
+          ? '[PM3] Structured command API detected'
+          : '[PM3] Structured command API unavailable; falling back to stdin injection'
+      );
 
       wasmLoaded = true;
       globalModule = module;
@@ -252,17 +309,109 @@ export function useProxmarkWasm({
     document.body.appendChild(script);
   }, [flushOutput]);
 
+  const normalizeAndReportError = useCallback((error: unknown): Error => {
+    const normalized = toError(error);
+    console.error('PM3 WASM command error:', normalized);
+    onErrorRef.current?.(normalized);
+    return normalized;
+  }, []);
+
+  const executeStructuredCommand = useCallback(async (
+    module: WasmModule,
+    command: string
+  ): Promise<number> => {
+    if (!module.ccall) {
+      throw new Error('WASM runtime does not expose ccall');
+    }
+
+    if (hasExport(module, 'pm3_web_exec_opts')) {
+      return await module.ccall(
+        'pm3_web_exec_opts',
+        'number',
+        ['string', 'number', 'number'],
+        [command, 0, 0],
+        { async: true }
+      );
+    }
+
+    if (hasExport(module, 'pm3_console') && hasExport(module, 'pm3_get_current_dev')) {
+      const devPtr = module.ccall('pm3_get_current_dev', 'number', [], []);
+      return await module.ccall(
+        'pm3_console',
+        'number',
+        ['number', 'string', 'number', 'number'],
+        [devPtr, command, 0, 0],
+        { async: true }
+      );
+    }
+
+    throw new Error('Structured PM3 command API not available');
+  }, []);
+
+  const enqueueCommand = useCallback((command: string): Promise<number | void> => {
+    const run = async (): Promise<number | void> => {
+      const module = globalModule;
+      if (!module || !isReadyRef.current) {
+        throw new Error('WASM client is not ready');
+      }
+
+      if (supportsStructuredCommandApi(module)) {
+        return executeStructuredCommand(module, command);
+      }
+
+      pushCommandToStdin(command);
+    };
+
+    const queued = commandQueueRef.current.then(run, run);
+    commandQueueRef.current = queued.then(() => undefined, () => undefined);
+    return queued;
+  }, [executeStructuredCommand]);
+
+  const flushPendingDeviceConnect = useCallback(async (): Promise<void> => {
+    if (!isReadyRef.current) {
+      return;
+    }
+
+    while (pendingDevicePathRef.current) {
+      if (pendingDeviceConnectRef.current) {
+        await pendingDeviceConnectRef.current;
+        continue;
+      }
+
+      const devicePath = pendingDevicePathRef.current;
+      const connectPromise = enqueueCommand(`hw connect -p ${devicePath}`).then(() => {
+        if (pendingDevicePathRef.current === devicePath) {
+          pendingDevicePathRef.current = null;
+        }
+      });
+
+      pendingDeviceConnectRef.current = connectPromise;
+
+      try {
+        await connectPromise;
+      } catch (error) {
+        throw normalizeAndReportError(error);
+      } finally {
+        pendingDeviceConnectRef.current = null;
+      }
+    }
+  }, [enqueueCommand, normalizeAndReportError]);
+
+  useEffect(() => {
+    if (!isReady) {
+      return;
+    }
+
+    void flushPendingDeviceConnect().catch(() => undefined);
+  }, [flushPendingDeviceConnect, isReady]);
+
   // Send a complete command (with newline)
   const sendCommand = useCallback((command: string) => {
-    if (!isReady) return;
-
-    // Add each character to shared stdin
-    for (let i = 0; i < command.length; i++) {
-      uartShared.pushStdin(command.charCodeAt(i));
-    }
-    // Add newline
-    uartShared.pushStdin('\n'.charCodeAt(0));
-  }, [isReady]);
+    if (!isReadyRef.current) return;
+    void enqueueCommand(command).catch((error) => {
+      normalizeAndReportError(error);
+    });
+  }, [enqueueCommand, normalizeAndReportError]);
 
   // Send a single character (for direct terminal input)
   const sendInput = useCallback((char: string) => {
@@ -281,6 +430,9 @@ export function useProxmarkWasm({
   // This is the nuclear option when sendBreak doesn't work
   const hardReset = useCallback(async (): Promise<void> => {
     console.warn('[PM3] Hard reset requested - disconnecting and reloading...');
+    pendingDevicePathRef.current = null;
+    pendingDeviceConnectRef.current = null;
+    commandQueueRef.current = Promise.resolve();
 
     // First disconnect the device via transport manager
     try {
@@ -336,17 +488,23 @@ export function useProxmarkWasm({
 
     const connected = await transportManager.connect(selectedType, device);
 
-    if (connected && isReady) {
-      // Tell the WASM client to connect with the appropriate device path
-      const devicePath = getDevicePath(selectedType);
-      sendCommand(`hw connect -p ${devicePath}`);
+    if (connected) {
+      pendingDevicePathRef.current = getDevicePath(selectedType);
+      if (isReadyRef.current) {
+        try {
+          await flushPendingDeviceConnect();
+        } catch {
+          return false;
+        }
+      }
     }
 
     return connected;
-  }, [isReady, sendCommand, transportManager]);
+  }, [flushPendingDeviceConnect, transportManager]);
 
   // Disconnect from physical device
   const disconnectDevice = useCallback(async (): Promise<void> => {
+    pendingDevicePathRef.current = null;
     await transportManager.disconnect();
   }, [transportManager]);
 
