@@ -30,3 +30,63 @@ No. Everything runs client-side in your browser or desktop app. No data is trans
 ### How do I update the WASM module?
 
 Pull the latest changes from the repository. The WASM binary is included in the `proxmark3wasm/` submodule and updated periodically to match upstream Proxmark3 releases.
+
+---
+
+## Troubleshooting
+
+### The Proxmark3 doesn't appear in the serial port picker
+
+Chrome's WebSerial port picker only shows devices that aren't already claimed by another process. Common causes:
+
+- **Another tab has it open** — if you previously connected in a different tab or window, Chrome holds the port. Close that tab first.
+- **A Node.js process has it open** — if you ran the smoke test runner and it didn't exit cleanly, the port may still be locked. Check with `lsof /dev/cu.usbmodem*` and kill the process.
+- **The device isn't plugged in** — verify with `ls /dev/cu.usbmodem*` (macOS) or `ls /dev/ttyACM*` (Linux).
+- **Unplug and replug** the USB cable to reset the port.
+
+### Hardnested shows target info but no progress
+
+Before the hardnested fix, the WASM build returned `PM3_ENOTIMPL` silently after printing the target block info. If you see:
+
+```
+Target block no 4 target key type: A known target key: 000000000000 (not set)
+File action: none Slow: No Tests: 0
+```
+
+...and then nothing, you're running the old WASM build without the hardnested patch. Rebuild with `npm run build:pm3-wasm` and copy the output to `public/wasm/`.
+
+### "Cannot enlarge memory" during hardnested
+
+The WASM module's memory limit is too low. Ensure the Makefile has:
+
+```makefile
+PM3LDFLAGS += -sMAXIMUM_MEMORY=2147483648
+```
+
+Then rebuild.
+
+### Segfault during hardnested brute force
+
+If `SAFE_HEAP=1` is in the Makefile linker flags, it conflicts with the `SharedArrayBuffer` used by pthreads. Remove `-sSAFE_HEAP=1` and rebuild.
+
+### Autopwn finds sector 0 keys but stops
+
+Before the hardnested fix, autopwn would find keys via dictionary check, then silently fail when it tried hardnested for the remaining sectors (because hardnested returned `PM3_ENOTIMPL`). With the fix, autopwn continues into the hardnested phase — but this can take several minutes per sector in WASM.
+
+### Output looks garbled or incomplete
+
+The WASM stdout handler collects output character-by-character and flushes on newlines. If a command prints partial lines without a newline (like progress bars), they may appear delayed. This is normal — the output will appear when the next newline is written.
+
+### The page freezes
+
+If `PROXY_TO_PTHREAD` is not set, blocking C code runs on the browser's main thread and freezes the tab. This should already be configured. If you see freezes, verify the Makefile has:
+
+```makefile
+PM3LDFLAGS += -sPROXY_TO_PTHREAD=1
+```
+
+### Connection drops or "serial read failed"
+
+- Check the USB cable — some cables are charge-only and don't support data.
+- Try a different USB port — hubs can be unreliable.
+- On macOS, the device appears as `/dev/cu.usbmodemiceman1` or similar. If it disappears from `/dev/`, the device may have reset.

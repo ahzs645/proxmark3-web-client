@@ -1,0 +1,184 @@
+---
+title: WASM Porting Guide
+description: Decisions, patterns, and pitfalls for porting Proxmark3 C code to Emscripten WASM.
+---
+
+This page documents the patterns and decisions made when porting the Proxmark3 C client to run as WASM in the browser. It's intended for developers who need to enable additional features, update the submodule, or debug WASM-specific issues.
+
+## The general approach
+
+The PM3 C client was not designed for WASM. Rather than forking and rewriting, the approach is **minimal patches** — typically `#ifdef __EMSCRIPTEN__` guards and Makefile conditionals. This keeps the diff small and makes rebasing on upstream PM3 releases manageable.
+
+### Files that have WASM-specific changes
+
+| File | What changed |
+|------|-------------|
+| `client/Makefile` | Emscripten linker flags, source file filtering, pthread config |
+| `client/src/cmdhfmfhard.h` | Removed inline stub that disabled hardnested |
+| `client/src/cmdhfmfhard.c` | Added lz4/bz2 API stubs under `__EMSCRIPTEN__` |
+| `client/src/util.c` | Capped `detect_num_CPUs()` to 4 for Emscripten |
+| `client/deps/hardnested/Makefile` | Forces `cpu_arch = wasm` to use NOSIMD path |
+| `client/src/uart/uart_web.c` | Custom UART layer using shared ring buffers (not a patch — this is a new file) |
+
+## Pattern: Stubbing unavailable libraries
+
+When a C source file includes a library header that isn't available in the Emscripten build (like `lz4frame.h` or `bzlib.h`), there are two options:
+
+### Option A: Remove the code paths with `#ifdef`
+
+```c
+#ifndef __EMSCRIPTEN__
+#include <lz4frame.h>
+// ... lz4-dependent code ...
+#endif
+```
+
+**Pros**: Clean, no dead code.
+**Cons**: Can be invasive if the library calls are interleaved throughout a function. Risks breaking brace matching and creates hard-to-review diffs.
+
+### Option B: Provide minimal API stubs
+
+```c
+#ifdef __EMSCRIPTEN__
+typedef unsigned LZ4F_errorCode_t;
+static inline int LZ4F_isError(LZ4F_errorCode_t c) { return 1; }
+// ... minimal stubs that make the code compile ...
+#else
+#include <lz4frame.h>
+#endif
+```
+
+**Pros**: The rest of the source file compiles unchanged. Error paths that already exist in the code handle the failures naturally.
+**Cons**: Dead code paths exist at runtime (the stub functions return errors so the code gracefully falls through).
+
+We chose **Option B** for `cmdhfmfhard.c` because the lz4/bz2 calls are deeply interleaved in a large function (`init_bitflip_bitarrays`). The existing error handling already handles "file not found" and "decompression failed" cases, so the stubs just trigger those existing paths.
+
+## Pattern: Disabling SIMD
+
+The hardnested brute-force core (`hardnested_bf_core.c`) is compiled multiple times — once per SIMD variant (AVX512, AVX2, SSE2, NEON, MMX, NOSIMD). The `deps/hardnested/Makefile` detects `uname -m` and builds the appropriate variants.
+
+For WASM, we override:
+
+```makefile
+ifdef EMSCRIPTEN
+cpu_arch = wasm
+else
+cpu_arch = $(shell uname -m)
+endif
+```
+
+Since `wasm` doesn't match any known architecture pattern, `IS_SIMD_ARCH` stays empty and the Makefile falls through to:
+
+```makefile
+ifeq ($(MULTIARCHSRCS), )
+    MYCFLAGS += -DNOSIMD_BUILD
+    MYSRCS += hardnested_bf_core.c hardnested_bitarray_core.c
+endif
+```
+
+This compiles a single NOSIMD variant with 64-bit integer bitslice operations.
+
+### Why not WASM SIMD128?
+
+Emscripten supports WASM SIMD128 via `wasm_simd128.h`, and all major browsers support it. It could be added as a new dispatch target alongside the existing AVX/SSE/NEON paths. This is a future improvement — the NOSIMD path works correctly, just 2-4x slower than SIMD would be.
+
+## Pattern: Controlling pthreads
+
+Emscripten implements `pthread_create()` by spawning Web Workers. Several things to know:
+
+### Pre-allocate a worker pool
+
+```makefile
+PM3LDFLAGS += -sPTHREAD_POOL_SIZE=8
+```
+
+Without this, each `pthread_create()` call creates a new Web Worker asynchronously. If the calling code immediately does `pthread_join()` (synchronous wait), it can deadlock — the worker hasn't started yet, and the main thread is blocked waiting for it.
+
+A pool of pre-created workers avoids this. Size it larger than the maximum concurrent thread count.
+
+### Cap thread count
+
+Native code calls `sysconf(_SC_NPROCESSORS_ONLN)` which in Emscripten returns the host machine's core count. A 16-core machine would spawn 16 Web Workers, each with its own WASM memory copy. This wastes hundreds of MB and can crash the tab.
+
+Cap it to a sensible number (we use 4).
+
+### PROXY_TO_PTHREAD
+
+```makefile
+PM3LDFLAGS += -sPROXY_TO_PTHREAD=1
+```
+
+This runs `main()` on a worker thread instead of the browser's main thread. Without it, any blocking C code (like `sleep()`, `select()`, or tight loops) would freeze the browser tab.
+
+### SAFE_HEAP incompatibility
+
+`-sSAFE_HEAP=1` instruments every memory access for debugging. It is **not compatible** with `SharedArrayBuffer` (which pthreads requires). If both are enabled, you'll get segfaults when worker threads access shared WASM memory. Remove `SAFE_HEAP` when using pthreads.
+
+## Pattern: Memory limits
+
+```makefile
+PM3LDFLAGS += -sINITIAL_MEMORY=134217728    # 128 MB
+PM3LDFLAGS += -sALLOW_MEMORY_GROWTH=1
+PM3LDFLAGS += -sMAXIMUM_MEMORY=2147483648   # 2 GB
+```
+
+WASM linear memory starts at `INITIAL_MEMORY` and grows on demand up to `MAXIMUM_MEMORY`. The absolute limit for WASM32 is 4 GB, but Emscripten's practical limit is 2 GB due to signed 32-bit pointer arithmetic.
+
+Most PM3 commands use under 128 MB. Hardnested is the outlier — it allocates large bitflip state arrays and can consume over 1 GB during nonce processing.
+
+If you hit `Cannot enlarge memory`, increase `MAXIMUM_MEMORY`.
+
+## How to enable a currently-disabled feature
+
+If a PM3 command is stubbed out for WASM (returning `PM3_ENOTIMPL` or similar), here's the general process:
+
+1. **Find the stub** — search for `__EMSCRIPTEN__` in the relevant header or source file
+2. **Check what the real implementation needs** — libraries, threading, SIMD, filesystem access
+3. **Address each dependency**:
+   - Missing library → stub the API (Option B above) or port/embed the library
+   - Threading → should work already with the existing pthread config
+   - SIMD → use NOSIMD fallback or add WASM SIMD128 path
+   - File I/O → embed files with `--embed-file` or use the `/pm3-cache/` mechanism
+4. **Re-include the source file** — remove it from the `filter-out` line in the Makefile
+5. **Test with the smoke runner** — `node scripts/pm3-wasm-smoke.cjs --command "your command"`
+6. **Check memory** — run with `--debug-serial` and watch for memory growth messages
+
+## Smoke testing
+
+The `scripts/pm3-wasm-smoke.cjs` runner lets you test WASM commands against real hardware from Node.js (no browser needed):
+
+```bash
+# Basic test
+node scripts/pm3-wasm-smoke.cjs \
+  --command "hw connect -p /dev/webserial" \
+  --command "hw version" \
+  --timings
+
+# Test a specific attack
+node scripts/pm3-wasm-smoke.cjs \
+  --command "hw connect -p /dev/webserial" \
+  --command "hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta" \
+  --timeout-ms 600000 --advance-idle-ms 120000
+
+# With assertions
+node scripts/pm3-wasm-smoke.cjs \
+  --command "hw connect -p /dev/webserial" \
+  --command "hf 14a info" \
+  --expect "MIFARE Classic"
+```
+
+Key flags:
+- `--advance-idle-ms` — how long to wait for output before advancing to the next command. Increase for slow operations like hardnested.
+- `--timeout-ms` — hard timeout for the entire run.
+- `--timings` — print per-command durations.
+- `--debug-serial` — print TX/RX byte counts for the serial bridge.
+
+## Keeping up with upstream
+
+When updating the `proxmark3wasm` submodule:
+
+1. Check if any patched files were modified upstream (`cmdhfmfhard.h`, `cmdhfmfhard.c`, `util.c`, the two Makefiles)
+2. Re-apply patches if needed — the changes are small and localized
+3. Rebuild: `npm run build:pm3-wasm`
+4. Run smoke tests against hardware
+5. Copy output: `cp proxmark3wasm/client/proxmark3.{js,wasm} public/wasm/`

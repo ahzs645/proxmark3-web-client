@@ -1,17 +1,18 @@
 ---
 title: WASM Backend
-description: How the Proxmark3 client runs as WebAssembly in the browser.
+description: How the Proxmark3 client runs as WebAssembly in the browser, including threading, memory, and attack support.
 ---
 
-The core of this project is the **Proxmark3 C client compiled to WebAssembly** via Emscripten. This means the full pm3 command processor runs entirely client-side.
+The core of this project is the **Proxmark3 C client compiled to WebAssembly** via Emscripten. This means the full pm3 command processor runs entirely client-side — no server, no proxy, no native install required.
 
 ## How It Works
 
 The `proxmark3wasm/` submodule contains the Proxmark3 client source code with modifications for Emscripten compilation. The build produces:
 
-- `proxmark3.wasm` — the compiled binary
-- `proxmark3.js` — Emscripten glue code
-- Supporting files for the Emscripten virtual filesystem
+- `proxmark3.wasm` — the compiled binary (~6 MB)
+- `proxmark3.js` — Emscripten glue code (handles module loading, memory, thread setup)
+
+These are served from `public/wasm/` and loaded by the `useProxmarkWasm` hook.
 
 ## Key APIs
 
@@ -21,29 +22,89 @@ The WASM module exposes these functions to JavaScript:
 |----------|---------|
 | `pm3_console` | Main command processor |
 | `pm3_web_exec` | Execute a command string |
-| `pm3_web_exec_opts` | Execute with structured options (newer API) |
+| `pm3_web_exec_opts` | Execute with structured options (newer, preferred API) |
+| `pm3_uart_rx_*` / `pm3_uart_tx_*` | Ring buffer pointers for serial I/O |
+| `pm3_uart_stdin_*` | Ring buffer pointers for keyboard input |
+| `pm3_uart_rb_capacity` | Ring buffer size |
 
 The `useProxmarkWasm` hook manages the WASM lifecycle:
 - Loading and initializing the module
 - Command queuing and execution
-- Output capture and routing
+- Output capture (character-by-character from stdout/stderr) and routing
 - Connection state management
 
 ## Threading
 
-WASM threading requires:
+The WASM build uses **Emscripten pthreads** backed by Web Workers and `SharedArrayBuffer`.
+
+### Build flags
+
+```makefile
+PM3LDFLAGS += -pthread -sUSE_PTHREADS=1 -sPROXY_TO_PTHREAD=1
+PM3LDFLAGS += -sPTHREAD_POOL_SIZE=8
+PM3LDFLAGS += -sDEFAULT_PTHREAD_STACK_SIZE=1048576
+```
+
+| Flag | Purpose |
+|------|---------|
+| `USE_PTHREADS=1` | Enables Emscripten pthread support |
+| `PROXY_TO_PTHREAD=1` | Runs `main()` on a worker thread so the browser event loop stays free |
+| `PTHREAD_POOL_SIZE=8` | Pre-allocates 8 Web Workers. Without this, `pthread_create()` must create workers on-the-fly which can deadlock in synchronous code |
+
+### Browser requirements
+
+Threading requires:
 
 - `SharedArrayBuffer` — for shared memory between threads
 - **COOP/COEP headers** — `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`
 
-These headers are configured in the Vite dev server and must be set by your hosting provider for production.
+These headers are configured in the Vite dev server and must be set by your hosting provider for production. The project includes a `coi-serviceworker.js` fallback for environments where server headers can't be configured (like GitHub Pages).
+
+### Thread count
+
+The native PM3 client uses `sysconf(_SC_NPROCESSORS_ONLN)` to determine how many brute-force threads to spawn. In Emscripten this returns the host machine's core count, which can be 8, 16, or 32 — far too many Web Workers.
+
+We cap it at 4 in `util.c`:
+
+```c
+#if defined(__EMSCRIPTEN__)
+    int count = sysconf(_SC_NPROCESSORS_ONLN);
+    if (count <= 0) count = 1;
+    return (count > 4) ? 4 : count;
+#endif
+```
+
+## Memory
+
+```makefile
+PM3LDFLAGS += -sINITIAL_MEMORY=134217728    # 128 MB starting heap
+PM3LDFLAGS += -sALLOW_MEMORY_GROWTH=1       # Heap can grow
+PM3LDFLAGS += -sMAXIMUM_MEMORY=2147483648   # Up to 2 GB
+```
+
+Most commands use well under 128 MB. The hardnested attack is the exception — it allocates large state arrays during nonce processing and can consume 1+ GB. The 2 GB limit is the maximum for WASM's 32-bit address space.
+
+:::caution
+If you see `Cannot enlarge memory`, the WASM module hit its memory ceiling. This typically happens during hardnested on cards with large keyspaces. Ensure `MAXIMUM_MEMORY` is set to `2147483648`.
+:::
+
+## Debug flags
+
+```makefile
+PM3LDFLAGS += -sASSERTIONS=2 -sSTACK_OVERFLOW_CHECK=2
+```
+
+`SAFE_HEAP=1` was intentionally **removed** — it instruments every memory access for debugging but is incompatible with `SharedArrayBuffer` (used by pthreads), causing segfaults when brute-force threads access shared memory.
 
 ## Virtual Filesystem
 
-Emscripten provides a virtual filesystem where the WASM module reads/writes files:
+Emscripten provides a virtual in-memory filesystem:
 
-- `/pm3-cache/` — synced with the browser's file cache
-- Device files (`/dev/webserial`, etc.) — mapped to transport streams
+- `/pm3-cache/` — synced with the browser's `localStorage` file cache. Key dictionaries and uploaded files are written here so PM3 commands can reference them (e.g., `hf mf chk -f /pm3-cache/keys.dic`).
+- Device files (`/dev/webserial`, `/dev/tauriserial`, `/dev/rfcomm0`) — mapped to transport streams via the custom UART layer in `uart/uart_web.c`.
+- `/home/web_user/.proxmark3/` — PM3 preferences and session logs.
+
+Files in the virtual filesystem are **ephemeral** — they are lost on page reload unless the UI explicitly saves them to `localStorage`.
 
 ## Building from Source
 
@@ -51,6 +112,21 @@ Emscripten provides a virtual filesystem where the WASM module reads/writes file
 # Requires Emscripten SDK installed and activated
 npm run build:pm3-wasm
 
-# Verify the build
+# Copy output to public directory
+cp proxmark3wasm/client/proxmark3.js proxmark3wasm/client/proxmark3.wasm public/wasm/
+
+# Verify with hardware
 npm run smoke:pm3-wasm
 ```
+
+The build command runs: `emmake make -C proxmark3wasm/client EMSCRIPTEN=1 SKIPREVENGTEST=1 SKIPREADLINE=1 proxmark3`
+
+### Build-time dependencies excluded for WASM
+
+| Library | Why excluded | Impact |
+|---------|-------------|--------|
+| `lz4` | Not available in Emscripten, would need porting | Compressed hardnested tables (`.lz4`) can't be loaded; attack still works using collected nonces |
+| `bz2` | Not available in Emscripten | Same as lz4 — `.bz2` compressed tables unavailable |
+| `readline` | No terminal line editing in browser context | Handled by xterm.js on the JS side instead |
+| `Qt` | No GUI framework in WASM | Replaced by the React UI |
+| `bluez` | Linux Bluetooth stack, not relevant | Bluetooth handled by Tauri transport layer |

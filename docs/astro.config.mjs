@@ -36,6 +36,7 @@ export default defineConfig({
 						{ label: 'Overview', slug: 'architecture/overview' },
 						{ label: 'Transport Layer', slug: 'architecture/transport' },
 						{ label: 'WASM Backend', slug: 'architecture/wasm' },
+						{ label: 'WASM Porting Guide', slug: 'architecture/wasm-porting' },
 					],
 				},
 				{
