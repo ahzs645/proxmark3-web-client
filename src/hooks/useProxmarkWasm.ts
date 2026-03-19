@@ -110,6 +110,10 @@ function toError(error: unknown): Error {
   return new Error(typeof error === 'string' ? error : 'Unknown error');
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Get the device path for the WASM client based on transport type
  */
@@ -355,7 +359,14 @@ export function useProxmarkWasm({
         throw new Error('WASM client is not ready');
       }
 
-      if (supportsStructuredCommandApi(module)) {
+      const shouldUseStructuredApi = supportsStructuredCommandApi(module)
+        && transportManager.activeTransportType !== 'webserial'
+        && pendingDevicePathRef.current !== '/dev/webserial';
+
+      // WebSerial needs the event loop free so the RX/TX pumps can move bytes.
+      // The structured PM3 API can block the main thread in-browser, which leaves
+      // the client stuck in offline mode during hw connect / live RFID commands.
+      if (shouldUseStructuredApi) {
         return executeStructuredCommand(module, command);
       }
 
@@ -365,7 +376,7 @@ export function useProxmarkWasm({
     const queued = commandQueueRef.current.then(run, run);
     commandQueueRef.current = queued.then(() => undefined, () => undefined);
     return queued;
-  }, [executeStructuredCommand]);
+  }, [executeStructuredCommand, transportManager]);
 
   const flushPendingDeviceConnect = useCallback(async (): Promise<void> => {
     if (!isReadyRef.current) {
@@ -490,6 +501,9 @@ export function useProxmarkWasm({
 
     if (connected) {
       pendingDevicePathRef.current = getDevicePath(selectedType);
+      // Give freshly opened serial transports a moment to settle before the
+      // PM3 client sends the initial hw connect command.
+      await wait(selectedType === 'webserial' ? 500 : 100);
       if (isReadyRef.current) {
         try {
           await flushPendingDeviceConnect();
