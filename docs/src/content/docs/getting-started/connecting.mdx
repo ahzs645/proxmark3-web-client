@@ -1,0 +1,54 @@
+---
+title: Connecting Your Device
+description: How to connect your Proxmark3 to the web client via USB or Bluetooth.
+---
+
+## USB (Web Serial)
+
+This is the primary connection method for the browser version.
+
+1. Plug your Proxmark3 into a USB port
+2. Open the app in Chrome, Edge, or Brave
+3. Click the **Connect** button in the ribbon toolbar
+4. Select your Proxmark3 from the browser's serial port picker
+5. The client will automatically run `hw connect` and establish the link
+
+The device appears as `/dev/webserial` internally. The connection status indicator in the toolbar shows when you're connected.
+
+:::note
+Web Serial requires a Chromium-based browser. Firefox and Safari are not supported.
+:::
+
+## Native Serial (Tauri Desktop)
+
+In the Tauri desktop app, serial ports are accessed directly via the Rust `serialport` crate — no browser permission prompts needed.
+
+1. Open the desktop app
+2. Select **Serial** from the transport selector dropdown
+3. Choose your port from the detected list
+4. Click **Connect**
+
+## Bluetooth (Tauri Desktop — macOS)
+
+For Proxmark3 devices with Bluetooth (like the PM3 X):
+
+1. Pair your Proxmark3 via macOS Bluetooth settings first
+2. Open the desktop app
+3. Select **Bluetooth** from the transport selector
+4. Choose your paired device
+5. Click **Connect**
+
+The Bluetooth transport uses SPP (Serial Port Profile) via macOS IOBluetooth.
+
+:::caution
+Bluetooth support is currently macOS only. Windows and Linux Bluetooth support is planned.
+:::
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| No ports shown | Check USB cable, try a different port, ensure drivers are installed |
+| Permission denied | On Linux, add your user to the `dialout` group |
+| Connection drops | Ensure COOP/COEP headers are set (required for SharedArrayBuffer) |
+| Slow response | Check that WASM threading is working (requires secure context + headers) |

@@ -1,0 +1,57 @@
+---
+title: Transport Layer
+description: How the client communicates with Proxmark3 hardware.
+---
+
+The transport layer abstracts hardware communication behind a common interface, allowing the UI to work identically regardless of connection method.
+
+## Transport Interface
+
+All transports implement a shared interface with:
+
+- `connect()` / `disconnect()`
+- Read and write streams
+- Event handlers for connection state changes
+- Device path mapping for the WASM layer
+
+## Implementations
+
+### WebSerialTransport
+
+Used in the **browser**. Leverages the [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API) available in Chromium browsers.
+
+- Device path: `/dev/webserial`
+- Requires user gesture to open port picker
+- Supports baud rate configuration
+
+### TauriSerialTransport
+
+Used in the **desktop app**. Accesses serial ports directly via the Rust `serialport` crate.
+
+- Device path: `/dev/tauriserial`
+- No browser permissions needed
+- Enumerates available ports automatically
+
+### TauriBluetoothTransport
+
+Used in the **desktop app** on macOS. Connects to Proxmark3 devices over Bluetooth SPP.
+
+- Device path: `/dev/rfcomm0`
+- Uses `objc2` bindings to macOS IOBluetooth framework
+- Requires prior pairing via System Preferences
+
+## Transport Manager
+
+The `TransportManager` class uses a factory pattern to create the appropriate transport based on:
+
+1. Runtime environment (browser vs. Tauri)
+2. User selection from the transport selector dropdown
+3. Available hardware capabilities
+
+## Ring Buffers
+
+Communication between JavaScript and the WASM module uses shared memory ring buffers with `Atomics` for thread-safe concurrent access:
+
+- **stdin buffer** — JS → WASM (commands)
+- **tx buffer** — WASM → device (outgoing data)
+- **rx path** — device → WASM (incoming data)

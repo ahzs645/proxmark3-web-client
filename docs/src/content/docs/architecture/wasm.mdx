@@ -1,0 +1,56 @@
+---
+title: WASM Backend
+description: How the Proxmark3 client runs as WebAssembly in the browser.
+---
+
+The core of this project is the **Proxmark3 C client compiled to WebAssembly** via Emscripten. This means the full pm3 command processor runs entirely client-side.
+
+## How It Works
+
+The `proxmark3wasm/` submodule contains the Proxmark3 client source code with modifications for Emscripten compilation. The build produces:
+
+- `proxmark3.wasm` — the compiled binary
+- `proxmark3.js` — Emscripten glue code
+- Supporting files for the Emscripten virtual filesystem
+
+## Key APIs
+
+The WASM module exposes these functions to JavaScript:
+
+| Function | Purpose |
+|----------|---------|
+| `pm3_console` | Main command processor |
+| `pm3_web_exec` | Execute a command string |
+| `pm3_web_exec_opts` | Execute with structured options (newer API) |
+
+The `useProxmarkWasm` hook manages the WASM lifecycle:
+- Loading and initializing the module
+- Command queuing and execution
+- Output capture and routing
+- Connection state management
+
+## Threading
+
+WASM threading requires:
+
+- `SharedArrayBuffer` — for shared memory between threads
+- **COOP/COEP headers** — `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`
+
+These headers are configured in the Vite dev server and must be set by your hosting provider for production.
+
+## Virtual Filesystem
+
+Emscripten provides a virtual filesystem where the WASM module reads/writes files:
+
+- `/pm3-cache/` — synced with the browser's file cache
+- Device files (`/dev/webserial`, etc.) — mapped to transport streams
+
+## Building from Source
+
+```bash
+# Requires Emscripten SDK installed and activated
+npm run build:pm3-wasm
+
+# Verify the build
+npm run smoke:pm3-wasm
+```

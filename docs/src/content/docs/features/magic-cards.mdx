@@ -1,0 +1,46 @@
+---
+title: HF - Magic Cards
+description: Support for Gen1a, Gen2, Gen3, and Gen4 magic Mifare cards.
+---
+
+The **Magic Card Panel** provides specialized operations for Chinese magic Mifare Classic cards.
+
+## Supported Card Types
+
+### Gen1a
+- Uses backdoor commands to bypass authentication
+- UID, ATQA, SAK can be freely written
+- Detectable by readers that check for backdoor response
+
+### Gen2 (CUID)
+- Direct write to block 0 without backdoor commands
+- Less detectable than Gen1a
+- Some variants have write protection
+
+### Gen3 (APDU)
+- Uses APDU commands for UID changes
+- Block 0 is locked after write on some variants
+- More compatible with modern readers
+
+### Gen4 (GTU)
+- Password-protected operations (default: `00000000`)
+- Most flexible — supports UID, ATQA, SAK, ATS changes
+- Can emulate multiple card types
+- Least detectable
+
+## Operations
+
+- **Detect magic card type** — identifies which generation your card is
+- **Read/Write UID** — change the card's UID
+- **ATQA/SAK manipulation** — modify card identification bytes
+- **BCC calculation** — automatic Block Check Character computation
+- **Random UID generation** — generate valid random UIDs
+- **Full block 0 write** — write complete manufacturer block
+
+## Usage
+
+1. Go to the **Magic** tab
+2. Place your magic card on the reader
+3. The panel will attempt to detect the card type
+4. Select your operation (change UID, write block 0, etc.)
+5. Fill in the parameters and execute

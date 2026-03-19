@@ -1,0 +1,38 @@
+---
+title: Introduction
+description: A web-based and desktop client for Proxmark3 RFID security testing devices.
+---
+
+**Proxmark3 Web Client** is a modern, browser-based interface for interacting with [Proxmark3](https://proxmark.com/) hardware — the industry-standard tool for RFID security research and testing.
+
+## What is it?
+
+Instead of relying solely on the command-line `pm3` client, this project gives you a rich graphical interface that runs directly in your browser or as a native desktop app via Tauri.
+
+The Proxmark3 firmware is compiled to **WebAssembly**, so the full pm3 client runs client-side — no server required.
+
+## Key Capabilities
+
+- **Browser-based** — works in Chrome/Edge via Web Serial API
+- **Desktop app** — native serial and Bluetooth via Tauri (macOS, Windows, Linux)
+- **HF attacks** — Autopwn, Nested, Darkside, Hardnested, Static Nested
+- **Magic card support** — Gen1a, Gen2, Gen3, Gen4 (GTU)
+- **LF operations** — EM410x, T55xx read/write/password management
+- **Memory editor** — visual block-by-block Mifare Classic editing
+- **Traffic capture** — protocol decoding for ISO14443-A/B, ISO15693, LF
+- **Terminal** — full xterm.js terminal for direct pm3 commands
+- **File cache** — persistent storage for key files, dumps, and scripts
+
+## Browser Requirements
+
+| Feature | Requirement |
+|---------|------------|
+| Web Serial | Chrome, Edge, or Brave (Chromium-based) |
+| WASM Threading | `SharedArrayBuffer` support (COOP/COEP headers) |
+| Desktop | macOS 10.13+, Windows 7+, Linux (Ubuntu 18.04+) |
+
+## Quick Links
+
+- [Installation](/proxmark3-web-client/docs/getting-started/installation/) — get up and running
+- [Connecting Your Device](/proxmark3-web-client/docs/getting-started/connecting/) — connect via USB or Bluetooth
+- [Architecture Overview](/proxmark3-web-client/docs/architecture/overview/) — how it all fits together

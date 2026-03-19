@@ -1,0 +1,39 @@
+---
+title: Proxmark3 Web Client
+description: A modern web & desktop interface for Proxmark3 RFID security tools.
+template: splash
+hero:
+  tagline: Control your Proxmark3 from the browser or desktop — no CLI required.
+  actions:
+    - text: Get Started
+      link: /proxmark3-web-client/docs/getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: Open the App
+      link: https://projects.ahmadjalil.com/proxmark3-web-client/
+      icon: external
+      variant: minimal
+    - text: View on GitHub
+      link: https://github.com/ahzs645/proxmark3-web-client
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="HF Attacks" icon="rocket">
+    Autopwn, Nested, Darkside, Hardnested, and Static Nested — all from a clean UI.
+  </Card>
+  <Card title="Magic Cards" icon="pencil">
+    Full Gen1a, Gen2, Gen3, and Gen4 (GTU) magic card support with UID manipulation.
+  </Card>
+  <Card title="LF Operations" icon="setting">
+    EM410x read/write, T55xx block access, and configurable LF sampling.
+  </Card>
+  <Card title="Runs in Your Browser" icon="laptop">
+    Proxmark3 firmware compiled to WASM — everything runs client-side via Web Serial.
+  </Card>
+</CardGrid>

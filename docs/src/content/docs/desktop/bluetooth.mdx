@@ -1,0 +1,39 @@
+---
+title: Bluetooth Support
+description: Connecting to Proxmark3 via Bluetooth in the desktop app.
+---
+
+The Tauri desktop app supports Bluetooth SPP connections to Proxmark3 devices (like the PM3 X) on macOS.
+
+## Requirements
+
+- macOS 10.13+
+- Proxmark3 with Bluetooth module (PM3 X, or aftermarket BT add-on)
+- Device paired via macOS System Preferences > Bluetooth
+
+## How It Works
+
+The Bluetooth transport uses Rust bindings to macOS's **IOBluetooth** framework via the `objc2` crate. It establishes a Serial Port Profile (SPP) connection, which the WASM module sees as `/dev/rfcomm0`.
+
+## Setup Steps
+
+1. **Pair your device** — go to System Preferences > Bluetooth, put your PM3 in pairing mode, and pair it
+2. **Open the desktop app**
+3. **Select Bluetooth** from the transport selector in the toolbar
+4. **Choose your device** from the list of paired Bluetooth devices
+5. **Click Connect**
+
+## Limitations
+
+- **macOS only** — Windows and Linux Bluetooth support is not yet implemented
+- **SPP only** — BLE (Bluetooth Low Energy) is not supported
+- **Pairing required** — the device must be paired at the OS level first
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Device not listed | Ensure it's paired in System Preferences |
+| Connection fails | Try unpairing and re-pairing the device |
+| Slow data transfer | SPP bandwidth is limited compared to USB — expected behavior |
+| Disconnects randomly | Check device battery, move closer to reduce interference |

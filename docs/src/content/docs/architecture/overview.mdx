@@ -1,0 +1,69 @@
+---
+title: Architecture Overview
+description: How the Proxmark3 Web Client is structured.
+---
+
+## High-Level Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│          React UI (Panels, Terminal)          │
+└──────────────────┬───────────────────────────┘
+                   │
+┌──────────────────┴───────────────────────────┐
+│     WASM Module (Proxmark3 C → Emscripten)   │
+│     Ring buffers, pm3_console, UART layer     │
+└──────────────────┬───────────────────────────┘
+                   │
+┌──────────────────┴───────────────────────────┐
+│           Transport Layer                     │
+│  WebSerial │ TauriSerial │ TauriBluetooth    │
+└──────────────────┬───────────────────────────┘
+                   │
+            Proxmark3 Hardware
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| UI | React 19, TypeScript, Tailwind CSS, Radix UI |
+| Terminal | xterm.js |
+| WASM | Proxmark3 C code compiled with Emscripten |
+| Desktop | Tauri 2.x (Rust backend) |
+| Build | Vite, PostCSS |
+| Deploy | GitHub Actions → GitHub Pages |
+
+## Project Structure
+
+```
+proxmark3-web-client/
+├── src/
+│   ├── App.tsx                    # Main app component
+│   ├── components/
+│   │   ├── panels/                # Feature panels (attacks, magic, LF, etc.)
+│   │   ├── ribbon/                # Top toolbar & transport selector
+│   │   ├── terminal/              # xterm.js wrapper
+│   │   └── ui/                    # Radix UI primitives
+│   ├── hooks/
+│   │   ├── useProxmarkWasm.ts     # WASM lifecycle & command queue
+│   │   └── useTheme.ts
+│   └── lib/
+│       ├── transports/            # Transport implementations
+│       ├── pm3WebUSB.ts           # UART ring buffer logic
+│       └── accessBits.ts          # Mifare access bits decoder
+├── src-tauri/                     # Tauri Rust backend
+├── proxmark3wasm/                 # WASM submodule
+├── docs/                          # This documentation (Astro Starlight)
+└── public/                        # Static assets
+```
+
+## Data Flow
+
+1. User types command (terminal) or clicks UI button (panel)
+2. Command enqueued via `useProxmarkWasm` hook
+3. Pushed to WASM stdin ring buffer using `Atomics` for thread safety
+4. WASM C code consumes from stdin, processes command
+5. Output captured from stdout via Emscripten callbacks
+6. Results displayed in terminal and parsed by UI panels
+7. Device communication flows through the selected transport

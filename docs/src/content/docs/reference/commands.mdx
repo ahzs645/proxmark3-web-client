@@ -1,0 +1,65 @@
+---
+title: Common Commands
+description: Quick reference for frequently used Proxmark3 commands.
+---
+
+## Hardware
+
+```bash
+hw version          # Firmware version info
+hw status           # Device status
+hw connect          # Reconnect to device
+hw ping             # Test device connection
+```
+
+## HF (High Frequency)
+
+```bash
+hf search                              # Detect HF card
+hf 14a info                            # ISO14443-A card info
+hf mf info                             # Mifare Classic info
+
+# Key recovery
+hf mf autopwn                          # Auto key recovery (all methods)
+hf mf nested --blk 0 -a -k FFFFFFFFFFFF  # Nested attack
+hf mf darkside                         # Darkside attack
+hf mf staticnested --blk 0 -a -k FFFFFFFFFFFF  # Static nested
+
+# Reading / Writing
+hf mf rdbl --blk 0 -k FFFFFFFFFFFF     # Read block
+hf mf wrbl --blk 1 -k FFFFFFFFFFFF -d 00112233445566778899AABBCCDDEEFF
+hf mf dump                             # Dump all sectors
+hf mf restore                          # Write dump to card
+
+# Magic cards
+hf mf csetuid --uid 01020304           # Set UID (Gen1a)
+hf mf gen4 --uid 01020304              # Set UID (Gen4/GTU)
+```
+
+## LF (Low Frequency)
+
+```bash
+lf search                              # Detect LF card
+lf em 410x reader                      # Read EM410x
+lf em 410x write --id 0102030405       # Write EM410x to T55xx
+lf t55xx detect                        # Detect T55xx config
+lf t55xx dump                          # Dump T55xx blocks
+lf t55xx read -b 0                     # Read block 0
+lf t55xx write -b 1 -d 00112233       # Write block 1
+```
+
+## Traffic Sniffing
+
+```bash
+hf 14a sniff                           # Sniff ISO14443-A traffic
+hf 14b sniff                           # Sniff ISO14443-B traffic
+lf sniff                               # Sniff LF traffic
+```
+
+## File Management
+
+```bash
+mem load -f dump.bin                    # Load file to device
+mem save -f dump.bin                    # Save from device
+mem wipe                               # Wipe device flash
+```

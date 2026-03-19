@@ -1,0 +1,28 @@
+---
+title: Memory Editor
+description: Visual Mifare Classic memory dump editor.
+---
+
+The **Card Memory Map** provides a visual, block-by-block editor for Mifare Classic dumps.
+
+## Features
+
+- **Block-by-block editing** — click any block to edit its hex data
+- **Sector trailer decoding** — Key A, Access Bits, Key B displayed separately
+- **Access bits visualization** — human-readable access conditions per block
+- **Key management** — edit Key A and Key B for each sector
+- **Dump persistence** — saves to localStorage, survives page reloads
+
+## Dump Management
+
+- **Load dumps** — import from JSON format (PM3DumpJson)
+- **Save dumps** — export with full metadata (UID, ATQA, SAK, keys)
+- **Recent dumps** — quick access to last 10 dumps
+- **Rename/delete** — manage your dump library
+
+## Hex/ASCII Viewer
+
+The companion **Hex ASCII Viewer** shows:
+- Dual hex + ASCII representation
+- Byte-level precision
+- Integration with the file cache system

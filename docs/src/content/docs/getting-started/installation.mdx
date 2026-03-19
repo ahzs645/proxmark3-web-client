@@ -1,0 +1,81 @@
+---
+title: Installation
+description: How to install and run the Proxmark3 Web Client.
+---
+
+## Web Version (Hosted)
+
+The easiest way to use the client is the hosted version — no installation needed:
+
+**[projects.ahmadjalil.com/proxmark3-web-client](https://projects.ahmadjalil.com/proxmark3-web-client/)**
+
+Just open it in Chrome, Edge, or Brave and connect your Proxmark3 via USB.
+
+## Local Development
+
+### Prerequisites
+
+- **Node.js 20+**
+- **npm**
+- A Proxmark3 device (for hardware features)
+
+### Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/ahzs645/proxmark3-web-client.git
+cd proxmark3-web-client
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The dev server runs at `http://localhost:5173` with hot module replacement.
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+Output goes to `./dist/` — ready to deploy to any static host.
+
+## Desktop App (Tauri)
+
+The Tauri build gives you native serial port access and Bluetooth support without browser limitations.
+
+### Prerequisites
+
+- Everything above, plus:
+- **Rust 1.77.2+** with `cargo`
+- Tauri CLI: `npm install -g @tauri-apps/cli`
+- Platform-specific dependencies (see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/))
+
+### Build & Run
+
+```bash
+# Development
+npm run dev:tauri
+
+# Production build
+npm run build:tauri
+```
+
+This produces a native app (`.dmg` on macOS, `.msi` on Windows, `.AppImage` on Linux).
+
+## Building the WASM Module
+
+If you need to rebuild the Proxmark3 WASM binary from source:
+
+```bash
+# Requires Emscripten SDK
+npm run build:pm3-wasm
+
+# Validate the build
+npm run smoke:pm3-wasm
+```
+
+The WASM source lives in the `proxmark3wasm/` git submodule.

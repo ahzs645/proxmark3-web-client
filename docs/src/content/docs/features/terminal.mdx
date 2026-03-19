@@ -1,0 +1,41 @@
+---
+title: Terminal
+description: Built-in terminal for direct Proxmark3 commands.
+---
+
+The integrated terminal provides full access to the pm3 command-line interface.
+
+## Features
+
+- **xterm.js** — full terminal emulation with ANSI color support
+- **Raw mode** — individual keystrokes passed to the WASM client for interactive commands
+- **Command history** — recent commands saved (up to 12)
+- **Theme support** — matches the app's light/dark theme
+- **Responsive sizing** — auto-fits to the available space
+
+## Usage
+
+Type any standard `pm3` command directly into the terminal. All output is displayed in real-time as the WASM client processes commands.
+
+### Common Commands
+
+```bash
+# Hardware info
+hw version
+
+# Detect HF card
+hf search
+
+# Detect LF card
+lf search
+
+# Read Mifare Classic
+hf mf rdbl --blk 0 -k FFFFFFFFFFFF
+
+# Dump Mifare Classic (after key recovery)
+hf mf dump
+```
+
+## Command Deck
+
+The **Command Deck** panel provides quick-access buttons for common operations, so you don't need to memorize command syntax. It also includes a cheat sheet for reference.

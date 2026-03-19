@@ -1,0 +1,49 @@
+---
+title: Tauri Desktop App
+description: Building and running the native desktop version.
+---
+
+The Tauri build wraps the web client in a native application, providing direct hardware access without browser limitations.
+
+## Advantages Over Browser
+
+- **Native serial port access** — no Web Serial API limitations
+- **Bluetooth SPP** — connect to PM3 X wirelessly (macOS)
+- **No COOP/COEP hassle** — SharedArrayBuffer works natively
+- **System tray integration** — runs as a desktop app
+- **Cross-platform** — macOS, Windows, Linux
+
+## Setup
+
+### Prerequisites
+
+1. [Rust](https://rustup.rs/) 1.77.2+
+2. [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
+3. Node.js 20+ and npm
+
+### Development
+
+```bash
+npm run dev:tauri
+```
+
+This starts both the Vite dev server and the Tauri native window with hot reload.
+
+### Production Build
+
+```bash
+npm run build:tauri
+```
+
+Outputs:
+- macOS: `.dmg` installer
+- Windows: `.msi` installer
+- Linux: `.AppImage`
+
+## Architecture
+
+The Tauri backend (`src-tauri/`) provides Rust commands that the frontend invokes:
+
+- **`serial.rs`** — serial port enumeration, open, read, write, close
+- **`bluetooth.rs`** — Bluetooth device discovery and SPP connection (macOS)
+- **`lib.rs`** — command registration and app setup

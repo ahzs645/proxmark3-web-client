@@ -1,0 +1,38 @@
+---
+title: LF Operations
+description: Low-frequency RFID operations including EM410x and T55xx support.
+---
+
+## LF Configuration
+
+The **LF Operations Panel** lets you configure low-frequency sampling parameters:
+
+- **Frequency presets** — 125 kHz and 134 kHz
+- **Divisor control** — fine-tune from 19–255 (`frequency = 12000 / (divisor + 1)`)
+- **Bits per sample** — adjust sampling resolution
+- **Decimation & averaging** — noise reduction options
+- **Trigger threshold** — set signal trigger level
+- **Sample count** — configure how many samples to collect
+
+## EM410x
+
+Read and write EM410x IDs to T55xx chips:
+
+- Select target chip type (T55x7 or T5555)
+- Configure clock rate
+- Optional password protection
+- Write any 10-character hex EM ID
+
+## T55xx
+
+The **T55xx Panel** provides block-level access:
+
+- **Read/write individual blocks** — direct block access (0–7)
+- **Password management** — set, change, or remove passwords
+- **Default password attempts** — try common passwords automatically
+- **Password presets** — built-in list of known default passwords
+- **Direct password bypass** — for testing locked cards
+
+:::tip
+Always read block 0 (configuration block) first to understand the card's current settings before writing.
+:::

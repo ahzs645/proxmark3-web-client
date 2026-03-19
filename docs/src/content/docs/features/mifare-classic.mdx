@@ -1,0 +1,36 @@
+---
+title: HF - Mifare Classic Attacks
+description: Supported Mifare Classic key recovery attacks and operations.
+---
+
+The **Mifare Attacks Panel** provides a graphical interface for all major Mifare Classic key recovery techniques.
+
+## Supported Attacks
+
+### Autopwn
+Automated key recovery that cycles through all available attack methods. This is the recommended starting point — it tries CHK, nested, hardnested, and darkside in sequence.
+
+### Nested Attack
+Recovers unknown sector keys when you already know at least one key. Fast and reliable on most cards.
+
+### Static Nested
+Variant for Chinese clone cards that use static (non-random) nonces. These cards have a predictable PRNG, making key recovery trivial.
+
+### Darkside Attack
+Exploits a vulnerability in the Mifare Classic PRNG to recover a key with no prior knowledge. Works on original NXP cards but not on newer hardened versions.
+
+### Hardnested
+Advanced attack for cards with a hardened PRNG (EV1, etc.). Slower than darkside but works on more card types.
+
+### Key Check (CHK)
+Validates a list of known keys against all sectors. Useful when you have a key dictionary or partial dump.
+
+## Usage
+
+1. Navigate to the **Attacks** tab
+2. Place a Mifare Classic card on the reader
+3. Select your attack type
+4. Configure parameters (known keys, target sectors, etc.)
+5. Click **Run** — output appears in the terminal
+
+Results include recovered keys per sector, which are automatically available for memory dump operations.

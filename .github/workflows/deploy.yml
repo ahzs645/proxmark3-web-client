@@ -20,11 +20,22 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build app
         run: npm run build
+
+      - name: Install docs dependencies
+        run: npm ci
+        working-directory: docs
+
+      - name: Build docs
+        run: npm run build
+        working-directory: docs
+
+      - name: Copy docs into dist
+        run: cp -r docs/dist dist/docs
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4

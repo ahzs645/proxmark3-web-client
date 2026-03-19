@@ -1,0 +1,32 @@
+---
+title: FAQ
+description: Frequently asked questions about the Proxmark3 Web Client.
+---
+
+### Does this replace the official pm3 client?
+
+No — this is an alternative interface that wraps the same pm3 client (compiled to WASM). The official CLI remains the most complete way to interact with Proxmark3.
+
+### Which browsers are supported?
+
+Chrome, Edge, and Brave (Chromium-based). Firefox and Safari do not support the Web Serial API.
+
+### Do I need to install drivers?
+
+On macOS and Linux, the Proxmark3 usually works out of the box. On Windows, you may need to install the appropriate USB driver (check the [official Proxmark3 wiki](https://github.com/RfidResearchGroup/proxmark3/wiki)).
+
+### Why does the page ask for special headers (COOP/COEP)?
+
+The WASM module uses threading via `SharedArrayBuffer`, which requires `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers. The hosted version and dev server include these automatically.
+
+### Can I use this on mobile?
+
+Not currently. Mobile browsers don't support Web Serial, and the Tauri app targets desktop platforms only.
+
+### Is my data sent to any server?
+
+No. Everything runs client-side in your browser or desktop app. No data is transmitted to external servers. Dumps and keys are stored in your browser's localStorage.
+
+### How do I update the WASM module?
+
+Pull the latest changes from the repository. The WASM binary is included in the `proxmark3wasm/` submodule and updated periodically to match upstream Proxmark3 releases.
