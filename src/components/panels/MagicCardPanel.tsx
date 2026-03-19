@@ -70,13 +70,6 @@ const SAK_PRESETS = [
   { value: "20", label: "Plus/DESFire" },
 ];
 
-// Common ATQA values
-const ATQA_PRESETS = [
-  { value: "0004", label: "Classic 1K" },
-  { value: "0002", label: "Classic 4K" },
-  { value: "0044", label: "Ultralight" },
-  { value: "0344", label: "DESFire" },
-];
 
 function calculateBcc(uid: string): string {
   const bytes = uid.match(/.{2}/g) || [];

@@ -51,10 +51,6 @@ function divisorToFreq(divisor: number): number {
   return 12000 / (divisor + 1);
 }
 
-// Calculate divisor from frequency
-function freqToDivisor(freq: number): number {
-  return Math.round(12000 / freq - 1);
-}
 
 export function LFOperationsPanel({ onCommand, disabled = false }: LFOperationsPanelProps) {
   const [config, setConfig] = useState<LFConfig>(DEFAULT_CONFIG);

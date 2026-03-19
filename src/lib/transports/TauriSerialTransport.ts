@@ -24,7 +24,6 @@ export class TauriSerialTransport implements Transport {
   private readLoopRunning: boolean = false;
   private txLoopRunning: boolean = false;
   private eventHandlers: TransportEventHandlers = {};
-  private connectedPortName: string | null = null;
 
   get isConnected(): boolean {
     return this._isConnected;
@@ -97,7 +96,7 @@ export class TauriSerialTransport implements Transport {
 
       if (success) {
         this._isConnected = true;
-        this.connectedPortName = portName;
+        // this._connectedPortName = portName;
 
         // Initialize shared memory if WASM runtime is ready
         if (window.Module && window.Module.HEAPU8 && window.Module._pm3_uart_rx_head_ptr) {
@@ -126,7 +125,7 @@ export class TauriSerialTransport implements Transport {
     }
 
     this._isConnected = false;
-    this.connectedPortName = null;
+    // this._connectedPortName = null;
     this.eventHandlers.onDisconnect?.();
   }
 
