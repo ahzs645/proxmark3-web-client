@@ -3,11 +3,11 @@
  * Uses the Web Serial API available in Chrome, Edge, and other Chromium-based browsers
  */
 
-import { uartShared } from '../pm3WebUSB';
-import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from './types';
+import { uartShared } from "../pm3WebUSB";
+import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from "./types";
 
 export class WebSerialTransport implements Transport {
-  readonly type: TransportType = 'webserial';
+  readonly type: TransportType = "webserial";
 
   private device: SerialPort | null = null;
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
@@ -22,7 +22,7 @@ export class WebSerialTransport implements Transport {
   }
 
   isAvailable(): boolean {
-    return typeof navigator !== 'undefined' && 'serial' in navigator;
+    return typeof navigator !== "undefined" && "serial" in navigator;
   }
 
   async listDevices(): Promise<TransportDevice[]> {
@@ -31,10 +31,10 @@ export class WebSerialTransport implements Transport {
     return [];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // oxlint-disable-next-line @typescript-eslint/no-unused-vars
   async connect(_device?: TransportDevice): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.error('WebSerial not supported in this browser');
+      console.error("WebSerial not supported in this browser");
       return false;
     }
 
@@ -53,7 +53,7 @@ export class WebSerialTransport implements Transport {
       this.eventHandlers.onConnect?.();
       return true;
     } catch (error) {
-      console.error('WebSerial connection failed:', error);
+      console.error("WebSerial connection failed:", error);
       this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
       return false;
     }
@@ -120,7 +120,7 @@ export class WebSerialTransport implements Transport {
         }
       }
     } catch (error) {
-      console.error('WebSerial read loop error:', error);
+      console.error("WebSerial read loop error:", error);
       this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
     } finally {
       if (this.reader) {
@@ -156,11 +156,11 @@ export class WebSerialTransport implements Transport {
           await this.writer.write(tmp.subarray(0, n));
         } else {
           // Sleep a bit to avoid busy-looping
-          await new Promise(resolve => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
       }
     } catch (error) {
-      console.error('WebSerial TX loop error:', error);
+      console.error("WebSerial TX loop error:", error);
       this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
     } finally {
       if (this.writer) {
@@ -178,11 +178,11 @@ export class WebSerialTransport implements Transport {
   }
 
   getName(): string {
-    return 'WebSerial (USB)';
+    return "WebSerial (USB)";
   }
 
   getDescription(): string {
-    return 'Connect via USB using browser WebSerial API';
+    return "Connect via USB using browser WebSerial API";
   }
 }
 
