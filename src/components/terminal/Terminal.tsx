@@ -25,6 +25,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     const xtermRef = useRef<XTerm | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
     const inputBufferRef = useRef<string>("");
+    const pendingWriteRef = useRef<string>("");
+    const flushHandleRef = useRef<number | null>(null);
     // Use refs to avoid re-initializing terminal when callbacks change
     const onInputRef = useRef(onInput);
     const onCommandRef = useRef(onCommand);
@@ -35,14 +37,46 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     onCommandRef.current = onCommand;
     rawModeRef.current = rawMode;
 
+    const flushPendingWrites = () => {
+      if (flushHandleRef.current !== null) {
+        cancelAnimationFrame(flushHandleRef.current);
+        flushHandleRef.current = null;
+      }
+
+      if (!pendingWriteRef.current) {
+        return;
+      }
+
+      const pending = pendingWriteRef.current;
+      pendingWriteRef.current = "";
+      xtermRef.current?.write(pending);
+    };
+
+    const scheduleWrite = (data: string) => {
+      pendingWriteRef.current += data;
+      if (flushHandleRef.current !== null) {
+        return;
+      }
+
+      flushHandleRef.current = requestAnimationFrame(() => {
+        flushHandleRef.current = null;
+        flushPendingWrites();
+      });
+    };
+
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
-        xtermRef.current?.write(data);
+        scheduleWrite(data);
       },
       writeln: (data: string) => {
-        xtermRef.current?.writeln(data);
+        scheduleWrite(`${data}\r\n`);
       },
       clear: () => {
+        pendingWriteRef.current = "";
+        if (flushHandleRef.current !== null) {
+          cancelAnimationFrame(flushHandleRef.current);
+          flushHandleRef.current = null;
+        }
         xtermRef.current?.clear();
       },
       focus: () => {
@@ -50,7 +84,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       },
       sendCommand: (cmd: string) => {
         if (xtermRef.current) {
-          xtermRef.current.write(`\r\n[pm3] ${cmd}\r\n`);
+          scheduleWrite(`\r\n[pm3] ${cmd}\r\n`);
           onCommand?.(cmd);
         }
       },
@@ -192,6 +226,11 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       setTimeout(() => term.focus(), 100);
 
       return () => {
+        pendingWriteRef.current = "";
+        if (flushHandleRef.current !== null) {
+          cancelAnimationFrame(flushHandleRef.current);
+          flushHandleRef.current = null;
+        }
         resizeObserver.disconnect();
         term.dispose();
       };

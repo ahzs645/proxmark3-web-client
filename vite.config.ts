@@ -14,7 +14,7 @@ export default defineConfig({
     env: {
       builtin: true,
     },
-    ignorePatterns: ["dist"],
+    ignorePatterns: ["dist", "public/wasm"],
     overrides: [
       {
         files: ["**/*.{ts,tsx}"],
