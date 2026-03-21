@@ -666,8 +666,35 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
+  const activeTransportType =
+    selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
+  const activeTransportLabel =
+    wasmState.availableTransports.find((transport) => transport.type === activeTransportType)
+      ?.name ||
+    (activeTransportType === "tauri-bluetooth"
+      ? "Bluetooth"
+      : activeTransportType === "tauri-serial"
+        ? "Native Serial"
+        : activeTransportType === "webserial"
+          ? "WebSerial"
+          : "Auto Select");
+  const sessionHeadline = wasmState.isLoading
+    ? "Booting the Proxmark3 workspace"
+    : canRunCommands && wasmState.isDeviceConnected
+      ? "Live hardware session"
+      : canRunCommands
+        ? "Offline tools are ready"
+        : "Client attention needed";
+  const sessionDescription = wasmState.isLoading
+    ? "The WASM client is starting up. Once it finishes, you can connect a reader or work with cached dumps."
+    : canRunCommands && wasmState.isDeviceConnected
+      ? "Your reader is connected. Use the ribbon for guided actions or send raw commands from the terminal."
+      : canRunCommands
+        ? "The client is ready for dump analysis, cache management, and command prep even before a device is connected."
+        : "Reload or reset the workspace if the client does not finish initializing.";
+
   return (
-    <div className="min-h-screen flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
+    <div className="min-h-dvh flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
       <RibbonToolbar
         connectionStatus={wasmState.isDeviceConnected ? "connected" : "disconnected"}
@@ -766,143 +793,284 @@ function App() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4 p-4 overflow-hidden">
-          {/* Left Panel - Tag Info & History */}
-          <div className="flex flex-col gap-4 min-h-0">
-            <TagInfoPanel
-              tagInfo={tagInfo}
-              onRefresh={handleRefreshTag}
-              onCopyUid={handleCopyUid}
-              onCommand={handleCommand}
-              disabled={!canRunCommands}
-            />
-
-            <Card className="flex-1 overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Recent Commands
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-auto">
-                <div className="space-y-1">
-                  {commandHistory
-                    .slice(-12)
-                    .reverse()
-                    .map((cmd, i) => (
-                      <div
-                        key={i}
-                        className="text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer"
-                        onClick={() => handleCommand(cmd)}
-                      >
-                        {cmd}
-                      </div>
-                    ))}
-                  {commandHistory.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No commands yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Terminal */}
-          <div className="flex flex-col gap-3 min-w-0 min-h-0">
-            <Card className="flex-1 overflow-hidden">
-              <CardHeader className="pb-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <span>Terminal</span>
-                    {canRunCommands ? (
-                      <Badge variant="success">Ready</Badge>
-                    ) : wasmState.isLoading ? (
-                      <Badge variant="warning">Loading...</Badge>
-                    ) : (
-                      <Badge variant="secondary">Offline</Badge>
-                    )}
-                    {wasmState.isDeviceConnected && (
-                      <Badge variant="outline">Device Connected</Badge>
-                    )}
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => handleCommand("help")}>
-                      Help
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => terminalRef.current?.clear()}
+        <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4">
+          <Card className="border-border/80 bg-card/70 shadow-sm backdrop-blur">
+            <CardContent className="flex flex-col gap-3 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant={
+                        canRunCommands ? "success" : wasmState.isLoading ? "warning" : "secondary"
+                      }
                     >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clear
-                    </Button>
+                      {canRunCommands
+                        ? "Engine Ready"
+                        : wasmState.isLoading
+                          ? "Booting"
+                          : "Offline"}
+                    </Badge>
+                    <Badge variant="outline">{activeTransportLabel}</Badge>
+                    <Badge variant="outline">
+                      {wasmState.isDeviceConnected ? "Reader Connected" : "Reader Disconnected"}
+                    </Badge>
+                    {activeDump && <Badge variant="outline">Active Dump: {activeDump.name}</Badge>}
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold tracking-tight">{sessionHeadline}</h2>
+                    <p className="max-w-3xl text-sm text-muted-foreground">{sessionDescription}</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    value={quickCommand}
-                    onChange={(e) => setQuickCommand(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && runQuickCommand()}
-                    placeholder="Send raw pm3 commands (hf mf autopwn --1k -f /pm3-cache/mfc_default_keys)"
-                    className="flex-1"
-                  />
-                  <Button size="sm" onClick={runQuickCommand}>
-                    <Send className="h-3 w-3 mr-1" />
-                    Send
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setQuickCommand("hf mf autopwn --1k")}
-                  >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    Autopwn
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setQuickCommand("hw tune")}>
-                    Tune
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setQuickCommand("hf iclass dump --ki 0")}
-                  >
-                    iCLASS
-                  </Button>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <div className="rounded-full border border-border/70 bg-background/60 px-3 py-1.5">
+                    Cache{" "}
+                    <span className="ml-1 font-medium text-foreground">{cachedAssets.length}</span>
+                  </div>
+                  <div className="rounded-full border border-border/70 bg-background/60 px-3 py-1.5">
+                    Dumps{" "}
+                    <span className="ml-1 font-medium text-foreground">{cachedDumps.length}</span>
+                  </div>
+                  <div className="rounded-full border border-border/70 bg-background/60 px-3 py-1.5">
+                    Commands{" "}
+                    <span className="ml-1 font-medium text-foreground">
+                      {commandHistory.length}
+                    </span>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="flex-1 p-0 overflow-hidden">
-                <Terminal
-                  ref={terminalRef}
-                  onCommand={handleCommand}
-                  onInput={handleTerminalInput}
-                  rawMode={true}
-                  className="h-full"
-                />
-              </CardContent>
-            </Card>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (wasmState.isDeviceConnected) {
+                      void handleDisconnect();
+                    } else {
+                      void handleConnect();
+                    }
+                  }}
+                >
+                  {wasmState.isDeviceConnected ? "Disconnect Reader" : "Connect Reader"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCommand("hf search")}
+                  disabled={!canRunCommands}
+                >
+                  HF Search
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setActiveTab("memory")}>
+                  Open Memory
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setActiveTab("actions")}>
+                  Shortcuts
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
+            {/* Main Terminal */}
+            <div className="order-1 flex min-h-0 min-w-0 flex-col gap-3 md:order-2">
+              <Card className="flex flex-1 flex-col overflow-hidden border-border/80 bg-card/80 backdrop-blur">
+                <CardHeader className="space-y-3 border-b border-border/60 pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span>Terminal</span>
+                      {canRunCommands ? (
+                        <Badge variant="success">Ready</Badge>
+                      ) : wasmState.isLoading ? (
+                        <Badge variant="warning">Loading...</Badge>
+                      ) : (
+                        <Badge variant="secondary">Offline</Badge>
+                      )}
+                      {wasmState.isDeviceConnected && (
+                        <Badge variant="outline">Device Connected</Badge>
+                      )}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => handleCommand("help")}>
+                        Help
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => terminalRef.current?.clear()}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex w-full items-center gap-2">
+                      <Input
+                        value={quickCommand}
+                        onChange={(e) => setQuickCommand(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && runQuickCommand()}
+                        placeholder="Send raw pm3 commands (hf mf autopwn --1k -f /pm3-cache/mfc_default_keys)"
+                        className="min-w-0 flex-1"
+                      />
+                      <Button size="sm" onClick={runQuickCommand} className="shrink-0">
+                        <Send className="h-3 w-3 mr-1" />
+                        Send
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="shrink-0"
+                        onClick={() => setQuickCommand("hf mf autopwn --1k")}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Autopwn
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
+                        onClick={() => setQuickCommand("hw tune")}
+                      >
+                        Tune
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
+                        onClick={() => setQuickCommand("hf iclass dump --ki 0")}
+                      >
+                        iCLASS
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
+                        onClick={() => setQuickCommand("trace list -t 14a -1")}
+                      >
+                        Trace
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden p-0">
+                  <Terminal
+                    ref={terminalRef}
+                    onCommand={handleCommand}
+                    onInput={handleTerminalInput}
+                    rawMode={true}
+                    className="h-full"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Left Panel - Tag Info & History */}
+            <div className="order-2 flex min-h-0 flex-col gap-4 md:order-1">
+              <TagInfoPanel
+                tagInfo={tagInfo}
+                onRefresh={handleRefreshTag}
+                onCopyUid={handleCopyUid}
+                onCommand={handleCommand}
+                disabled={!canRunCommands}
+              />
+
+              <Card className="overflow-hidden border-border/80 bg-card/80 backdrop-blur md:flex-1">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Recent Commands
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-auto">
+                  {commandHistory.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {commandHistory
+                        .slice(-12)
+                        .reverse()
+                        .map((cmd, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-md border border-transparent px-2 py-1.5 text-left text-xs font-mono text-muted-foreground transition-colors hover:border-border hover:bg-secondary/40 hover:text-foreground"
+                            onClick={() => handleCommand(cmd)}
+                          >
+                            <span className="truncate">{cmd}</span>
+                            <span className="ml-2 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                              rerun
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        No commands yet. Start with a quick action.
+                      </p>
+                      <div className="grid gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="justify-start"
+                          onClick={() => {
+                            if (wasmState.isDeviceConnected) {
+                              handleCommand("hw version");
+                            } else {
+                              void handleConnect();
+                            }
+                          }}
+                        >
+                          {wasmState.isDeviceConnected ? "Reader Info" : "Connect Reader"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="justify-start"
+                          onClick={() => handleCommand("hf search")}
+                          disabled={!canRunCommands}
+                        >
+                          HF Search
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="justify-start"
+                          onClick={() => setActiveTab("memory")}
+                        >
+                          Open Memory Workspace
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       )}
 
       {/* Status Bar */}
-      <div className="h-8 bg-card border-t border-border px-4 flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-4">
-          <span>Proxmark3 Web Client</span>
-          <span>•</span>
-          <span>
-            {wasmState.isLoading
-              ? "Loading WASM..."
-              : wasmState.isReady
-                ? wasmState.isDeviceConnected
-                  ? "Device Connected"
-                  : "WASM Ready (Offline)"
-                : "WASM Error"}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span>Commands: {commandHistory.length}</span>
-          <span>|</span>
-          <span>Cache: {cachedAssets.length}</span>
+      <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
+            <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
+            <span>
+              {wasmState.isLoading
+                ? "Loading WASM..."
+                : wasmState.isReady
+                  ? wasmState.isDeviceConnected
+                    ? "Device Connected"
+                    : "WASM Ready (Offline)"
+                  : "WASM Error"}
+            </span>
+            <span>{activeTransportLabel}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>Commands: {commandHistory.length}</span>
+            <span>Cache: {cachedAssets.length}</span>
+            <span>Dumps: {cachedDumps.length}</span>
+          </div>
         </div>
       </div>
     </div>
