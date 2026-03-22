@@ -21,6 +21,8 @@ import { LFOperationsPanel } from "@/components/panels/LFOperationsPanel";
 import { T55xxPanel } from "@/components/panels/T55xxPanel";
 import { TrafficCapturePanel } from "@/components/panels/TrafficCapturePanel";
 import { SettingsPanel } from "@/components/panels/SettingsPanel";
+import { UtilitiesPanel } from "@/components/panels/UtilitiesPanel";
+import { LibraryPanel } from "@/components/panels/LibraryPanel";
 import { Activity, Send, Sparkles, Trash2 } from "lucide-react";
 import type { TransportType } from "@/lib/transports";
 import pm3WebUSB from "@/lib/pm3WebUSB";
@@ -40,11 +42,21 @@ type EmscriptenFSLike = {
 const CACHE_STORAGE_KEY = "pm3-cache";
 const CACHE_PATH_PREFIX = "/pm3-cache";
 const DUMP_CACHE_KEY = "pm3-dumps";
+const COMMAND_HISTORY_KEY = "pm3-command-history";
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
-  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [commandHistory, setCommandHistory] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(COMMAND_HISTORY_KEY);
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch (e) {
+      console.error("Failed to parse command history", e);
+      return [];
+    }
+  });
   const [activeTab, setActiveTab] = useState<string>("connect");
   const [quickCommand, setQuickCommand] = useState("hf search");
   const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(null);
@@ -583,6 +595,12 @@ function App() {
   }, [cachedDumps]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(COMMAND_HISTORY_KEY, JSON.stringify(commandHistory.slice(-100)));
+    }
+  }, [commandHistory]);
+
+  useEffect(() => {
     if (wasmState.isReady && cachedAssets.length) {
       syncCacheToFS();
     }
@@ -779,6 +797,25 @@ function App() {
         <div className="flex-1 p-4 overflow-hidden">
           <div className="h-full max-w-4xl mx-auto">
             <TrafficCapturePanel onCommand={handleCommand} disabled={!canRunCommands} />
+          </div>
+        </div>
+      ) : activeTab === "library" ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-5xl mx-auto">
+            <LibraryPanel
+              currentTag={tagInfo}
+              activeDump={activeDump}
+              cachedDumps={cachedDumps}
+              onDumpLoad={handleDumpLoad}
+              onDumpRename={handleDumpRename}
+              onDumpDelete={handleDumpDelete}
+            />
+          </div>
+        </div>
+      ) : activeTab === "utilities" ? (
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full max-w-5xl mx-auto">
+            <UtilitiesPanel />
           </div>
         </div>
       ) : activeTab === "settings" ? (

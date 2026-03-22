@@ -444,6 +444,20 @@ export function RibbonToolbar({
                   Hex
                 </TabsTrigger>
                 <TabsTrigger
+                  value="library"
+                  className="shrink-0 rounded-full border border-transparent px-3 py-1.5 text-xs gap-1 data-[state=active]:border-border data-[state=active]:bg-background/80"
+                >
+                  <Book className="h-3 w-3" />
+                  Library
+                </TabsTrigger>
+                <TabsTrigger
+                  value="utilities"
+                  className="shrink-0 rounded-full border border-transparent px-3 py-1.5 text-xs gap-1 data-[state=active]:border-border data-[state=active]:bg-background/80"
+                >
+                  <Cpu className="h-3 w-3" />
+                  Utilities
+                </TabsTrigger>
+                <TabsTrigger
                   value="settings"
                   className="shrink-0 rounded-full border border-transparent px-3 py-1.5 text-xs gap-1 data-[state=active]:border-border data-[state=active]:bg-background/80"
                 >
@@ -958,6 +972,48 @@ export function RibbonToolbar({
                 disabled={!commandsEnabled || cacheSyncing}
               />
             </CompactGroup>
+          </div>
+        </TabsContent>
+
+        {/* Library Tab */}
+        <TabsContent value="library" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Library">
+              <MiniButton
+                icon={<FolderOpen className="h-3 w-3" />}
+                label="Memory"
+                onClick={() => onTabChange("memory")}
+                variant="default"
+              />
+              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                Local browser vault
+              </Badge>
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              Save cards, organize keys, and annotate cached dumps without leaving the browser.
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Utilities Tab */}
+        <TabsContent value="utilities" className="m-0 p-2 ribbon-tab-content">
+          <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
+            <CompactGroup title="Utilities">
+              <MiniButton
+                icon={<FileCode2 className="h-3 w-3" />}
+                label="Hex"
+                onClick={() => onTabChange("hex")}
+                variant="outline"
+              />
+              <Badge variant="secondary" className="h-7 px-2 text-xs">
+                Offline calculators
+              </Badge>
+            </CompactGroup>
+            <Separator orientation="vertical" className="h-14 shrink-0" />
+            <div className="text-xs text-muted-foreground">
+              APDU, PN532, UID, and checksum helpers run locally with no external services.
+            </div>
           </div>
         </TabsContent>
 
