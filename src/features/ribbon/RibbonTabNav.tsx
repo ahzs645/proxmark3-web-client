@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RefreshCw, StopCircle } from "lucide-react";
 import { RIBBON_TABS, getIcon } from "./config";
 import type { ConnectionStatus } from "./types";
@@ -47,30 +48,40 @@ export function RibbonTabNav({
           {isConnected ? "Connected" : isConnecting ? "Connecting…" : "Disconnected"}
         </Badge>
         <Separator orientation="vertical" className="mx-0.5 h-4" />
-        {onStopOperation ? (
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={onStopOperation}
-            disabled={!commandsEnabled}
-            className="h-6 w-6"
-            title="Send Ctrl+C to stop current operation"
-          >
-            <StopCircle className="h-3.5 w-3.5" />
-          </Button>
-        ) : null}
-        {onHardReset ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onHardReset}
-            className="h-6 w-6 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950"
-            title="Force reload if stuck (will disconnect)"
-          >
-            <RefreshCw className="h-3 w-3" />
-          </Button>
-        ) : null}
-        <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
+        <TooltipProvider delayDuration={300}>
+          {onStopOperation ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={onStopOperation}
+                  disabled={!commandsEnabled}
+                  className="h-6 w-6"
+                >
+                  <StopCircle className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Stop operation (Ctrl+C)</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {onHardReset ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onHardReset}
+                  className="h-6 w-6 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Force reset (will disconnect)</TooltipContent>
+            </Tooltip>
+          ) : null}
+          <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
+        </TooltipProvider>
       </div>
     </div>
   );
