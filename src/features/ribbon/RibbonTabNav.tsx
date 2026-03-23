@@ -1,18 +1,76 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { RefreshCw, StopCircle } from "lucide-react";
 import { RIBBON_TABS, getIcon } from "./config";
+import type { ConnectionStatus } from "./types";
+import type { Theme } from "@/hooks/useTheme";
 
-export function RibbonTabNav() {
+interface RibbonTabNavProps {
+  connectionStatus: ConnectionStatus;
+  activeTransportLabel: string;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+  onStopOperation?: () => void;
+  onHardReset?: () => void;
+  commandsEnabled: boolean;
+}
+
+export function RibbonTabNav({
+  connectionStatus,
+  activeTransportLabel,
+  theme,
+  onThemeChange,
+  onStopOperation,
+  onHardReset,
+  commandsEnabled,
+}: RibbonTabNavProps) {
+  const isConnected = connectionStatus === "connected";
+  const isConnecting = connectionStatus === "connecting";
+
   return (
-    <div className="relative border-t border-border/60">
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-card via-card/85 to-transparent" />
+    <div className="relative flex items-center gap-2 px-2 py-1.5">
       <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-card via-card/85 to-transparent" />
-      <div className="overflow-x-auto px-2 py-2 scrollbar-hide">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
         <TabsList className="h-auto min-w-max gap-1 bg-transparent p-0">
           {RIBBON_TABS.map((tab) => (
             <RibbonNavTrigger key={tab.value} tab={tab} />
           ))}
         </TabsList>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground">{activeTransportLabel}</span>
+        <Badge variant={isConnected ? "success" : "secondary"} className="text-[10px]">
+          {isConnected ? "Connected" : isConnecting ? "Connecting…" : "Disconnected"}
+        </Badge>
+        <Separator orientation="vertical" className="mx-0.5 h-4" />
+        {onStopOperation ? (
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={onStopOperation}
+            disabled={!commandsEnabled}
+            className="h-6 w-6"
+            title="Send Ctrl+C to stop current operation"
+          >
+            <StopCircle className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+        {onHardReset ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onHardReset}
+            className="h-6 w-6 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950"
+            title="Force reload if stuck (will disconnect)"
+          >
+            <RefreshCw className="h-3 w-3" />
+          </Button>
+        ) : null}
+        <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
       </div>
     </div>
   );

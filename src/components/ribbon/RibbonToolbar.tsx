@@ -1,5 +1,4 @@
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { RibbonHeader } from "@/features/ribbon/RibbonHeader";
 import { RibbonTabNav } from "@/features/ribbon/RibbonTabNav";
 import { useRibbonSelections } from "@/features/ribbon/hooks/useRibbonSelections";
 import type { RibbonToolbarProps } from "@/features/ribbon/types";
@@ -61,7 +60,7 @@ export function RibbonToolbar({
   return (
     <div className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <RibbonHeader
+        <RibbonTabNav
           connectionStatus={connectionStatus}
           activeTransportLabel={activeTransportLabel}
           theme={theme}
@@ -70,8 +69,6 @@ export function RibbonToolbar({
           onHardReset={onHardReset}
           commandsEnabled={commandsEnabled}
         />
-
-        <RibbonTabNav />
 
         <TabsContent value="connect" className="m-0 p-2 ribbon-tab-content">
           <ConnectTab
