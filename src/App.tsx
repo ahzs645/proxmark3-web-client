@@ -12,9 +12,19 @@ import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory"
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
+import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
 const CACHE_PATH_PREFIX = "/pm3-cache";
+const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
+const ANSI_ESCAPE_REGEX = new RegExp(
+  `${ANSI_ESCAPE_CHAR}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`,
+  "g",
+);
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_ESCAPE_REGEX, "");
+}
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
@@ -29,17 +39,11 @@ function App() {
     terminalRef.current?.writeln(line);
   }, []);
 
-  const {
-    activeDump,
-    cachedDumps,
-    handleDumpDelete,
-    handleDumpLoad,
-    handleDumpRename,
-    upsertCachedDump,
-  } = useDumpStore({
-    onActivateMemory: () => setActiveTab("memory"),
-    onLog: writeTerminalLine,
-  });
+  const { activeDump, cachedDumps, handleDumpDelete, handleDumpRename, upsertCachedDump } =
+    useDumpStore({
+      onActivateMemory: () => setActiveTab("memory"),
+      onLog: writeTerminalLine,
+    });
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -172,7 +176,7 @@ function App() {
 
   const cacheGeneratedArtifact = useCallback(
     (filePath: string) => {
-      const normalizedPath = filePath.trim().replace(/^`|`$/g, "");
+      const normalizedPath = stripAnsi(filePath).trim().replace(/^`|`$/g, "");
       const name = normalizedPath.split("/").pop();
       if (!name) return;
       if (!/(?:-key\.bin|-dump\.bin|-dump\.json)$/i.test(name)) return;
@@ -194,7 +198,8 @@ function App() {
         try {
           const parsed = JSON.parse(new TextDecoder().decode(bytes)) as PM3DumpJson;
           if (parsed.blocks || parsed.Card) {
-            upsertCachedDump(parsed, name, { activate: false, announce: false });
+            const cachedDump = upsertCachedDump(parsed, name, { activate: false, announce: false });
+            importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
           }
         } catch (error) {
           console.error(`Failed to parse generated dump JSON: ${name}`, error);
@@ -215,19 +220,29 @@ function App() {
 
   const processGeneratedOutputLine = useCallback(
     (line: string) => {
-      const binaryMatch = line.match(
+      const cleanLine = stripAnsi(line);
+
+      const binaryMatch = cleanLine.match(
         /(?:Found keys have been dumped to|Saved \d+ bytes to binary file)\s+`([^`]+)`/,
       );
       if (binaryMatch) {
         cacheGeneratedArtifact(binaryMatch[1]);
       }
 
-      const jsonMatch = line.match(/Saved to json file\s+([^\s`]+)/);
+      const jsonMatch = cleanLine.match(/Saved to json file\s+([^\s`]+)/);
       if (jsonMatch) {
         cacheGeneratedArtifact(jsonMatch[1]);
       }
     },
     [cacheGeneratedArtifact],
+  );
+
+  const handleDumpLoad = useCallback(
+    (dump: PM3DumpJson, name: string) => {
+      const cachedDump = upsertCachedDump(dump, name, { activate: true, announce: true });
+      importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+    },
+    [upsertCachedDump],
   );
 
   // WASM output handler
@@ -476,6 +491,12 @@ function App() {
       syncCacheToFS();
     }
   }, [cachedAssets.length, wasmState.isReady, syncCacheToFS]);
+
+  useEffect(() => {
+    cachedDumps.forEach((dump) => {
+      importDumpKeysToLibrary(dump.data, dump.id);
+    });
+  }, [cachedDumps]);
 
   // Set up unresponsive device handler
   useEffect(() => {

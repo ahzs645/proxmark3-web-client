@@ -25,8 +25,11 @@ import {
   KEYS_STORAGE_KEY,
   defaultCardName,
   extractDumpKeys,
+  exportStoredKeys,
   getDumpUid,
+  LIBRARY_KEYS_UPDATED_EVENT,
   loadStoredState,
+  saveStoredState,
   upsertCardRecord,
   upsertKeyRecord,
 } from "./library/utils";
@@ -67,12 +70,25 @@ export function LibraryPanel({
   }, [cards]);
 
   useEffect(() => {
-    localStorage.setItem(KEYS_STORAGE_KEY, JSON.stringify(keys));
+    saveStoredState(KEYS_STORAGE_KEY, keys);
   }, [keys]);
 
   useEffect(() => {
     localStorage.setItem(DUMPS_STORAGE_KEY, JSON.stringify(dumpMeta));
   }, [dumpMeta]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncKeysFromStorage = () => {
+      setKeys(loadStoredState(KEYS_STORAGE_KEY, []));
+    };
+
+    window.addEventListener(LIBRARY_KEYS_UPDATED_EVENT, syncKeysFromStorage);
+    return () => {
+      window.removeEventListener(LIBRARY_KEYS_UPDATED_EVENT, syncKeysFromStorage);
+    };
+  }, []);
 
   const dumpMetaMap = useMemo(
     () => new Map(dumpMeta.map((meta) => [meta.dumpId, meta])),
@@ -328,6 +344,7 @@ export function LibraryPanel({
               onDeleteKey={(keyId) => setKeys((prev) => prev.filter((entry) => entry.id !== keyId))}
               onImportDefaultKeys={importDefaultKeys}
               onImportActiveDumpKeys={importActiveDumpKeys}
+              onExportKeys={() => exportStoredKeys(filteredKeys)}
             />
           </TabsContent>
 

@@ -1,10 +1,11 @@
-import type { CachedDump } from "../CardMemoryMap";
+import type { CachedDump, PM3DumpJson } from "../CardMemoryMap";
 import { sanitizeHex } from "@/lib/rfidUtils";
 import type { CardDraft, KeyDraft, StoredCard, StoredKey } from "./types";
 
 export const CARDS_STORAGE_KEY = "pm3-library-cards";
 export const KEYS_STORAGE_KEY = "pm3-library-keys";
 export const DUMPS_STORAGE_KEY = "pm3-library-dump-meta";
+export const LIBRARY_KEYS_UPDATED_EVENT = "pm3-library-keys-updated";
 
 export function loadStoredState<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -15,6 +16,11 @@ export function loadStoredState<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+export function saveStoredState<T>(key: string, value: T): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 function makeId(prefix: string): string {
@@ -106,13 +112,7 @@ export function upsertKeyRecord(keys: StoredKey[], draft: KeyDraft): StoredKey[]
     return [updated, ...keys.filter((key) => key.id !== existing.id)];
   }
 
-  const duplicate = keys.find(
-    (key) =>
-      key.value === cleanValue &&
-      key.uidFilter === cleanUid &&
-      key.kind === draft.kind &&
-      key.label === draft.label,
-  );
+  const duplicate = keys.find((key) => matchesKeyDraft(key, draft, cleanValue, cleanUid));
   if (duplicate) {
     return [{ ...duplicate, updatedAt: now }, ...keys.filter((key) => key.id !== duplicate.id)];
   }
@@ -132,17 +132,37 @@ export function upsertKeyRecord(keys: StoredKey[], draft: KeyDraft): StoredKey[]
   ];
 }
 
+function matchesKeyDraft(
+  key: StoredKey,
+  draft: KeyDraft,
+  cleanValue = sanitizeHex(draft.value, 12),
+  cleanUid = sanitizeHex(draft.uidFilter, 20),
+) {
+  return (
+    key.value === cleanValue &&
+    key.uidFilter === cleanUid &&
+    key.kind === draft.kind &&
+    (key.label === draft.label ||
+      (draft.sourceDumpId != null &&
+        draft.sourceDumpId !== "" &&
+        key.sourceDumpId === draft.sourceDumpId))
+  );
+}
+
 export function getDumpUid(dump: CachedDump) {
   return sanitizeHex(dump.data.Card?.UID || "", 20);
 }
 
-export function extractDumpKeys(activeDump: CachedDump | null): KeyDraft[] {
-  if (!activeDump?.data.SectorKeys) return [];
+export function extractDumpKeysFromData(
+  dump: PM3DumpJson | null | undefined,
+  sourceDumpId?: string | null,
+): KeyDraft[] {
+  if (!dump?.SectorKeys) return [];
 
-  const uidFilter = sanitizeHex(activeDump.data.Card?.UID || "", 20);
+  const uidFilter = sanitizeHex(dump.Card?.UID || "", 20);
   const drafts: KeyDraft[] = [];
 
-  Object.entries(activeDump.data.SectorKeys).forEach(([sector, keyData]) => {
+  Object.entries(dump.SectorKeys).forEach(([sector, keyData]) => {
     const keyA = sanitizeHex(keyData.KeyA || "", 12);
     const keyB = sanitizeHex(keyData.KeyB || "", 12);
 
@@ -152,7 +172,7 @@ export function extractDumpKeys(activeDump: CachedDump | null): KeyDraft[] {
         value: keyA,
         kind: "history",
         uidFilter,
-        sourceDumpId: activeDump.id,
+        sourceDumpId: sourceDumpId ?? null,
       });
     }
 
@@ -162,12 +182,50 @@ export function extractDumpKeys(activeDump: CachedDump | null): KeyDraft[] {
         value: keyB,
         kind: "history",
         uidFilter,
-        sourceDumpId: activeDump.id,
+        sourceDumpId: sourceDumpId ?? null,
       });
     }
   });
 
   return drafts;
+}
+
+export function extractDumpKeys(activeDump: CachedDump | null): KeyDraft[] {
+  return extractDumpKeysFromData(activeDump?.data, activeDump?.id ?? null);
+}
+
+export function importDumpKeysToLibrary(
+  dump: PM3DumpJson | null | undefined,
+  sourceDumpId?: string | null,
+): number {
+  const drafts = extractDumpKeysFromData(dump, sourceDumpId);
+  if (drafts.length === 0) return 0;
+
+  const existing = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
+  let imported = 0;
+  const next = drafts.reduce((items, draft) => {
+    const cleanValue = sanitizeHex(draft.value, 12);
+    const cleanUid = sanitizeHex(draft.uidFilter, 20);
+    if (items.some((key) => matchesKeyDraft(key, draft, cleanValue, cleanUid))) {
+      return items;
+    }
+
+    imported += 1;
+    return upsertKeyRecord(items, draft);
+  }, existing);
+  if (imported === 0) return 0;
+
+  saveStoredState(KEYS_STORAGE_KEY, next);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(LIBRARY_KEYS_UPDATED_EVENT, {
+        detail: { sourceDumpId, imported },
+      }),
+    );
+  }
+
+  return imported;
 }
 
 export function exportDump(dump: CachedDump) {
@@ -178,6 +236,23 @@ export function exportDump(dump: CachedDump) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `${dump.name.replace(/[^a-z0-9-_]+/gi, "_") || "pm3-dump"}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportStoredKeys(keys: StoredKey[]) {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    count: keys.length,
+    keys,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "pm3-library-keys.json";
   anchor.click();
   URL.revokeObjectURL(url);
 }

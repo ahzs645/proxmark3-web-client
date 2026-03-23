@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Clock, Copy, Edit3, KeyRound, Plus, Search, Shield, Trash2 } from "lucide-react";
+import { Clock, Copy, Download, Edit3, KeyRound, Plus, Search, Shield, Trash2 } from "lucide-react";
 import type { GroupedKeys, KeyDraft, StoredKey, StoredKeyKind } from "./types";
 import { copyText, relativeTime } from "./utils";
 
@@ -14,6 +14,7 @@ interface KeysTabProps {
   onDeleteKey: (keyId: string) => void;
   onImportDefaultKeys: () => void;
   onImportActiveDumpKeys: () => void;
+  onExportKeys: () => void;
 }
 
 export function KeysTab({
@@ -25,7 +26,10 @@ export function KeysTab({
   onDeleteKey,
   onImportDefaultKeys,
   onImportActiveDumpKeys,
+  onExportKeys,
 }: KeysTabProps) {
+  const totalKeys = Object.values(groupedKeys).reduce((sum, entries) => sum + entries.length, 0);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -54,6 +58,10 @@ export function KeysTab({
         >
           <KeyRound className="h-3 w-3 mr-1" />
           Import Dump Keys
+        </Button>
+        <Button size="sm" variant="outline" onClick={onExportKeys} disabled={totalKeys === 0}>
+          <Download className="h-3 w-3 mr-1" />
+          Export Keys
         </Button>
       </div>
 

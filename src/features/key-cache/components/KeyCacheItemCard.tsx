@@ -1,9 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import { kindConfig } from "../config";
 import type { CachedAsset } from "../types";
-import { formatTemplate, prettySize, resolveCachePath, relativeTime } from "../utils";
+import {
+  downloadCachedAsset,
+  formatTemplate,
+  prettySize,
+  resolveCachePath,
+  relativeTime,
+} from "../utils";
 
 interface KeyCacheItemCardProps {
   item: CachedAsset;
@@ -38,6 +44,15 @@ export function KeyCacheItemCard({
           <span>{prettySize(item.size)}</span>
           <span>•</span>
           <span>{relativeTime(item.updatedAt)}</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => downloadCachedAsset(item)}
+            title="Download"
+          >
+            <Download className="h-3 w-3" />
+          </Button>
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onDelete(item.id)}>
             <Trash2 className="h-3 w-3" />
           </Button>

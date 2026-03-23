@@ -22,3 +22,29 @@ export function resolveCachePath(cachePathPrefix: string, name: string, relative
 export function formatTemplate(template: string, cachePath: string) {
   return template.replace("{{path}}", cachePath);
 }
+
+export function downloadCachedAsset({
+  base64,
+  name,
+  relativePath,
+}: {
+  base64?: string;
+  name: string;
+  relativePath?: string;
+}) {
+  if (!base64) return;
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const blob = new Blob([bytes]);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = relativePath?.split("/").pop() || name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

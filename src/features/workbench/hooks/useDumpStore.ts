@@ -63,6 +63,16 @@ export function useDumpStore({ onActivateMemory, onLog }: UseDumpStoreOptions = 
         if (activate) {
           setActiveDumpId(existing.id);
         }
+        if (announce) {
+          onLog?.(`\x1b[32mLoaded dump: ${name}\x1b[0m`);
+          if (dump.Card?.UID) {
+            onLog?.(`\x1b[36mCard UID: ${dump.Card.UID}\x1b[0m`);
+          }
+        }
+        if (activate) {
+          onActivateMemory?.();
+        }
+        return updated;
       } else {
         const newDump: CachedDump = {
           id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${name}`,
@@ -74,17 +84,16 @@ export function useDumpStore({ onActivateMemory, onLog }: UseDumpStoreOptions = 
         if (activate) {
           setActiveDumpId(newDump.id);
         }
-      }
-
-      if (activate) {
-        onActivateMemory?.();
-      }
-
-      if (announce) {
-        onLog?.(`\x1b[32mLoaded dump: ${name}\x1b[0m`);
-        if (dump.Card?.UID) {
-          onLog?.(`\x1b[36mCard UID: ${dump.Card.UID}\x1b[0m`);
+        if (announce) {
+          onLog?.(`\x1b[32mLoaded dump: ${name}\x1b[0m`);
+          if (dump.Card?.UID) {
+            onLog?.(`\x1b[36mCard UID: ${dump.Card.UID}\x1b[0m`);
+          }
         }
+        if (activate) {
+          onActivateMemory?.();
+        }
+        return newDump;
       }
     },
     [cachedDumps, onActivateMemory, onLog],
