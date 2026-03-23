@@ -1,5 +1,6 @@
 import type { CachedDump, PM3DumpJson } from "../CardMemoryMap";
 import { sanitizeHex } from "@/lib/rfidUtils";
+import { exportDumpJson } from "@/features/memory/lib/export";
 import type { CardDraft, KeyDraft, StoredCard, StoredKey } from "./types";
 
 export const CARDS_STORAGE_KEY = "pm3-library-cards";
@@ -229,15 +230,7 @@ export function importDumpKeysToLibrary(
 }
 
 export function exportDump(dump: CachedDump) {
-  const blob = new Blob([JSON.stringify(dump.data, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${dump.name.replace(/[^a-z0-9-_]+/gi, "_") || "pm3-dump"}.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  exportDumpJson(dump);
 }
 
 export function exportStoredKeys(keys: StoredKey[]) {

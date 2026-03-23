@@ -11,6 +11,7 @@ import {
   generateClassic1KData,
   generateUltralightData,
 } from "@/features/memory/lib/dumpAdapters";
+import { exportDumpJson } from "@/features/memory/lib/export";
 import { hexToAscii, parseTrailer } from "@/features/memory/lib/trailer";
 import type {
   Block,
@@ -171,6 +172,11 @@ export function CardMemoryMap({
     onCommand("hf mf dump");
   }, [onCommand]);
 
+  const handleExportDump = useCallback(() => {
+    if (!activeDump) return;
+    exportDumpJson(activeDump);
+  }, [activeDump]);
+
   const handleAutopwn = useCallback(() => {
     onCommand(cardType === "classic-4k" ? "hf mf autopwn --4k" : "hf mf autopwn --1k");
   }, [cardType, onCommand]);
@@ -195,6 +201,7 @@ export function CardMemoryMap({
             onSearchFilterChange={setSearchFilter}
             onToggleCachePanel={() => setShowCachePanel((prev) => !prev)}
             onToggleShowKeys={() => setShowKeys((prev) => !prev)}
+            onExportDump={handleExportDump}
             onDump={handleDump}
             onAutopwn={handleAutopwn}
           />

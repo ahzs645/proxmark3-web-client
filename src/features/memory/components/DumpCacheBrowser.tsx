@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { exportDumpJson } from "@/features/memory/lib/export";
 import type { CachedDump, PM3DumpJson } from "@/features/memory/types";
 import { cn } from "@/lib/utils";
-import { Check, Clock, Copy, CreditCard, Pencil, Trash2, X } from "lucide-react";
+import { Check, Clock, Copy, CreditCard, Download, Pencil, Trash2, X } from "lucide-react";
 
 interface DumpCacheBrowserProps {
   cachedDumps: CachedDump[];
@@ -119,6 +120,15 @@ export function DumpCacheBrowser({
                       title="Rename"
                     >
                       <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => exportDumpJson(dump)}
+                      className="h-6 w-6 p-0"
+                      title="Export JSON"
+                    >
+                      <Download className="h-3 w-3" />
                     </Button>
                     <Button
                       size="sm"

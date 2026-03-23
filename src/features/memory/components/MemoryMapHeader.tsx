@@ -26,6 +26,7 @@ interface MemoryMapHeaderProps {
   onSearchFilterChange: (value: string) => void;
   onToggleCachePanel: () => void;
   onToggleShowKeys: () => void;
+  onExportDump: () => void;
   onDump: () => void;
   onAutopwn: () => void;
 }
@@ -48,6 +49,7 @@ export function MemoryMapHeader({
   onSearchFilterChange,
   onToggleCachePanel,
   onToggleShowKeys,
+  onExportDump,
   onDump,
   onAutopwn,
 }: MemoryMapHeaderProps) {
@@ -77,6 +79,16 @@ export function MemoryMapHeader({
               className="hidden"
             />
           </label>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onExportDump}
+            disabled={!activeDump}
+            className="h-7 text-xs"
+          >
+            <Download className="mr-1 h-3 w-3" />
+            Export JSON
+          </Button>
           <Button size="sm" variant="ghost" onClick={onToggleShowKeys} className="h-7 text-xs">
             {showKeys ? <EyeOff className="mr-1 h-3 w-3" /> : <Eye className="mr-1 h-3 w-3" />}
             Keys
@@ -89,7 +101,7 @@ export function MemoryMapHeader({
             className="h-7 text-xs"
           >
             <Download className="mr-1 h-3 w-3" />
-            Dump
+            Read Card
           </Button>
           <Button size="sm" onClick={onAutopwn} disabled={disabled} className="h-7 text-xs">
             <Key className="mr-1 h-3 w-3" />

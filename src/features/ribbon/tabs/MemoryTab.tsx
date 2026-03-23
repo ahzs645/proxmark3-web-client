@@ -94,7 +94,7 @@ export function MemoryTab({
         />
         <RibbonButton
           icon={<Download className="h-3 w-3" />}
-          label="Dump"
+          label="Read Card"
           onClick={() => onCommand("hf mf dump")}
           disabled={!commandsEnabled}
         />
