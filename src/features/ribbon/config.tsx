@@ -1,0 +1,171 @@
+import {
+  Activity,
+  Book,
+  Copy,
+  Cpu,
+  CreditCard,
+  Download,
+  Edit3,
+  FileCode2,
+  Key,
+  Layers,
+  ListChecks,
+  Play,
+  Radio,
+  Search,
+  Settings,
+  Shield,
+  Square,
+  Target,
+  Upload,
+  Wand2,
+  type LucideIcon,
+} from "lucide-react";
+
+export interface RibbonAction {
+  icon: string;
+  label: string;
+  command: string;
+  variant?: "default" | "outline";
+}
+
+export interface RibbonCardType {
+  value: string;
+  label: string;
+}
+
+export interface RibbonTabDefinition {
+  value: string;
+  label: string;
+  icon?: string;
+  separatorBefore?: boolean;
+}
+
+const ICONS: Record<string, LucideIcon> = {
+  target: Target,
+  wand2: Wand2,
+  activity: Activity,
+  radio: Radio,
+  cpu: Cpu,
+  layers: Layers,
+  fileCode2: FileCode2,
+  book: Book,
+  settings: Settings,
+  creditCard: CreditCard,
+  copy: Copy,
+  play: Play,
+  download: Download,
+  upload: Upload,
+  search: Search,
+  key: Key,
+  shield: Shield,
+  square: Square,
+  edit: Edit3,
+  listchecks: ListChecks,
+};
+
+export function getIcon(iconName: string, className = "h-3 w-3") {
+  const Icon = ICONS[iconName];
+  return Icon ? <Icon className={className} /> : <Radio className={className} />;
+}
+
+export const RIBBON_TABS: RibbonTabDefinition[] = [
+  { value: "connect", label: "Connect" },
+  { value: "hf", label: "HF" },
+  { value: "lf", label: "LF" },
+  { value: "data", label: "Data" },
+  { value: "tools", label: "Tools" },
+  { value: "actions", label: "Shortcuts" },
+  { value: "attacks", label: "Attacks", icon: "target", separatorBefore: true },
+  { value: "magic", label: "Magic", icon: "wand2" },
+  { value: "traffic", label: "Traffic", icon: "activity" },
+  { value: "lfops", label: "LF Ops", icon: "radio", separatorBefore: true },
+  { value: "t55xx", label: "T55xx", icon: "cpu" },
+  { value: "memory", label: "Memory", icon: "layers", separatorBefore: true },
+  { value: "hex", label: "Hex", icon: "fileCode2" },
+  { value: "library", label: "Library", icon: "book" },
+  { value: "utilities", label: "Utilities", icon: "cpu" },
+  { value: "settings", label: "Settings", icon: "settings" },
+];
+
+export const LF_CARD_TYPES: RibbonCardType[] = [
+  { value: "em4x", label: "EM4x" },
+  { value: "hid", label: "HID" },
+  { value: "t55xx", label: "T55xx" },
+  { value: "indala", label: "Indala" },
+  { value: "wiegand", label: "Wiegand" },
+];
+
+export const HF_CARD_TYPES: RibbonCardType[] = [
+  { value: "mfclassic", label: "MIFARE Classic" },
+  { value: "mfultralight", label: "MIFARE Ultralight" },
+  { value: "iclass", label: "iClass" },
+  { value: "desfire", label: "DESFire" },
+  { value: "attacks", label: "Attacks" },
+];
+
+export const LF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
+  em4x: [
+    { icon: "radio", label: "Read", command: "lf em 410x reader" },
+    { icon: "copy", label: "Clone", command: "lf em 410x clone" },
+    { icon: "play", label: "Sim", command: "lf em 410x sim" },
+  ],
+  hid: [
+    { icon: "creditCard", label: "Read", command: "lf hid read" },
+    { icon: "copy", label: "Clone", command: "lf hid clone" },
+    { icon: "play", label: "Sim", command: "lf hid sim" },
+    { icon: "zap", label: "Brute", command: "lf hid brute -w H10301 -f 101" },
+  ],
+  t55xx: [
+    { icon: "search", label: "Detect", command: "lf t55xx detect" },
+    { icon: "download", label: "Dump", command: "lf t55xx dump" },
+    { icon: "edit", label: "Write", command: "lf t55xx write" },
+    { icon: "square", label: "Wipe", command: "lf t55xx wipe" },
+  ],
+  indala: [
+    { icon: "radio", label: "Read", command: "lf indala read" },
+    { icon: "copy", label: "Clone", command: "lf indala clone" },
+    { icon: "play", label: "Sim", command: "lf indala sim" },
+  ],
+  wiegand: [
+    { icon: "book", label: "List", command: "wiegand list" },
+    { icon: "download", label: "Encode", command: "wiegand encode --fc 101 --cn 1337" },
+    { icon: "upload", label: "Decode", command: "wiegand decode --raw 2006f623ae" },
+  ],
+};
+
+export const HF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
+  mfclassic: [
+    { icon: "creditCard", label: "Info", command: "hf mf info" },
+    { icon: "key", label: "Autopwn", command: "hf mf autopwn", variant: "default" },
+    { icon: "download", label: "Dump", command: "hf mf dump" },
+    { icon: "upload", label: "Restore", command: "hf mf restore" },
+    { icon: "play", label: "Sim", command: "hf mf sim" },
+  ],
+  mfultralight: [
+    { icon: "creditCard", label: "Info", command: "hf mfu info" },
+    { icon: "download", label: "Dump", command: "hf mfu dump" },
+    { icon: "play", label: "Sim", command: "hf mfu sim -t 7" },
+  ],
+  iclass: [
+    { icon: "shield", label: "Info", command: "hf iclass info" },
+    { icon: "download", label: "Dump", command: "hf iclass dump" },
+    { icon: "key", label: "Keys", command: "hf iclass managekeys -p" },
+    { icon: "play", label: "Sim", command: "hf iclass sim -t 3" },
+  ],
+  desfire: [
+    { icon: "creditCard", label: "Info", command: "hf mfdes info" },
+    { icon: "book", label: "List Apps", command: "hf mfdes lsapp" },
+    { icon: "key", label: "Auth", command: "hf mfdes auth" },
+  ],
+  attacks: [
+    {
+      icon: "zap",
+      label: "Hardnested",
+      command: "hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w",
+    },
+    { icon: "key", label: "Nested", command: "hf mf nested 1 0 a FFFFFFFFFFFF" },
+    { icon: "shield", label: "Darkside", command: "hf mf darkside" },
+    { icon: "listchecks", label: "Chk Keys", command: "hf mf chk --1k -f mfc_default_keys" },
+  ],
+};
