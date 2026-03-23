@@ -11,13 +11,14 @@ export function getModuleExport<T extends ModuleExport>(
   module: Pm3BrowserModule,
   name: string,
 ): T | undefined {
-  const direct = module[name];
+  const dynamicModule = module as Record<string, unknown>;
+  const direct = dynamicModule[name];
   if (typeof direct === "function") return direct as T;
 
   const asmExport = module.asm?.[name];
   if (typeof asmExport === "function") return asmExport as T;
 
-  const underscored = module[`_${name}`];
+  const underscored = dynamicModule[`_${name}`];
   if (typeof underscored === "function") return underscored as T;
 
   return undefined;
