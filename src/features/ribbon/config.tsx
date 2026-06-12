@@ -19,6 +19,7 @@ import {
   Target,
   Upload,
   Wand2,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -62,6 +63,7 @@ const ICONS: Record<string, LucideIcon> = {
   square: Square,
   edit: Edit3,
   listchecks: ListChecks,
+  zap: Zap,
 };
 
 export function getIcon(iconName: string, className = "h-3 w-3") {

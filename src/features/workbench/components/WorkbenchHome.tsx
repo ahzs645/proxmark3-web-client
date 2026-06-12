@@ -10,7 +10,9 @@ interface WorkbenchHomeProps {
   tagInfo: TagInfo | null;
   canRunCommands: boolean;
   isLoading: boolean;
+  isConnecting: boolean;
   isDeviceConnected: boolean;
+  hasHardwareTransport: boolean;
   activeTransportLabel: string;
   activeDumpName?: string;
   cacheCount: number;
@@ -34,7 +36,9 @@ export function WorkbenchHome({
   tagInfo,
   canRunCommands,
   isLoading,
+  isConnecting,
   isDeviceConnected,
+  hasHardwareTransport,
   activeTransportLabel,
   activeDumpName,
   cacheCount,
@@ -57,7 +61,9 @@ export function WorkbenchHome({
       <SessionDashboard
         isLoading={isLoading}
         canRunCommands={canRunCommands}
+        isConnecting={isConnecting}
         isDeviceConnected={isDeviceConnected}
+        hasHardwareTransport={hasHardwareTransport}
         activeTransportLabel={activeTransportLabel}
         activeDumpName={activeDumpName}
         cacheCount={cacheCount}
@@ -95,6 +101,7 @@ export function WorkbenchHome({
           canRunCommands={canRunCommands}
           commandHistory={commandHistory}
           isDeviceConnected={isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
           onCommand={onCommand}
           onConnect={onConnect}
           onCopyUid={onCopyUid}

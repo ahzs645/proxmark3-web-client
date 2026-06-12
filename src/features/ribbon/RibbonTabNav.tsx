@@ -43,7 +43,9 @@ export function RibbonTabNav({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground">{activeTransportLabel}</span>
+        <span className="hidden text-[10px] text-muted-foreground 2xl:inline">
+          {activeTransportLabel}
+        </span>
         <Badge variant={isConnected ? "success" : "secondary"} className="text-[10px]">
           {isConnected ? "Connected" : isConnecting ? "Connecting…" : "Disconnected"}
         </Badge>
@@ -58,6 +60,7 @@ export function RibbonTabNav({
                   onClick={onStopOperation}
                   disabled={!commandsEnabled}
                   className="h-6 w-6"
+                  aria-label="Stop operation"
                 >
                   <StopCircle className="h-3.5 w-3.5" />
                 </Button>
@@ -73,6 +76,7 @@ export function RibbonTabNav({
                   size="icon"
                   onClick={onHardReset}
                   className="h-6 w-6 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950"
+                  aria-label="Force reset"
                 >
                   <RefreshCw className="h-3 w-3" />
                 </Button>

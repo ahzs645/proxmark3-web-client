@@ -28,6 +28,7 @@ export function ConnectTab({
 }: ConnectTabProps) {
   const isConnected = connectionStatus === "connected";
   const isConnecting = connectionStatus === "connecting";
+  const hasTransport = availableTransports.length > 0;
 
   return (
     <div className="flex items-start gap-2 overflow-x-auto scrollbar-hide">
@@ -40,8 +41,9 @@ export function ConnectTab({
               <Usb className={isConnected ? "text-green-500" : ""} />
             )
           }
-          label={isConnected ? "Disconnect" : "Connect"}
+          label={isConnected ? "Disconnect" : isConnecting ? "Connecting…" : "Connect"}
           onClick={isConnected ? onDisconnect : onConnect}
+          disabled={isConnecting || (!isConnected && !hasTransport)}
           variant={isConnected ? "secondary" : "default"}
         />
         <RibbonButton
@@ -51,9 +53,16 @@ export function ConnectTab({
             onDisconnect();
             setTimeout(onConnect, 500);
           }}
-          disabled={!commandsEnabled}
+          disabled={!commandsEnabled || isConnecting || !hasTransport}
         />
       </RibbonGroup>
+
+      {!hasTransport ? (
+        <div className="flex h-16 max-w-xs shrink-0 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+          No WebSerial in this browser — hardware connection requires Chrome/Edge on desktop.
+          Offline tools still work.
+        </div>
+      ) : null}
 
       {availableTransports.length > 1 && onTransportChange ? (
         <>

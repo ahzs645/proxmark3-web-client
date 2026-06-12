@@ -1,11 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { MonitorSmartphone } from "lucide-react";
 
 interface SessionDashboardProps {
   isLoading: boolean;
   canRunCommands: boolean;
+  isConnecting: boolean;
   isDeviceConnected: boolean;
+  hasHardwareTransport: boolean;
   activeTransportLabel: string;
   activeDumpName?: string;
   cacheCount: number;
@@ -20,7 +23,9 @@ interface SessionDashboardProps {
 export function SessionDashboard({
   isLoading,
   canRunCommands,
+  isConnecting,
   isDeviceConnected,
+  hasHardwareTransport,
   activeTransportLabel,
   activeDumpName,
   cacheCount,
@@ -35,16 +40,20 @@ export function SessionDashboard({
     ? "Booting the Proxmark3 workspace"
     : canRunCommands && isDeviceConnected
       ? "Live hardware session"
-      : canRunCommands
-        ? "Offline tools are ready"
-        : "Client attention needed";
+      : isConnecting
+        ? "Connecting to reader"
+        : canRunCommands
+          ? "Offline tools are ready"
+          : "Client attention needed";
   const sessionDescription = isLoading
     ? "The WASM client is starting up. Once it finishes, you can connect a reader or work with cached dumps."
     : canRunCommands && isDeviceConnected
       ? "Your reader is connected. Use the ribbon for guided actions or send raw commands from the terminal."
-      : canRunCommands
-        ? "The client is ready for dump analysis, cache management, and command prep even before a device is connected."
-        : "Reload or reset the workspace if the client does not finish initializing.";
+      : isConnecting
+        ? "Waiting for the device handshake to finish. Approve the browser prompt if one is shown."
+        : canRunCommands
+          ? "The client is ready for dump analysis, cache management, and command prep even before a device is connected."
+          : "Reload or reset the workspace if the client does not finish initializing.";
 
   return (
     <Card className="border-border/80 bg-card/70 shadow-sm backdrop-blur">
@@ -81,9 +90,31 @@ export function SessionDashboard({
           </div>
         </div>
 
+        {!hasHardwareTransport ? (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+            <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong>This browser can't connect to Proxmark3 hardware.</strong> WebSerial is
+              unavailable here — it isn't supported on mobile browsers, Firefox, or Safari. You can
+              still analyze dumps, use the hex viewer, manage the library, and prepare commands. To
+              connect a reader, open this app in Chrome or Edge on a desktop.
+            </span>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={onToggleConnection}>
-            {isDeviceConnected ? "Disconnect Reader" : "Connect Reader"}
+          <Button
+            size="sm"
+            onClick={onToggleConnection}
+            disabled={isConnecting || !hasHardwareTransport}
+          >
+            {!hasHardwareTransport
+              ? "No Hardware Support"
+              : isDeviceConnected
+                ? "Disconnect Reader"
+                : isConnecting
+                  ? "Connecting…"
+                  : "Connect Reader"}
           </Button>
           <Button size="sm" variant="secondary" onClick={onRunHfSearch} disabled={!canRunCommands}>
             HF Search

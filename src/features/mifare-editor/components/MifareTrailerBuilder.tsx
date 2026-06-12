@@ -117,7 +117,7 @@ export function MifareTrailerBuilder({
             <Badge variant="outline" className="text-[10px]">
               Preview
             </Badge>
-            <code className="flex-1 font-mono text-[11px] text-amber-400">
+            <code className="flex-1 font-mono text-[11px] text-amber-600 dark:text-amber-400">
               {trailerPreview.match(/.{1,2}/g)?.join(" ")}
             </code>
             <Button
@@ -167,7 +167,7 @@ export function MifareTrailerBuilder({
             </Button>
           </div>
 
-          <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-400">
+          <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-600 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
               Writing incorrect access bits can permanently lock the sector. Double-check before

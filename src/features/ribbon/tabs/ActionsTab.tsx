@@ -7,8 +7,8 @@ interface ActionsTabProps {
   cacheItems: CachedAsset[];
   cacheSyncing?: boolean;
   onCacheUpload: (files: FileList | null) => void;
-  onCacheUse?: (item: CachedAsset, template: string) => void;
-  onCacheDelete?: (id: string) => void;
+  onCacheUse: (item: CachedAsset, template: string) => void;
+  onCacheDelete: (id: string) => void;
   onCacheSync: () => void;
   cachePathPrefix?: string;
   onCommand: (cmd: string) => void;
@@ -35,8 +35,8 @@ export function ActionsTab({
         <KeyCachePanel
           items={cacheItems}
           onUpload={onCacheUpload}
-          onUse={onCacheUse!}
-          onDelete={onCacheDelete!}
+          onUse={onCacheUse}
+          onDelete={onCacheDelete}
           onSync={onCacheSync}
           syncing={cacheSyncing}
           cachePathPrefix={cachePathPrefix}

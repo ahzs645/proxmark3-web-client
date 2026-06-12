@@ -54,8 +54,13 @@ export function CardsTab({
             className="pl-9"
           />
         </div>
+        <Button size="sm" onClick={() => onOpenCardEditor(null)}>
+          <Plus className="h-3 w-3 mr-1" />
+          Add Card
+        </Button>
         <Button
           size="sm"
+          variant="outline"
           onClick={() => onOpenCardEditor(currentTagCardDraft)}
           disabled={!currentTagCardDraft}
         >
@@ -76,7 +81,8 @@ export function CardsTab({
       <div className="space-y-3">
         {filteredCards.length === 0 ? (
           <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-            Save the current tag or an active dump to build a local browser card library.
+            No cards yet. Add one manually to catalog a card you're analyzing, or save the current
+            tag / active dump.
           </div>
         ) : (
           filteredCards.map((card) => {
@@ -133,6 +139,7 @@ export function CardsTab({
                       variant="ghost"
                       className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
                       onClick={() => onDeleteCard(card.id)}
+                      aria-label="Delete card"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

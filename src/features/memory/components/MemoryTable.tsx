@@ -99,13 +99,15 @@ export function MemoryTable({
                         </div>
                         <div className="flex items-center gap-1">
                           <Key className="h-2.5 w-2.5 text-blue-500" />
-                          <code className="text-[10px] font-mono text-blue-400">{keys.KeyB}</code>
+                          <code className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
+                            {keys.KeyB}
+                          </code>
                         </div>
                       </>
                     ) : sectorBlocks.some((block) => block.kind === "trailer") ? (
                       <Badge
                         variant="secondary"
-                        className="h-4 border-amber-500/30 bg-amber-500/20 text-[10px] text-amber-400"
+                        className="h-4 border-amber-500/30 bg-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400"
                       >
                         <Lock className="mr-0.5 h-2.5 w-2.5" />
                         Protected
@@ -147,7 +149,8 @@ export function MemoryTable({
                               "h-4 text-[10px]",
                               isManufacturer &&
                                 "border-emerald-500/30 bg-emerald-500/20 text-emerald-400",
-                              isTrailer && "border-amber-500/30 bg-amber-500/20 text-amber-400",
+                              isTrailer &&
+                                "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400",
                               block.kind === "data" &&
                                 !isEmpty &&
                                 "bg-secondary text-secondary-foreground",

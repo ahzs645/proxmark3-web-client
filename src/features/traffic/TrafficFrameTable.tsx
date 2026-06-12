@@ -54,12 +54,18 @@ export function TrafficFrameTable({
             </td>
             <td className="px-3 py-1.5 text-center">
               {frame.direction === "reader" ? (
-                <Badge variant="outline" className="gap-0.5 text-[9px] text-blue-400">
+                <Badge
+                  variant="outline"
+                  className="gap-0.5 text-[9px] text-blue-600 dark:text-blue-400"
+                >
                   <ArrowRight className="h-2.5 w-2.5" />
                   Rdr
                 </Badge>
               ) : (
-                <Badge variant="outline" className="gap-0.5 text-[9px] text-green-400">
+                <Badge
+                  variant="outline"
+                  className="gap-0.5 text-[9px] text-green-600 dark:text-green-400"
+                >
                   <ArrowLeft className="h-2.5 w-2.5" />
                   Tag
                 </Badge>

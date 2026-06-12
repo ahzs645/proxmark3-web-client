@@ -16,11 +16,11 @@ export interface RibbonToolbarProps {
   cacheItems: import("@/components/panels/KeyCachePanel").CachedAsset[];
   cacheSyncing?: boolean;
   onCacheUpload: (files: FileList | null) => void;
-  onCacheUse?: (
+  onCacheUse: (
     item: import("@/components/panels/KeyCachePanel").CachedAsset,
     template: string,
   ) => void;
-  onCacheDelete?: (id: string) => void;
+  onCacheDelete: (id: string) => void;
   onCacheSync: () => void;
   cachePathPrefix?: string;
   activeTab: string;

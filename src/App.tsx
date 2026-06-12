@@ -6,16 +6,20 @@ import { useProxmarkWasm } from "@/hooks/useProxmarkWasm";
 import { useTheme } from "@/hooks/useTheme";
 import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyCachePanel";
 import type { PM3DumpJson } from "@/components/panels/CardMemoryMap";
-import type { TransportType } from "@/lib/transports";
+import { getTransportLabel, type TransportType } from "@/lib/transports";
 import pm3WebUSB from "@/lib/pm3WebUSB";
 import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory";
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
 import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
+import { RIBBON_TABS } from "@/features/ribbon/config";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
+const TAB_STORAGE_KEY = "pm3-active-tab";
+const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
+const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
 const ANSI_ESCAPE_REGEX = new RegExp(
   `${ANSI_ESCAPE_CHAR}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`,
@@ -29,9 +33,18 @@ function stripAnsi(value: string): string {
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("connect");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === "undefined") return "connect";
+    const saved = localStorage.getItem(TAB_STORAGE_KEY);
+    return saved && RIBBON_TABS.some((tab) => tab.value === saved) ? saved : "connect";
+  });
   const [quickCommand, setQuickCommand] = useState("hf search");
-  const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(null);
+  const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(() => {
+    if (typeof window === "undefined") return null;
+    const saved = localStorage.getItem(TRANSPORT_STORAGE_KEY) as TransportType | null;
+    return saved && TRANSPORT_TYPES.includes(saved) ? saved : null;
+  });
+  const [isConnecting, setIsConnecting] = useState(false);
   const { commandHistory, pushCommand } = useCommandHistory();
   const { theme, setTheme } = useTheme();
   const outputLineBufferRef = useRef("");
@@ -487,6 +500,21 @@ function App() {
   }, [cachedAssets]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selectedTransport) {
+      localStorage.setItem(TRANSPORT_STORAGE_KEY, selectedTransport);
+    } else {
+      localStorage.removeItem(TRANSPORT_STORAGE_KEY);
+    }
+  }, [selectedTransport]);
+
+  useEffect(() => {
     if (wasmState.isReady && cachedAssets.length) {
       syncCacheToFS();
     }
@@ -511,14 +539,10 @@ function App() {
   }, []);
 
   const handleConnect = useCallback(async () => {
+    if (isConnecting) return;
     const transportType =
       selectedTransport || wasmState.availableTransports[0]?.type || "webserial";
-    const transportName =
-      transportType === "tauri-bluetooth"
-        ? "Bluetooth"
-        : transportType === "tauri-serial"
-          ? "Native Serial"
-          : "WebSerial";
+    const transportName = getTransportLabel(transportType, wasmState.availableTransports);
 
     terminalRef.current?.writeln(`\x1b[36mConnecting to Proxmark3 via ${transportName}...\x1b[0m`);
     if (transportType === "webserial") {
@@ -529,16 +553,21 @@ function App() {
       terminalRef.current?.writeln("\x1b[90mSearching for Proxmark3 X Bluetooth device...\x1b[0m");
     }
 
-    const success = await wasmState.connectDevice(transportType);
-    if (success) {
-      terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
-      terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
-    } else {
-      terminalRef.current?.writeln(
-        `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
-      );
+    setIsConnecting(true);
+    try {
+      const success = await wasmState.connectDevice(transportType);
+      if (success) {
+        terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
+        terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
+      } else {
+        terminalRef.current?.writeln(
+          `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
+        );
+      }
+    } finally {
+      setIsConnecting(false);
     }
-  }, [wasmState, selectedTransport]);
+  }, [wasmState, selectedTransport, isConnecting]);
 
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
@@ -576,23 +605,32 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
+  const hasHardwareTransport = wasmState.availableTransports.length > 0;
   const activeTransportType =
     selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
-  const activeTransportLabel =
-    wasmState.availableTransports.find((transport) => transport.type === activeTransportType)
-      ?.name ||
-    (activeTransportType === "tauri-bluetooth"
-      ? "Bluetooth"
-      : activeTransportType === "tauri-serial"
-        ? "Native Serial"
-        : activeTransportType === "webserial"
-          ? "WebSerial"
-          : "Auto Select");
+  const activeTransportLabel = getTransportLabel(
+    activeTransportType,
+    wasmState.availableTransports,
+  );
+  const wasmStatus = wasmState.isLoading
+    ? { text: "Loading WASM…", dot: "bg-amber-500 status-pulse" }
+    : !wasmState.isReady
+      ? {
+          text: wasmState.error ? `WASM Error: ${wasmState.error.message}` : "WASM Error",
+          dot: "bg-red-500",
+        }
+      : wasmState.isDeviceConnected
+        ? { text: "Device Connected", dot: "bg-green-500" }
+        : isConnecting
+          ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
+          : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
     <div className="min-h-dvh flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
       <RibbonToolbar
-        connectionStatus={wasmState.isDeviceConnected ? "connected" : "disconnected"}
+        connectionStatus={
+          wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
+        }
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
         onCommand={handleCommand}
@@ -627,7 +665,9 @@ function App() {
         cachePathPrefix={CACHE_PATH_PREFIX}
         canRunCommands={canRunCommands}
         isLoading={wasmState.isLoading}
+        isConnecting={isConnecting}
         isDeviceConnected={wasmState.isDeviceConnected}
+        hasHardwareTransport={hasHardwareTransport}
         activeTransportLabel={activeTransportLabel}
         commandHistory={commandHistory}
         quickCommand={quickCommand}
@@ -652,14 +692,12 @@ function App() {
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2 md:gap-4">
             <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
-            <span>
-              {wasmState.isLoading
-                ? "Loading WASM..."
-                : wasmState.isReady
-                  ? wasmState.isDeviceConnected
-                    ? "Device Connected"
-                    : "WASM Ready (Offline)"
-                  : "WASM Error"}
+            <span className="flex items-center gap-1.5" title={wasmStatus.text}>
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
+                aria-hidden="true"
+              />
+              <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
             </span>
             <span>{activeTransportLabel}</span>
           </div>

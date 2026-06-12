@@ -1,23 +1,58 @@
+import { lazy, Suspense } from "react";
+import { Loader2 } from "lucide-react";
 import type { Theme } from "@/hooks/useTheme";
-import { HexAsciiViewer } from "@/components/panels/HexAsciiViewer";
-import {
-  CardMemoryMap,
-  type CachedDump,
-  type PM3DumpJson,
-} from "@/components/panels/CardMemoryMap";
-import { MifareAttacksPanel } from "@/components/panels/MifareAttacksPanel";
-import { MagicCardPanel } from "@/components/panels/MagicCardPanel";
-import { LFOperationsPanel } from "@/components/panels/LFOperationsPanel";
-import { T55xxPanel } from "@/components/panels/T55xxPanel";
-import { TrafficCapturePanel } from "@/components/panels/TrafficCapturePanel";
-import { SettingsPanel } from "@/components/panels/SettingsPanel";
-import { LibraryPanel } from "@/components/panels/LibraryPanel";
-import { UtilitiesPanel } from "@/components/panels/UtilitiesPanel";
+import type { CachedDump, PM3DumpJson } from "@/components/panels/CardMemoryMap";
 import { WorkbenchHome } from "./WorkbenchHome";
 import type { CachedAssetWithData } from "../types";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
 import type { RefObject } from "react";
 import type { TagInfo } from "@/components/panels/TagInfoPanel";
+
+const CardMemoryMap = lazy(() =>
+  import("@/components/panels/CardMemoryMap").then((m) => ({ default: m.CardMemoryMap })),
+);
+const HexAsciiViewer = lazy(() =>
+  import("@/components/panels/HexAsciiViewer").then((m) => ({ default: m.HexAsciiViewer })),
+);
+const MifareAttacksPanel = lazy(() =>
+  import("@/components/panels/MifareAttacksPanel").then((m) => ({
+    default: m.MifareAttacksPanel,
+  })),
+);
+const MagicCardPanel = lazy(() =>
+  import("@/components/panels/MagicCardPanel").then((m) => ({ default: m.MagicCardPanel })),
+);
+const LFOperationsPanel = lazy(() =>
+  import("@/components/panels/LFOperationsPanel").then((m) => ({
+    default: m.LFOperationsPanel,
+  })),
+);
+const T55xxPanel = lazy(() =>
+  import("@/components/panels/T55xxPanel").then((m) => ({ default: m.T55xxPanel })),
+);
+const TrafficCapturePanel = lazy(() =>
+  import("@/components/panels/TrafficCapturePanel").then((m) => ({
+    default: m.TrafficCapturePanel,
+  })),
+);
+const SettingsPanel = lazy(() =>
+  import("@/components/panels/SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+);
+const LibraryPanel = lazy(() =>
+  import("@/components/panels/LibraryPanel").then((m) => ({ default: m.LibraryPanel })),
+);
+const UtilitiesPanel = lazy(() =>
+  import("@/components/panels/UtilitiesPanel").then((m) => ({ default: m.UtilitiesPanel })),
+);
+
+function PanelLoading() {
+  return (
+    <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Loading panel…
+    </div>
+  );
+}
 
 interface MainPanelRouterProps {
   activeTab: string;
@@ -31,7 +66,9 @@ interface MainPanelRouterProps {
   cachePathPrefix: string;
   canRunCommands: boolean;
   isLoading: boolean;
+  isConnecting: boolean;
   isDeviceConnected: boolean;
+  hasHardwareTransport: boolean;
   activeTransportLabel: string;
   commandHistory: string[];
   quickCommand: string;
@@ -63,7 +100,9 @@ export function MainPanelRouter({
   cachePathPrefix,
   canRunCommands,
   isLoading,
+  isConnecting,
   isDeviceConnected,
+  hasHardwareTransport,
   activeTransportLabel,
   commandHistory,
   quickCommand,
@@ -82,8 +121,10 @@ export function MainPanelRouter({
   onDumpDelete,
   onClearCache,
 }: MainPanelRouterProps) {
+  let panel = null;
+
   if (activeTab === "memory") {
-    return (
+    panel = (
       <div className="flex-1 flex flex-col overflow-hidden p-4">
         <CardMemoryMap
           onCommand={onCommand}
@@ -96,20 +137,16 @@ export function MainPanelRouter({
         />
       </div>
     );
-  }
-
-  if (activeTab === "hex") {
-    return (
+  } else if (activeTab === "hex") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-4xl mx-auto">
           <HexAsciiViewer dumps={cachedAssets} />
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "attacks") {
-    return (
+  } else if (activeTab === "attacks") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
           <MifareAttacksPanel
@@ -121,10 +158,8 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "magic") {
-    return (
+  } else if (activeTab === "magic") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
           <MagicCardPanel
@@ -137,40 +172,32 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "lfops") {
-    return (
+  } else if (activeTab === "lfops") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
           <LFOperationsPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "t55xx") {
-    return (
+  } else if (activeTab === "t55xx") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
           <T55xxPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "traffic") {
-    return (
+  } else if (activeTab === "traffic") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-4xl mx-auto">
           <TrafficCapturePanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "library") {
-    return (
+  } else if (activeTab === "library") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
           <LibraryPanel
@@ -184,20 +211,16 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "utilities") {
-    return (
+  } else if (activeTab === "utilities") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
           <UtilitiesPanel />
         </div>
       </div>
     );
-  }
-
-  if (activeTab === "settings") {
-    return (
+  } else if (activeTab === "settings") {
+    panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-xl mx-auto">
           <SettingsPanel
@@ -212,28 +235,37 @@ export function MainPanelRouter({
   }
 
   return (
-    <WorkbenchHome
-      terminalRef={terminalRef}
-      tagInfo={tagInfo}
-      canRunCommands={canRunCommands}
-      isLoading={isLoading}
-      isDeviceConnected={isDeviceConnected}
-      activeTransportLabel={activeTransportLabel}
-      activeDumpName={activeDump?.name}
-      cacheCount={cachedAssets.length}
-      dumpCount={cachedDumps.length}
-      commandHistory={commandHistory}
-      quickCommand={quickCommand}
-      onQuickCommandChange={onQuickCommandChange}
-      onRunQuickCommand={onRunQuickCommand}
-      onCommand={onCommand}
-      onInput={onInput}
-      onConnect={onConnect}
-      onDisconnect={onDisconnect}
-      onCopyUid={onCopyUid}
-      onOpenMemory={onOpenMemory}
-      onOpenShortcuts={onOpenShortcuts}
-      onRefreshTag={onRefreshTag}
-    />
+    <>
+      {/* Keep the workbench (and its terminal) mounted while a panel is open so
+          terminal scrollback and live WASM output survive tab switches. */}
+      <div className={panel ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
+        <WorkbenchHome
+          terminalRef={terminalRef}
+          tagInfo={tagInfo}
+          canRunCommands={canRunCommands}
+          isLoading={isLoading}
+          isConnecting={isConnecting}
+          isDeviceConnected={isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
+          activeTransportLabel={activeTransportLabel}
+          activeDumpName={activeDump?.name}
+          cacheCount={cachedAssets.length}
+          dumpCount={cachedDumps.length}
+          commandHistory={commandHistory}
+          quickCommand={quickCommand}
+          onQuickCommandChange={onQuickCommandChange}
+          onRunQuickCommand={onRunQuickCommand}
+          onCommand={onCommand}
+          onInput={onInput}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+          onCopyUid={onCopyUid}
+          onOpenMemory={onOpenMemory}
+          onOpenShortcuts={onOpenShortcuts}
+          onRefreshTag={onRefreshTag}
+        />
+      </div>
+      {panel ? <Suspense fallback={<PanelLoading />}>{panel}</Suspense> : null}
+    </>
   );
 }

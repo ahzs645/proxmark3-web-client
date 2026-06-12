@@ -24,6 +24,8 @@ export function SettingsPanel({
   const {
     settings,
     saved,
+    importError,
+    clearImportError,
     setDefaultCardType,
     setDefaultAuthKey,
     setConfirmDestructiveOps,
@@ -78,6 +80,8 @@ export function SettingsPanel({
 
         <DataManagementSection
           cacheCount={cacheCount}
+          importError={importError}
+          onClearImportError={clearImportError}
           onExportSettings={exportSettings}
           onImportSettings={importSettings}
           onResetSettings={resetSettings}

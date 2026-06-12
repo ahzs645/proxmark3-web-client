@@ -9,7 +9,7 @@ export function AttackWarnings({ activeAttack }: AttackWarningsProps) {
   return (
     <>
       {activeAttack === "darkside" ? (
-        <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-400">
+        <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-600 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
           <span>
             Darkside attack can take 5-30 minutes. Ensure stable connection and do not move the card
@@ -19,7 +19,7 @@ export function AttackWarnings({ activeAttack }: AttackWarningsProps) {
       ) : null}
 
       {activeAttack === "hardnested" ? (
-        <div className="flex items-start gap-2 rounded bg-blue-500/10 p-2 text-[10px] text-blue-400">
+        <div className="flex items-start gap-2 rounded bg-blue-500/10 p-2 text-[10px] text-blue-600 dark:text-blue-400">
           <Shield className="mt-0.5 h-3 w-3 shrink-0" />
           <span>
             Hardnested works on cards with hardened PRNG. It requires one known key and recovers one

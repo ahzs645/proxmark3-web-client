@@ -24,9 +24,10 @@ export function CardDialog({ draft, onDraftChange, onSave, onClose }: CardDialog
     <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Save Card</DialogTitle>
+          <DialogTitle>{draft?.id ? "Edit Card" : "Add Card"}</DialogTitle>
           <DialogDescription>
-            Store card identity and notes in the browser library.
+            Store card identity and notes in the browser library. No hardware needed — useful for
+            cataloging cards you're analyzing from dumps.
           </DialogDescription>
         </DialogHeader>
 
@@ -43,7 +44,7 @@ export function CardDialog({ draft, onDraftChange, onSave, onClose }: CardDialog
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">UID</label>
+                <label className="text-xs text-muted-foreground">UID (hex, required)</label>
                 <Input
                   value={draft.uid}
                   onChange={(e) =>
@@ -51,6 +52,7 @@ export function CardDialog({ draft, onDraftChange, onSave, onClose }: CardDialog
                       prev ? { ...prev, uid: sanitizeHex(e.target.value, 20) } : prev,
                     )
                   }
+                  placeholder="04A23BC2"
                   className="font-mono"
                 />
               </div>
@@ -118,7 +120,9 @@ export function CardDialog({ draft, onDraftChange, onSave, onClose }: CardDialog
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSave}>Save Card</Button>
+          <Button onClick={onSave} disabled={!draft?.uid}>
+            Save Card
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
