@@ -43,7 +43,9 @@ export function RibbonTabNav({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground">{activeTransportLabel}</span>
+        <span className="hidden text-[10px] text-muted-foreground 2xl:inline">
+          {activeTransportLabel}
+        </span>
         <Badge variant={isConnected ? "success" : "secondary"} className="text-[10px]">
           {isConnected ? "Connected" : isConnecting ? "Connecting…" : "Disconnected"}
         </Badge>
