@@ -13,9 +13,13 @@ import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
 import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
+import { RIBBON_TABS } from "@/features/ribbon/config";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
+const TAB_STORAGE_KEY = "pm3-active-tab";
+const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
+const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
 const ANSI_ESCAPE_REGEX = new RegExp(
   `${ANSI_ESCAPE_CHAR}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`,
@@ -29,9 +33,17 @@ function stripAnsi(value: string): string {
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
   const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("connect");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === "undefined") return "connect";
+    const saved = localStorage.getItem(TAB_STORAGE_KEY);
+    return saved && RIBBON_TABS.some((tab) => tab.value === saved) ? saved : "connect";
+  });
   const [quickCommand, setQuickCommand] = useState("hf search");
-  const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(null);
+  const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(() => {
+    if (typeof window === "undefined") return null;
+    const saved = localStorage.getItem(TRANSPORT_STORAGE_KEY) as TransportType | null;
+    return saved && TRANSPORT_TYPES.includes(saved) ? saved : null;
+  });
   const [isConnecting, setIsConnecting] = useState(false);
   const { commandHistory, pushCommand } = useCommandHistory();
   const { theme, setTheme } = useTheme();
@@ -488,6 +500,21 @@ function App() {
   }, [cachedAssets]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selectedTransport) {
+      localStorage.setItem(TRANSPORT_STORAGE_KEY, selectedTransport);
+    } else {
+      localStorage.removeItem(TRANSPORT_STORAGE_KEY);
+    }
+  }, [selectedTransport]);
+
+  useEffect(() => {
     if (wasmState.isReady && cachedAssets.length) {
       syncCacheToFS();
     }
@@ -584,6 +611,18 @@ function App() {
     activeTransportType,
     wasmState.availableTransports,
   );
+  const wasmStatus = wasmState.isLoading
+    ? { text: "Loading WASM…", dot: "bg-amber-500 status-pulse" }
+    : !wasmState.isReady
+      ? {
+          text: wasmState.error ? `WASM Error: ${wasmState.error.message}` : "WASM Error",
+          dot: "bg-red-500",
+        }
+      : wasmState.isDeviceConnected
+        ? { text: "Device Connected", dot: "bg-green-500" }
+        : isConnecting
+          ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
+          : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
     <div className="min-h-dvh flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
@@ -625,6 +664,7 @@ function App() {
         cachePathPrefix={CACHE_PATH_PREFIX}
         canRunCommands={canRunCommands}
         isLoading={wasmState.isLoading}
+        isConnecting={isConnecting}
         isDeviceConnected={wasmState.isDeviceConnected}
         activeTransportLabel={activeTransportLabel}
         commandHistory={commandHistory}
@@ -650,14 +690,12 @@ function App() {
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2 md:gap-4">
             <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
-            <span>
-              {wasmState.isLoading
-                ? "Loading WASM..."
-                : wasmState.isReady
-                  ? wasmState.isDeviceConnected
-                    ? "Device Connected"
-                    : "WASM Ready (Offline)"
-                  : "WASM Error"}
+            <span className="flex items-center gap-1.5" title={wasmStatus.text}>
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
+                aria-hidden="true"
+              />
+              <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
             </span>
             <span>{activeTransportLabel}</span>
           </div>

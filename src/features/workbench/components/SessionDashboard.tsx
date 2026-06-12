@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 interface SessionDashboardProps {
   isLoading: boolean;
   canRunCommands: boolean;
+  isConnecting: boolean;
   isDeviceConnected: boolean;
   activeTransportLabel: string;
   activeDumpName?: string;
@@ -20,6 +21,7 @@ interface SessionDashboardProps {
 export function SessionDashboard({
   isLoading,
   canRunCommands,
+  isConnecting,
   isDeviceConnected,
   activeTransportLabel,
   activeDumpName,
@@ -35,16 +37,20 @@ export function SessionDashboard({
     ? "Booting the Proxmark3 workspace"
     : canRunCommands && isDeviceConnected
       ? "Live hardware session"
-      : canRunCommands
-        ? "Offline tools are ready"
-        : "Client attention needed";
+      : isConnecting
+        ? "Connecting to reader"
+        : canRunCommands
+          ? "Offline tools are ready"
+          : "Client attention needed";
   const sessionDescription = isLoading
     ? "The WASM client is starting up. Once it finishes, you can connect a reader or work with cached dumps."
     : canRunCommands && isDeviceConnected
       ? "Your reader is connected. Use the ribbon for guided actions or send raw commands from the terminal."
-      : canRunCommands
-        ? "The client is ready for dump analysis, cache management, and command prep even before a device is connected."
-        : "Reload or reset the workspace if the client does not finish initializing.";
+      : isConnecting
+        ? "Waiting for the device handshake to finish. Approve the browser prompt if one is shown."
+        : canRunCommands
+          ? "The client is ready for dump analysis, cache management, and command prep even before a device is connected."
+          : "Reload or reset the workspace if the client does not finish initializing.";
 
   return (
     <Card className="border-border/80 bg-card/70 shadow-sm backdrop-blur">
@@ -82,8 +88,12 @@ export function SessionDashboard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={onToggleConnection}>
-            {isDeviceConnected ? "Disconnect Reader" : "Connect Reader"}
+          <Button size="sm" onClick={onToggleConnection} disabled={isConnecting}>
+            {isDeviceConnected
+              ? "Disconnect Reader"
+              : isConnecting
+                ? "Connecting…"
+                : "Connect Reader"}
           </Button>
           <Button size="sm" variant="secondary" onClick={onRunHfSearch} disabled={!canRunCommands}>
             HF Search

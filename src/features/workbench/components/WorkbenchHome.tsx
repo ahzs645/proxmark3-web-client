@@ -10,6 +10,7 @@ interface WorkbenchHomeProps {
   tagInfo: TagInfo | null;
   canRunCommands: boolean;
   isLoading: boolean;
+  isConnecting: boolean;
   isDeviceConnected: boolean;
   activeTransportLabel: string;
   activeDumpName?: string;
@@ -34,6 +35,7 @@ export function WorkbenchHome({
   tagInfo,
   canRunCommands,
   isLoading,
+  isConnecting,
   isDeviceConnected,
   activeTransportLabel,
   activeDumpName,
@@ -57,6 +59,7 @@ export function WorkbenchHome({
       <SessionDashboard
         isLoading={isLoading}
         canRunCommands={canRunCommands}
+        isConnecting={isConnecting}
         isDeviceConnected={isDeviceConnected}
         activeTransportLabel={activeTransportLabel}
         activeDumpName={activeDumpName}

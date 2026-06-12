@@ -127,6 +127,19 @@ export default defineConfig({
     },
   },
   base: "./",
+  build: {
+    rolldownOptions: {
+      output: {
+        advancedChunks: {
+          groups: [
+            { name: "xterm", test: /node_modules[\\/]@xterm[\\/]/ },
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: "vendor", test: /node_modules[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   plugins: [react()],
   resolve: {
     alias: {
