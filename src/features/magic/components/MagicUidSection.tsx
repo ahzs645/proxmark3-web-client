@@ -82,7 +82,7 @@ export function MagicUidSection({
             </Button>
           </div>
           {!uidValidation.valid && uidHasValue ? (
-            <p className="text-[10px] text-red-400">{uidValidation.error}</p>
+            <p className="text-[10px] text-red-600 dark:text-red-400">{uidValidation.error}</p>
           ) : null}
         </div>
 

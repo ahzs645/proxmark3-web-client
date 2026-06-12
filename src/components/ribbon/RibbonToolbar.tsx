@@ -1,4 +1,5 @@
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { getTransportLabel } from "@/lib/transports";
 import { RibbonTabNav } from "@/features/ribbon/RibbonTabNav";
 import { useRibbonSelections } from "@/features/ribbon/hooks/useRibbonSelections";
 import type { RibbonToolbarProps } from "@/features/ribbon/types";
@@ -45,15 +46,7 @@ export function RibbonToolbar({
 }: RibbonToolbarProps) {
   const commandsEnabled = canRunCommands;
   const activeTransport = selectedTransport || availableTransports[0]?.type || null;
-  const activeTransportLabel =
-    availableTransports.find((transport) => transport.type === activeTransport)?.name ||
-    (activeTransport === "tauri-bluetooth"
-      ? "Bluetooth"
-      : activeTransport === "tauri-serial"
-        ? "Native Serial"
-        : activeTransport === "webserial"
-          ? "WebSerial"
-          : "Auto Select");
+  const activeTransportLabel = getTransportLabel(activeTransport, availableTransports);
   const { selectedLFCardType, setSelectedLFCardType, selectedHFCardType, setSelectedHFCardType } =
     useRibbonSelections();
 

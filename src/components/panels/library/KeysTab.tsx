@@ -136,6 +136,7 @@ export function KeysTab({
                           variant="ghost"
                           className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
                           onClick={() => onDeleteKey(key.id)}
+                          aria-label="Delete key"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

@@ -133,6 +133,7 @@ export function CardsTab({
                       variant="ghost"
                       className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
                       onClick={() => onDeleteCard(card.id)}
+                      aria-label="Delete card"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

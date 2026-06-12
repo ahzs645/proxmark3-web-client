@@ -114,7 +114,7 @@ export function BlockInspector({
 
       {trailerInfo ? (
         <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-          <div className="flex items-center gap-2 text-xs font-medium text-amber-400">
+          <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400">
             <Wand2 className="h-3 w-3" />
             Sector Trailer Builder
           </div>
@@ -122,13 +122,13 @@ export function BlockInspector({
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Current Key A</span>
-              <span className="font-mono text-amber-400">
+              <span className="font-mono text-amber-600 dark:text-amber-400">
                 {showKeys ? trailerInfo.keyA : "????????????"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Current Key B</span>
-              <span className="font-mono text-amber-400">
+              <span className="font-mono text-amber-600 dark:text-amber-400">
                 {showKeys ? trailerInfo.keyB : "????????????"}
               </span>
             </div>
@@ -182,7 +182,7 @@ export function BlockInspector({
           <div className="space-y-1">
             <span className="text-[10px] text-muted-foreground">Preview</span>
             <div className="flex items-center gap-2 rounded border border-amber-500/20 bg-background/50 p-2">
-              <code className="flex-1 break-all font-mono text-[10px] text-amber-400">
+              <code className="flex-1 break-all font-mono text-[10px] text-amber-600 dark:text-amber-400">
                 {trailerPreview.match(/.{1,2}/g)?.join(" ")}
               </code>
               <Button
@@ -236,7 +236,7 @@ export function BlockInspector({
             </Button>
           </div>
 
-          <div className="flex items-start gap-2 rounded bg-red-500/10 p-2 text-[9px] text-red-400">
+          <div className="flex items-start gap-2 rounded bg-red-500/10 p-2 text-[9px] text-red-600 dark:text-red-400">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
             <span>Writing incorrect access bits can permanently lock the sector!</span>
           </div>

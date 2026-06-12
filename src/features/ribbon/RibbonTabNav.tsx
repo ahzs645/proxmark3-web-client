@@ -58,6 +58,7 @@ export function RibbonTabNav({
                   onClick={onStopOperation}
                   disabled={!commandsEnabled}
                   className="h-6 w-6"
+                  aria-label="Stop operation"
                 >
                   <StopCircle className="h-3.5 w-3.5" />
                 </Button>
@@ -73,6 +74,7 @@ export function RibbonTabNav({
                   size="icon"
                   onClick={onHardReset}
                   className="h-6 w-6 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950"
+                  aria-label="Force reset"
                 >
                   <RefreshCw className="h-3 w-3" />
                 </Button>

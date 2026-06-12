@@ -40,8 +40,9 @@ export function ConnectTab({
               <Usb className={isConnected ? "text-green-500" : ""} />
             )
           }
-          label={isConnected ? "Disconnect" : "Connect"}
+          label={isConnected ? "Disconnect" : isConnecting ? "Connecting…" : "Connect"}
           onClick={isConnected ? onDisconnect : onConnect}
+          disabled={isConnecting}
           variant={isConnected ? "secondary" : "default"}
         />
         <RibbonButton
@@ -51,7 +52,7 @@ export function ConnectTab({
             onDisconnect();
             setTimeout(onConnect, 500);
           }}
-          disabled={!commandsEnabled}
+          disabled={!commandsEnabled || isConnecting}
         />
       </RibbonGroup>
 

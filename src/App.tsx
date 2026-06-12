@@ -6,7 +6,7 @@ import { useProxmarkWasm } from "@/hooks/useProxmarkWasm";
 import { useTheme } from "@/hooks/useTheme";
 import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyCachePanel";
 import type { PM3DumpJson } from "@/components/panels/CardMemoryMap";
-import type { TransportType } from "@/lib/transports";
+import { getTransportLabel, type TransportType } from "@/lib/transports";
 import pm3WebUSB from "@/lib/pm3WebUSB";
 import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory";
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
@@ -32,6 +32,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>("connect");
   const [quickCommand, setQuickCommand] = useState("hf search");
   const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const { commandHistory, pushCommand } = useCommandHistory();
   const { theme, setTheme } = useTheme();
   const outputLineBufferRef = useRef("");
@@ -511,14 +512,10 @@ function App() {
   }, []);
 
   const handleConnect = useCallback(async () => {
+    if (isConnecting) return;
     const transportType =
       selectedTransport || wasmState.availableTransports[0]?.type || "webserial";
-    const transportName =
-      transportType === "tauri-bluetooth"
-        ? "Bluetooth"
-        : transportType === "tauri-serial"
-          ? "Native Serial"
-          : "WebSerial";
+    const transportName = getTransportLabel(transportType, wasmState.availableTransports);
 
     terminalRef.current?.writeln(`\x1b[36mConnecting to Proxmark3 via ${transportName}...\x1b[0m`);
     if (transportType === "webserial") {
@@ -529,16 +526,21 @@ function App() {
       terminalRef.current?.writeln("\x1b[90mSearching for Proxmark3 X Bluetooth device...\x1b[0m");
     }
 
-    const success = await wasmState.connectDevice(transportType);
-    if (success) {
-      terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
-      terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
-    } else {
-      terminalRef.current?.writeln(
-        `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
-      );
+    setIsConnecting(true);
+    try {
+      const success = await wasmState.connectDevice(transportType);
+      if (success) {
+        terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
+        terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
+      } else {
+        terminalRef.current?.writeln(
+          `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
+        );
+      }
+    } finally {
+      setIsConnecting(false);
     }
-  }, [wasmState, selectedTransport]);
+  }, [wasmState, selectedTransport, isConnecting]);
 
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
@@ -578,21 +580,17 @@ function App() {
 
   const activeTransportType =
     selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
-  const activeTransportLabel =
-    wasmState.availableTransports.find((transport) => transport.type === activeTransportType)
-      ?.name ||
-    (activeTransportType === "tauri-bluetooth"
-      ? "Bluetooth"
-      : activeTransportType === "tauri-serial"
-        ? "Native Serial"
-        : activeTransportType === "webserial"
-          ? "WebSerial"
-          : "Auto Select");
+  const activeTransportLabel = getTransportLabel(
+    activeTransportType,
+    wasmState.availableTransports,
+  );
   return (
     <div className="min-h-dvh flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
       <RibbonToolbar
-        connectionStatus={wasmState.isDeviceConnected ? "connected" : "disconnected"}
+        connectionStatus={
+          wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
+        }
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
         onCommand={handleCommand}

@@ -170,9 +170,13 @@ export function MagicBlock0Section({
               Block 0
             </Badge>
             <code className="flex-1 break-all font-mono text-[11px]">
-              <span className="text-blue-400">{block0Preview.slice(0, 8)}</span>
-              <span className="text-amber-400">{block0Preview.slice(8, 10)}</span>
-              <span className="text-green-400">{block0Preview.slice(10, 14)}</span>
+              <span className="text-blue-600 dark:text-blue-400">{block0Preview.slice(0, 8)}</span>
+              <span className="text-amber-600 dark:text-amber-400">
+                {block0Preview.slice(8, 10)}
+              </span>
+              <span className="text-green-600 dark:text-green-400">
+                {block0Preview.slice(10, 14)}
+              </span>
               <span className="text-muted-foreground">{block0Preview.slice(14)}</span>
             </code>
             <Button
@@ -180,6 +184,7 @@ export function MagicBlock0Section({
               variant="ghost"
               onClick={() => onCopyBlock0Preview(block0Preview)}
               className="h-6 w-6 p-0"
+              aria-label="Copy block 0 preview"
             >
               <Copy className="h-3 w-3" />
             </Button>
@@ -187,13 +192,13 @@ export function MagicBlock0Section({
 
           <div className="flex gap-4 text-[9px] text-muted-foreground">
             <span>
-              <span className="text-blue-400">UID</span>
+              <span className="text-blue-600 dark:text-blue-400">UID</span>
             </span>
             <span>
-              <span className="text-amber-400">BCC</span>
+              <span className="text-amber-600 dark:text-amber-400">BCC</span>
             </span>
             <span>
-              <span className="text-green-400">SAK+ATQA</span>
+              <span className="text-green-600 dark:text-green-400">SAK+ATQA</span>
             </span>
             <span>
               <span className="text-muted-foreground">Manufacturer</span>

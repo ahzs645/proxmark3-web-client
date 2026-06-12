@@ -76,7 +76,7 @@ export function DataManagementSection({
         </p>
       </div>
 
-      <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-400">
+      <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-[10px] text-amber-600 dark:text-amber-400">
         <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
         <span>
           Clearing the cache will remove all uploaded key files and dumps from browser storage. Make

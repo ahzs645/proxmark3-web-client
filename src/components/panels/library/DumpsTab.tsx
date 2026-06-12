@@ -130,6 +130,7 @@ export function DumpsTab({
                       variant="ghost"
                       className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
                       onClick={() => onDeleteDump?.(dump.id)}
+                      aria-label="Delete dump"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

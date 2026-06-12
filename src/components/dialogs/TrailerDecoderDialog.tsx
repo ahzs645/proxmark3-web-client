@@ -68,7 +68,7 @@ export function TrailerDecoderDialog({
           />
 
           {state.keyBReadable ? (
-            <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-xs text-amber-400">
+            <div className="flex items-start gap-2 rounded bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-400">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 Key B is readable with this configuration. This means Key B <strong>cannot</strong>{" "}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -113,7 +113,9 @@
   border-color: hsl(var(--border));
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -124,11 +126,17 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: "Space Grotesk", "SF Pro Display", "Segoe UI", sans-serif;
-  font-feature-settings: "rlig" 1, "calt" 1;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
-code, .font-mono, .xterm {
+code,
+.font-mono,
+.xterm {
   font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
 }
 
@@ -154,7 +162,9 @@ table {
 }
 
 /* Improved focus states */
-input:focus, textarea:focus, button:focus-visible {
+input:focus,
+textarea:focus,
+button:focus-visible {
   outline: none;
   ring: 2px;
   ring-color: hsl(var(--primary));
@@ -162,7 +172,9 @@ input:focus, textarea:focus, button:focus-visible {
 
 /* Card hover effects */
 .card-interactive {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .card-interactive:hover {
@@ -176,8 +188,12 @@ input:focus, textarea:focus, button:focus-visible {
 }
 
 @keyframes pulse-highlight {
-  0% { background-color: hsl(var(--primary) / 0.5); }
-  100% { background-color: hsl(var(--primary) / 0.2); }
+  0% {
+    background-color: hsl(var(--primary) / 0.5);
+  }
+  100% {
+    background-color: hsl(var(--primary) / 0.2);
+  }
 }
 
 /* Sector row dividers */
@@ -191,26 +207,13 @@ input:focus, textarea:focus, button:focus-visible {
 }
 
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* Badge variants for RFID types */
-.badge-manufacturer {
-  background-color: hsl(142.1 76.2% 36.3% / 0.2);
-  color: hsl(142.1 76.2% 50%);
-  border-color: hsl(142.1 76.2% 36.3% / 0.4);
-}
-
-.badge-trailer {
-  background-color: hsl(38 92% 50% / 0.2);
-  color: hsl(38 92% 50%);
-  border-color: hsl(38 92% 50% / 0.4);
-}
-
-.badge-data {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Smooth transitions for theme switching */
@@ -241,9 +244,9 @@ input:focus, textarea:focus, button:focus-visible {
 
 /* Hide scrollbar but keep scroll functionality */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari, Opera */
+  display: none; /* Chrome, Safari, Opera */
 }
