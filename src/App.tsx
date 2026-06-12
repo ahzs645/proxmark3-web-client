@@ -605,6 +605,7 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
+  const hasHardwareTransport = wasmState.availableTransports.length > 0;
   const activeTransportType =
     selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
   const activeTransportLabel = getTransportLabel(
@@ -666,6 +667,7 @@ function App() {
         isLoading={wasmState.isLoading}
         isConnecting={isConnecting}
         isDeviceConnected={wasmState.isDeviceConnected}
+        hasHardwareTransport={hasHardwareTransport}
         activeTransportLabel={activeTransportLabel}
         commandHistory={commandHistory}
         quickCommand={quickCommand}

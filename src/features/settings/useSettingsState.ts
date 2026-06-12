@@ -12,6 +12,7 @@ import {
 export function useSettingsState() {
   const [settings, setSettings] = useState<SettingsState>(loadSettingsFromStorage);
   const [saved, setSaved] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     saveSettingsToStorage(settings);
@@ -75,7 +76,7 @@ export function useSettingsState() {
           const parsed = parseSettingsFromText(reader.result);
           persistSettings(parsed);
         } catch {
-          alert("Failed to import settings. Invalid JSON file.");
+          setImportError("Failed to import settings. The file is not a valid settings JSON.");
         }
       };
       reader.readAsText(file);
@@ -84,14 +85,17 @@ export function useSettingsState() {
     [persistSettings],
   );
 
+  const clearImportError = useCallback(() => setImportError(null), []);
+
   const resetSettings = useCallback(() => {
-    if (!confirm("Reset all settings to defaults?")) return;
     persistSettings(DEFAULT_SETTINGS);
   }, [persistSettings]);
 
   return {
     settings,
     saved,
+    importError,
+    clearImportError,
     setDefaultCardType,
     setDefaultAuthKey,
     setConfirmDestructiveOps,

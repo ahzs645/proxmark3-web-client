@@ -206,19 +206,18 @@ export function LibraryPanel({
     );
   };
 
+  // Called with null/undefined to start a blank manual entry
   const openCardEditor = (card?: StoredCard | CardDraft | null) => {
-    if (!card) return;
-
     setCardDraft({
-      id: "id" in card ? card.id : undefined,
-      name: card.name || "",
-      uid: sanitizeHex(card.uid || "", 20),
-      type: card.type || "",
-      sak: sanitizeHex(card.sak || "", 2),
-      atqa: sanitizeHex(card.atqa || "", 4),
-      notes: card.notes || "",
-      favorite: card.favorite || false,
-      sourceDumpId: card.sourceDumpId ?? null,
+      id: card && "id" in card ? card.id : undefined,
+      name: card?.name || "",
+      uid: sanitizeHex(card?.uid || "", 20),
+      type: card?.type || "",
+      sak: sanitizeHex(card?.sak || "", 2),
+      atqa: sanitizeHex(card?.atqa || "", 4),
+      notes: card?.notes || "",
+      favorite: card?.favorite || false,
+      sourceDumpId: card?.sourceDumpId ?? null,
     });
   };
 

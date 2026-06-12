@@ -68,6 +68,7 @@ interface MainPanelRouterProps {
   isLoading: boolean;
   isConnecting: boolean;
   isDeviceConnected: boolean;
+  hasHardwareTransport: boolean;
   activeTransportLabel: string;
   commandHistory: string[];
   quickCommand: string;
@@ -101,6 +102,7 @@ export function MainPanelRouter({
   isLoading,
   isConnecting,
   isDeviceConnected,
+  hasHardwareTransport,
   activeTransportLabel,
   commandHistory,
   quickCommand,
@@ -244,6 +246,7 @@ export function MainPanelRouter({
           isLoading={isLoading}
           isConnecting={isConnecting}
           isDeviceConnected={isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
           activeTransportLabel={activeTransportLabel}
           activeDumpName={activeDump?.name}
           cacheCount={cachedAssets.length}

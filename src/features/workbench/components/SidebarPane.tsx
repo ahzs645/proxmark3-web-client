@@ -8,6 +8,7 @@ interface SidebarPaneProps {
   canRunCommands: boolean;
   commandHistory: string[];
   isDeviceConnected: boolean;
+  hasHardwareTransport: boolean;
   onCommand: (cmd: string) => void;
   onConnect: () => void;
   onCopyUid: () => void;
@@ -20,6 +21,7 @@ export function SidebarPane({
   canRunCommands,
   commandHistory,
   isDeviceConnected,
+  hasHardwareTransport,
   onCommand,
   onConnect,
   onCopyUid,
@@ -73,6 +75,7 @@ export function SidebarPane({
                   size="sm"
                   variant="outline"
                   className="justify-start"
+                  disabled={!isDeviceConnected && !hasHardwareTransport}
                   onClick={() => {
                     if (isDeviceConnected) {
                       onCommand("hw version");
@@ -81,7 +84,11 @@ export function SidebarPane({
                     }
                   }}
                 >
-                  {isDeviceConnected ? "Reader Info" : "Connect Reader"}
+                  {isDeviceConnected
+                    ? "Reader Info"
+                    : hasHardwareTransport
+                      ? "Connect Reader"
+                      : "Reader Unavailable Here"}
                 </Button>
                 <Button
                   size="sm"
