@@ -29,7 +29,7 @@ export function SidebarPane({
   onRefreshTag,
 }: SidebarPaneProps) {
   return (
-    <div className="order-2 flex min-h-0 flex-col gap-4 md:order-1">
+    <div className="order-1 flex min-h-0 flex-col gap-4 md:order-1">
       <TagInfoPanel
         tagInfo={tagInfo}
         onRefresh={onRefreshTag}

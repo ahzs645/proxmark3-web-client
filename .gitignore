@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Raw hardware capture logs (working artifacts; bundled demo data lives in src/)
+captures/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

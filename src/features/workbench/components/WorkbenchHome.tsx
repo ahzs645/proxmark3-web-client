@@ -28,6 +28,8 @@ interface WorkbenchHomeProps {
   onCopyUid: () => void;
   onOpenMemory: () => void;
   onOpenShortcuts: () => void;
+  onOpenTab: (tab: string) => void;
+  onLoadSample: () => void;
   onRefreshTag: () => void;
 }
 
@@ -54,6 +56,8 @@ export function WorkbenchHome({
   onCopyUid,
   onOpenMemory,
   onOpenShortcuts,
+  onOpenTab,
+  onLoadSample,
   onRefreshTag,
 }: WorkbenchHomeProps) {
   return (
@@ -78,11 +82,13 @@ export function WorkbenchHome({
         }}
         onOpenMemory={onOpenMemory}
         onOpenShortcuts={onOpenShortcuts}
+        onOpenTab={onOpenTab}
+        onLoadSample={onLoadSample}
         onRunHfSearch={() => onCommand("hf search")}
       />
 
       <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="order-1 flex min-h-0 min-w-0 flex-col gap-3 md:order-2">
+        <div className="order-2 flex min-h-0 min-w-0 flex-col gap-3 md:order-2">
           <TerminalPane
             terminalRef={terminalRef}
             canRunCommands={canRunCommands}

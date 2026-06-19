@@ -14,6 +14,7 @@ import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter
 import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
 import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
 import { RIBBON_TABS } from "@/features/ribbon/config";
+import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
@@ -680,6 +681,10 @@ function App() {
         onCopyUid={handleCopyUid}
         onOpenMemory={() => setActiveTab("memory")}
         onOpenShortcuts={() => setActiveTab("actions")}
+        onOpenTab={setActiveTab}
+        onLoadSample={() =>
+          handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
+        }
         onRefreshTag={handleRefreshTag}
         onDumpLoad={handleDumpLoad}
         onDumpRename={handleDumpRename}

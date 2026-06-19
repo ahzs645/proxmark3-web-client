@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MonitorSmartphone } from "lucide-react";
+import { MonitorSmartphone, Sparkles } from "lucide-react";
 
 interface SessionDashboardProps {
   isLoading: boolean;
@@ -17,6 +17,8 @@ interface SessionDashboardProps {
   onToggleConnection: () => void;
   onOpenMemory: () => void;
   onOpenShortcuts: () => void;
+  onOpenTab: (tab: string) => void;
+  onLoadSample: () => void;
   onRunHfSearch: () => void;
 }
 
@@ -34,6 +36,8 @@ export function SessionDashboard({
   onToggleConnection,
   onOpenMemory,
   onOpenShortcuts,
+  onOpenTab,
+  onLoadSample,
   onRunHfSearch,
 }: SessionDashboardProps) {
   const sessionHeadline = isLoading
@@ -91,14 +95,31 @@ export function SessionDashboard({
         </div>
 
         {!hasHardwareTransport ? (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
-            <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              <strong>This browser can't connect to Proxmark3 hardware.</strong> WebSerial is
-              unavailable here — it isn't supported on mobile browsers, Firefox, or Safari. You can
-              still analyze dumps, use the hex viewer, manage the library, and prepare commands. To
-              connect a reader, open this app in Chrome or Edge on a desktop.
-            </span>
+          <div className="flex flex-col gap-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-start gap-2">
+              <MonitorSmartphone className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <strong>This browser can't connect to Proxmark3 hardware.</strong> WebSerial isn't
+                supported on mobile browsers, Firefox, or Safari. You can still explore dumps
+                offline — start with the sample below. To connect a reader, open this app in Chrome
+                or Edge on desktop.
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:pl-6">
+              <Button size="sm" variant="outline" onClick={onLoadSample}>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Load sample dump
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onOpenTab("memory")}>
+                Memory Map
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onOpenTab("hex")}>
+                Hex Viewer
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onOpenTab("library")}>
+                Library
+              </Button>
+            </div>
           </div>
         ) : null}
 

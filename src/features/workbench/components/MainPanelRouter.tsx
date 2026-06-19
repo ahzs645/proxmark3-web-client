@@ -81,6 +81,8 @@ interface MainPanelRouterProps {
   onCopyUid: () => void;
   onOpenMemory: () => void;
   onOpenShortcuts: () => void;
+  onOpenTab: (tab: string) => void;
+  onLoadSample: () => void;
   onRefreshTag: () => void;
   onDumpLoad: (dump: PM3DumpJson, name: string) => void;
   onDumpRename: (id: string, newName: string) => void;
@@ -115,6 +117,8 @@ export function MainPanelRouter({
   onCopyUid,
   onOpenMemory,
   onOpenShortcuts,
+  onOpenTab,
+  onLoadSample,
   onRefreshTag,
   onDumpLoad,
   onDumpRename,
@@ -262,6 +266,8 @@ export function MainPanelRouter({
           onCopyUid={onCopyUid}
           onOpenMemory={onOpenMemory}
           onOpenShortcuts={onOpenShortcuts}
+          onOpenTab={onOpenTab}
+          onLoadSample={onLoadSample}
           onRefreshTag={onRefreshTag}
         />
       </div>

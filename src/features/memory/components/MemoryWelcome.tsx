@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CachedDump, PM3DumpJson } from "@/features/memory/types";
-import { CreditCard, FileJson, FolderOpen, HardDrive } from "lucide-react";
+import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
+import { CreditCard, FileJson, FolderOpen, HardDrive, Sparkles } from "lucide-react";
 
 interface MemoryWelcomeProps {
   cachedDumps: CachedDump[];
@@ -22,6 +23,19 @@ export function MemoryWelcome({ cachedDumps, onDumpLoad, onJsonUpload }: MemoryW
           <p className="text-sm text-muted-foreground">
             Load a Proxmark3 card dump to view and edit the memory contents, sector keys, and access
             conditions.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Button
+            className="w-full"
+            onClick={() => onDumpLoad?.(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Load sample dump
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            No reader handy? Load real card data captured from hardware to explore the Memory Map.
           </p>
         </div>
 
