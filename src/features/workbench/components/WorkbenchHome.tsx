@@ -9,6 +9,8 @@ interface WorkbenchHomeProps {
   terminalRef: RefObject<TerminalHandle | null>;
   /** When a main panel is open, collapse to a terminal-only dock (dashboard + sidebar hidden). */
   panelOpen?: boolean;
+  /** Collapse the terminal dock (only meaningful while panelOpen). */
+  onCollapseTerminal?: () => void;
   tagInfo: TagInfo | null;
   canRunCommands: boolean;
   isLoading: boolean;
@@ -38,6 +40,7 @@ interface WorkbenchHomeProps {
 export function WorkbenchHome({
   terminalRef,
   panelOpen = false,
+  onCollapseTerminal,
   tagInfo,
   canRunCommands,
   isLoading,
@@ -122,6 +125,7 @@ export function WorkbenchHome({
             onRunQuickCommand={onRunQuickCommand}
             onCommand={onCommand}
             onInput={onInput}
+            onCollapse={panelOpen ? onCollapseTerminal : undefined}
           />
         </div>
 

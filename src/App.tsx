@@ -12,7 +12,13 @@ import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory"
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
-import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
+import {
+  importDumpKeysToLibrary,
+  buildKeyDictionary,
+  loadStoredState,
+  KEYS_STORAGE_KEY,
+} from "@/components/panels/library/utils";
+import type { StoredKey } from "@/components/panels/library/types";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
@@ -21,6 +27,9 @@ const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
+// Panel tabs that run pm3 commands → show the terminal dock by default. Others
+// (memory, hex, library, utilities, settings) hide it until a command runs.
+const COMMAND_PANEL_TABS = new Set(["attacks", "magic", "lfops", "t55xx", "traffic"]);
 const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
 const ANSI_ESCAPE_REGEX = new RegExp(
@@ -41,6 +50,9 @@ function App() {
     return saved && RIBBON_TABS.some((tab) => tab.value === saved) ? saved : "connect";
   });
   const [quickCommand, setQuickCommand] = useState("hf search");
+  // Terminal dock visibility under a panel: defaults per-tab, can be toggled, and
+  // pops open whenever a command is dispatched (see handleCommand).
+  const [terminalDockOpen, setTerminalDockOpen] = useState(true);
   const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem(TRANSPORT_STORAGE_KEY) as TransportType | null;
@@ -194,7 +206,9 @@ function App() {
       const normalizedPath = stripAnsi(filePath).trim().replace(/^`|`$/g, "");
       const name = normalizedPath.split("/").pop();
       if (!name) return;
-      if (!/(?:-key\.bin|-dump\.bin|-dump\.json)$/i.test(name)) return;
+      // Match key/dump artifacts incl. numbered suffixes PM3 adds to avoid
+      // overwrites (e.g. hf-mf-<uid>-dump-001.json, -key-001.bin).
+      if (!/-(?:key(?:-\d+)?\.bin|dump(?:-\d+)?\.(?:bin|json))$/i.test(name)) return;
 
       const bytes = readFsBytes(normalizedPath);
       if (!bytes) return;
@@ -466,6 +480,9 @@ function App() {
   const handleCommand = useCallback(
     (cmd: string) => {
       pushCommand(cmd);
+      // Pop the terminal dock open so output is visible, even on panels that
+      // hide it by default (e.g. running a command from Memory).
+      setTerminalDockOpen(true);
 
       // Handle local clear command
       if (cmd === "clear") {
@@ -483,6 +500,63 @@ function App() {
       }
     },
     [pushCommand, wasmState],
+  );
+
+  // Write a small text file straight into the cache FS (no React-state round
+  // trip), used to drop a key dictionary in place right before a command.
+  const writeCacheTextFile = useCallback((name: string, text: string): string | null => {
+    const win = window as unknown as Record<string, unknown>;
+    const FS = (win.FS || (win.Module as Record<string, unknown> | undefined)?.FS) as
+      | EmscriptenFSLike
+      | undefined;
+    if (!FS?.writeFile) return null;
+    try {
+      const info = FS.analyzePath ? FS.analyzePath(CACHE_PATH_PREFIX) : { exists: false };
+      if (!info?.exists) {
+        if (FS.mkdirTree) FS.mkdirTree(CACHE_PATH_PREFIX);
+        else if (FS.mkdir) FS.mkdir(CACHE_PATH_PREFIX);
+      }
+      const path = `${CACHE_PATH_PREFIX}/${name}`;
+      FS.writeFile(path, new TextEncoder().encode(text), { flags: "w+" });
+      return path;
+    } catch (error) {
+      console.error(`Failed to write cache file: ${name}`, error);
+      return null;
+    }
+  }, []);
+
+  // Dump a card using keys already saved in the browser library: export them as
+  // a pm3 dictionary and seed autopwn with it (uses known keys first, recovers
+  // any missing). The resulting dump flows through cacheGeneratedArtifact.
+  const handleDumpWithSavedKeys = useCallback(
+    (uid: string, cardType: "1k" | "4k") => {
+      if (!wasmState.isReady) {
+        terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
+        return;
+      }
+      const storedKeys = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
+      const dictionary = buildKeyDictionary(storedKeys, uid);
+      if (!dictionary) {
+        terminalRef.current?.writeln(
+          "\x1b[33mNo saved keys for this card yet — run Autopwn or Check Keys first.\x1b[0m",
+        );
+        return;
+      }
+      const fileName = `hf-mf-${uid || "card"}-saved-keys.dic`;
+      const path = writeCacheTextFile(fileName, `${dictionary}\n`);
+      if (!path) {
+        terminalRef.current?.writeln(
+          "\x1b[31mCould not write the key dictionary to the cache filesystem.\x1b[0m",
+        );
+        return;
+      }
+      const count = dictionary.split("\n").length;
+      terminalRef.current?.writeln(
+        `\x1b[36mSeeding dump with ${count} saved key${count === 1 ? "" : "s"} → ${path}\x1b[0m`,
+      );
+      handleCommand(`hf mf autopwn --${cardType} -f ${path}`);
+    },
+    [handleCommand, writeCacheTextFile, wasmState.isReady],
   );
 
   const handleCacheUse = useCallback(
@@ -509,6 +583,11 @@ function App() {
     if (typeof window !== "undefined") {
       localStorage.setItem(TAB_STORAGE_KEY, activeTab);
     }
+  }, [activeTab]);
+
+  // Reset terminal dock visibility to the active panel's default on tab change.
+  useEffect(() => {
+    setTerminalDockOpen(COMMAND_PANEL_TABS.has(activeTab));
   }, [activeTab]);
 
   useEffect(() => {
@@ -661,6 +740,9 @@ function App() {
       />
       <MainPanelRouter
         activeTab={activeTab}
+        terminalDockOpen={terminalDockOpen}
+        onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+        onDumpWithSavedKeys={handleDumpWithSavedKeys}
         theme={theme}
         onThemeChange={setTheme}
         terminalRef={terminalRef}

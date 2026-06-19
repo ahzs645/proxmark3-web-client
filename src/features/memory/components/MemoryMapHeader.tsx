@@ -11,6 +11,7 @@ import {
   EyeOff,
   FileJson,
   Key,
+  KeyRound,
   Search,
 } from "lucide-react";
 
@@ -29,6 +30,8 @@ interface MemoryMapHeaderProps {
   onExportDump: () => void;
   onDump: () => void;
   onAutopwn: () => void;
+  /** Dump the card seeding autopwn with keys saved in the library. */
+  onDumpWithSavedKeys?: () => void;
 }
 
 const CARD_TYPE_LABELS: Record<CardType, string> = {
@@ -52,6 +55,7 @@ export function MemoryMapHeader({
   onExportDump,
   onDump,
   onAutopwn,
+  onDumpWithSavedKeys,
 }: MemoryMapHeaderProps) {
   return (
     <>
@@ -107,6 +111,19 @@ export function MemoryMapHeader({
             <Key className="mr-1 h-3 w-3" />
             Autopwn
           </Button>
+          {onDumpWithSavedKeys ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onDumpWithSavedKeys}
+              disabled={disabled}
+              className="h-7 text-xs"
+              title="Dump using keys saved in the library (seeds autopwn with them)"
+            >
+              <KeyRound className="mr-1 h-3 w-3" />
+              Dump · saved keys
+            </Button>
+          ) : null}
         </div>
       </div>
 

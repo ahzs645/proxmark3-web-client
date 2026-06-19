@@ -249,3 +249,24 @@ export function exportStoredKeys(keys: StoredKey[]) {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Build a Proxmark3 key dictionary (one 12-hex key per line) from stored keys,
+ * for use with `hf mf autopwn/chk -f <file>`. Includes keys tagged for the
+ * given UID plus untagged/global keys, de-duplicated. Returns "" if none.
+ */
+export function buildKeyDictionary(keys: StoredKey[], uid?: string): string {
+  const cleanUid = sanitizeHex(uid || "", 20);
+  const seen = new Set<string>();
+  const lines: string[] = [];
+
+  for (const key of keys) {
+    if (cleanUid && key.uidFilter && key.uidFilter !== cleanUid) continue;
+    const value = sanitizeHex(key.value, 12).toUpperCase();
+    if (value.length !== 12 || value.includes("?") || seen.has(value)) continue;
+    seen.add(value);
+    lines.push(value);
+  }
+
+  return lines.join("\n");
+}

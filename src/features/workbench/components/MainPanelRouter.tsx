@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronUp, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Theme } from "@/hooks/useTheme";
 import type { CachedDump, PM3DumpJson } from "@/components/panels/CardMemoryMap";
 import { WorkbenchHome } from "./WorkbenchHome";
@@ -56,6 +57,9 @@ function PanelLoading() {
 
 interface MainPanelRouterProps {
   activeTab: string;
+  terminalDockOpen: boolean;
+  onTerminalDockToggle: () => void;
+  onDumpWithSavedKeys: (uid: string, cardType: "1k" | "4k") => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   terminalRef: RefObject<TerminalHandle | null>;
@@ -92,6 +96,9 @@ interface MainPanelRouterProps {
 
 export function MainPanelRouter({
   activeTab,
+  terminalDockOpen,
+  onTerminalDockToggle,
+  onDumpWithSavedKeys,
   theme,
   onThemeChange,
   terminalRef,
@@ -132,6 +139,7 @@ export function MainPanelRouter({
       <div className="flex-1 flex flex-col overflow-hidden p-4">
         <CardMemoryMap
           onCommand={onCommand}
+          onDumpWithSavedKeys={onDumpWithSavedKeys}
           disabled={!canRunCommands}
           cachedDumps={cachedDumps}
           onDumpLoad={onDumpLoad}
@@ -248,18 +256,21 @@ export function MainPanelRouter({
       ) : null}
 
       {/* Keep the workbench (and its terminal) mounted while a panel is open so
-          terminal scrollback and live WASM output survive tab switches. When a
-          panel is open it collapses to a terminal dock beneath the panel. */}
+          terminal scrollback and live WASM output survive tab switches. Under a
+          panel it becomes a terminal dock; when the dock is hidden it stays
+          mounted (display:none) so streaming output is never lost. */}
       <div
-        className={
-          panel
-            ? "flex min-h-0 shrink-0 basis-[45%] flex-col border-t border-border"
-            : "flex min-h-0 flex-1 flex-col"
-        }
+        className={cn(
+          "flex min-h-0 flex-col",
+          !panel && "flex-1",
+          panel && terminalDockOpen && "shrink-0 basis-[45%] border-t border-border",
+          panel && !terminalDockOpen && "hidden",
+        )}
       >
         <WorkbenchHome
           terminalRef={terminalRef}
           panelOpen={!!panel}
+          onCollapseTerminal={panel ? onTerminalDockToggle : undefined}
           tagInfo={tagInfo}
           canRunCommands={canRunCommands}
           isLoading={isLoading}
@@ -286,6 +297,18 @@ export function MainPanelRouter({
           onRefreshTag={onRefreshTag}
         />
       </div>
+
+      {/* When the dock is hidden under a panel, offer a slim reopen affordance. */}
+      {panel && !terminalDockOpen ? (
+        <button
+          type="button"
+          onClick={onTerminalDockToggle}
+          className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border bg-card/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ChevronUp className="h-3 w-3" />
+          Show terminal
+        </button>
+      ) : null}
     </div>
   );
 }

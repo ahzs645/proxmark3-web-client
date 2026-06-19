@@ -26,6 +26,7 @@ export type { Block, CachedDump, CardType, PM3DumpJson } from "@/features/memory
 
 interface CardMemoryMapProps {
   onCommand: (cmd: string) => void;
+  onDumpWithSavedKeys?: (uid: string, cardType: "1k" | "4k") => void;
   disabled?: boolean;
   cardType?: CardType;
   initialData?: Block[];
@@ -38,6 +39,7 @@ interface CardMemoryMapProps {
 
 export function CardMemoryMap({
   onCommand,
+  onDumpWithSavedKeys,
   disabled = false,
   cardType = "classic-1k",
   initialData,
@@ -181,6 +183,11 @@ export function CardMemoryMap({
     onCommand(cardType === "classic-4k" ? "hf mf autopwn --4k" : "hf mf autopwn --1k");
   }, [cardType, onCommand]);
 
+  const handleDumpWithSavedKeys = useCallback(() => {
+    const uid = activeDump?.data?.Card?.UID || "";
+    onDumpWithSavedKeys?.(uid, cardType === "classic-4k" ? "4k" : "1k");
+  }, [activeDump, cardType, onDumpWithSavedKeys]);
+
   const handleCopyData = useCallback((data: string) => {
     void navigator.clipboard.writeText(data.replace(/\s/g, ""));
   }, []);
@@ -204,6 +211,7 @@ export function CardMemoryMap({
             onExportDump={handleExportDump}
             onDump={handleDump}
             onAutopwn={handleAutopwn}
+            onDumpWithSavedKeys={onDumpWithSavedKeys ? handleDumpWithSavedKeys : undefined}
           />
 
           {showCachePanel ? (

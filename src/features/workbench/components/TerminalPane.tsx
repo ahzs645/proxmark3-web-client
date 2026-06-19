@@ -1,5 +1,5 @@
 import type { KeyboardEvent, RefObject } from "react";
-import { Send, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Send, Sparkles, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ interface TerminalPaneProps {
   onRunQuickCommand: () => void;
   onCommand: (cmd: string) => void;
   onInput: (char: string) => void;
+  /** When provided, shows a collapse button to hide the terminal dock. */
+  onCollapse?: () => void;
 }
 
 export function TerminalPane({
@@ -28,6 +30,7 @@ export function TerminalPane({
   onRunQuickCommand,
   onCommand,
   onInput,
+  onCollapse,
 }: TerminalPaneProps) {
   return (
     <Card className="flex flex-1 flex-col overflow-hidden border-border/80 bg-card/80 backdrop-blur">
@@ -52,6 +55,18 @@ export function TerminalPane({
               <Trash2 className="mr-1 h-3 w-3" />
               Clear
             </Button>
+            {onCollapse ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onCollapse}
+                aria-label="Hide terminal"
+                title="Hide terminal"
+              >
+                <ChevronDown className="mr-1 h-3 w-3" />
+                Hide
+              </Button>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-col gap-2">
