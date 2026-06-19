@@ -39,7 +39,7 @@ export function T55xxOperationsSection({
             type="checkbox"
             checked={usePassword}
             onChange={(e) => onUsePasswordChange(e.target.checked)}
-            className="rounded border-gray-300"
+            className="rounded border-input"
           />
           <span>Use Password</span>
         </label>

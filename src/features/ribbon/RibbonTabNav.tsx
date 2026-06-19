@@ -99,7 +99,7 @@ function RibbonNavTrigger({ tab }: { tab: (typeof RIBBON_TABS)[number] }) {
       ) : null}
       <TabsTrigger
         value={tab.value}
-        className="shrink-0 rounded-full border border-transparent px-3 py-1.5 text-xs data-[state=active]:border-border data-[state=active]:bg-background/80"
+        className="shrink-0 gap-1 rounded-none bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-2px_0_0_hsl(var(--primary))]"
       >
         {tab.icon ? getIcon(tab.icon, "h-3 w-3") : null}
         {tab.label}

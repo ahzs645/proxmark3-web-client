@@ -94,7 +94,7 @@ export function LFAdvancedSection({
               type="checkbox"
               checked={config.averaging}
               onChange={(e) => onConfigChange("averaging", e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-input"
             />
             <span>Enable Averaging</span>
           </label>

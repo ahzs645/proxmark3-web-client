@@ -35,7 +35,7 @@ export function LFOperationsSection({
         >
           <Search className="h-5 w-5" />
           <span className="text-xs font-medium">Search</span>
-          <span className="text-[9px] text-muted-foreground">Auto-detect tag</span>
+          <span className="text-[9px] text-primary-foreground/75">Auto-detect tag</span>
         </Button>
 
         <Button
@@ -47,7 +47,7 @@ export function LFOperationsSection({
         >
           <Download className="h-5 w-5" />
           <span className="text-xs font-medium">Read</span>
-          <span className="text-[9px] text-muted-foreground">Field ON</span>
+          <span className="text-[9px] text-secondary-foreground/70">Field ON</span>
         </Button>
 
         <Button
