@@ -239,12 +239,27 @@ export function MainPanelRouter({
   }
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Active panel sits on top; the terminal dock below shows live output. */}
+      {panel ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <Suspense fallback={<PanelLoading />}>{panel}</Suspense>
+        </div>
+      ) : null}
+
       {/* Keep the workbench (and its terminal) mounted while a panel is open so
-          terminal scrollback and live WASM output survive tab switches. */}
-      <div className={panel ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
+          terminal scrollback and live WASM output survive tab switches. When a
+          panel is open it collapses to a terminal dock beneath the panel. */}
+      <div
+        className={
+          panel
+            ? "flex min-h-0 shrink-0 basis-[45%] flex-col border-t border-border"
+            : "flex min-h-0 flex-1 flex-col"
+        }
+      >
         <WorkbenchHome
           terminalRef={terminalRef}
+          panelOpen={!!panel}
           tagInfo={tagInfo}
           canRunCommands={canRunCommands}
           isLoading={isLoading}
@@ -271,7 +286,6 @@ export function MainPanelRouter({
           onRefreshTag={onRefreshTag}
         />
       </div>
-      {panel ? <Suspense fallback={<PanelLoading />}>{panel}</Suspense> : null}
-    </>
+    </div>
   );
 }

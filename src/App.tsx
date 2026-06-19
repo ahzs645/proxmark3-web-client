@@ -15,6 +15,7 @@ import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/work
 import { importDumpKeysToLibrary } from "@/components/panels/library/utils";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
+import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
@@ -214,6 +215,8 @@ function App() {
           if (parsed.blocks || parsed.Card) {
             const cachedDump = upsertCachedDump(parsed, name, { activate: false, announce: false });
             importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+            const derived = tagInfoFromDump(parsed);
+            if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
           }
         } catch (error) {
           console.error(`Failed to parse generated dump JSON: ${name}`, error);
@@ -255,6 +258,8 @@ function App() {
     (dump: PM3DumpJson, name: string) => {
       const cachedDump = upsertCachedDump(dump, name, { activate: true, announce: true });
       importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+      const derived = tagInfoFromDump(dump);
+      if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
     },
     [upsertCachedDump],
   );
@@ -626,7 +631,7 @@ function App() {
           ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
           : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
-    <div className="min-h-dvh flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
+    <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
       {/* Ribbon Toolbar */}
       <RibbonToolbar
         connectionStatus={

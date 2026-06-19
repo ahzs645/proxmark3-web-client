@@ -39,7 +39,15 @@ export function TagInfoSuggestedActions({
                 {action.label}
               </span>
               {action.description ? (
-                <span className="text-[9px] font-normal text-muted-foreground">
+                <span
+                  className={`text-[9px] font-normal ${
+                    action.variant === "default"
+                      ? "text-primary-foreground/75"
+                      : action.variant === "secondary"
+                        ? "text-secondary-foreground/70"
+                        : "text-muted-foreground"
+                  }`}
+                >
                   {action.description}
                 </span>
               ) : null}

@@ -7,6 +7,8 @@ import type { TagInfo } from "@/components/panels/TagInfoPanel";
 
 interface WorkbenchHomeProps {
   terminalRef: RefObject<TerminalHandle | null>;
+  /** When a main panel is open, collapse to a terminal-only dock (dashboard + sidebar hidden). */
+  panelOpen?: boolean;
   tagInfo: TagInfo | null;
   canRunCommands: boolean;
   isLoading: boolean;
@@ -35,6 +37,7 @@ interface WorkbenchHomeProps {
 
 export function WorkbenchHome({
   terminalRef,
+  panelOpen = false,
   tagInfo,
   canRunCommands,
   isLoading,
@@ -61,34 +64,54 @@ export function WorkbenchHome({
   onRefreshTag,
 }: WorkbenchHomeProps) {
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4">
-      <SessionDashboard
-        isLoading={isLoading}
-        canRunCommands={canRunCommands}
-        isConnecting={isConnecting}
-        isDeviceConnected={isDeviceConnected}
-        hasHardwareTransport={hasHardwareTransport}
-        activeTransportLabel={activeTransportLabel}
-        activeDumpName={activeDumpName}
-        cacheCount={cacheCount}
-        dumpCount={dumpCount}
-        commandCount={commandHistory.length}
-        onToggleConnection={() => {
-          if (isDeviceConnected) {
-            onDisconnect();
-          } else {
-            onConnect();
-          }
-        }}
-        onOpenMemory={onOpenMemory}
-        onOpenShortcuts={onOpenShortcuts}
-        onOpenTab={onOpenTab}
-        onLoadSample={onLoadSample}
-        onRunHfSearch={() => onCommand("hf search")}
-      />
+    <div
+      className={
+        panelOpen
+          ? "flex flex-1 flex-col overflow-hidden p-2 pt-0"
+          : "flex flex-1 flex-col gap-4 overflow-hidden p-4"
+      }
+    >
+      {panelOpen ? null : (
+        <SessionDashboard
+          isLoading={isLoading}
+          canRunCommands={canRunCommands}
+          isConnecting={isConnecting}
+          isDeviceConnected={isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
+          activeTransportLabel={activeTransportLabel}
+          activeDumpName={activeDumpName}
+          cacheCount={cacheCount}
+          dumpCount={dumpCount}
+          commandCount={commandHistory.length}
+          onToggleConnection={() => {
+            if (isDeviceConnected) {
+              onDisconnect();
+            } else {
+              onConnect();
+            }
+          }}
+          onOpenMemory={onOpenMemory}
+          onOpenShortcuts={onOpenShortcuts}
+          onOpenTab={onOpenTab}
+          onLoadSample={onLoadSample}
+          onRunHfSearch={() => onCommand("hf search")}
+        />
+      )}
 
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="order-2 flex min-h-0 min-w-0 flex-col gap-3 md:order-2">
+      <div
+        className={
+          panelOpen
+            ? "flex min-h-0 flex-1"
+            : "grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[320px_minmax(0,1fr)]"
+        }
+      >
+        <div
+          className={
+            panelOpen
+              ? "flex min-h-0 min-w-0 flex-1 flex-col gap-3"
+              : "order-2 flex min-h-0 min-w-0 flex-col gap-3 md:order-2"
+          }
+        >
           <TerminalPane
             terminalRef={terminalRef}
             canRunCommands={canRunCommands}
@@ -102,18 +125,20 @@ export function WorkbenchHome({
           />
         </div>
 
-        <SidebarPane
-          tagInfo={tagInfo}
-          canRunCommands={canRunCommands}
-          commandHistory={commandHistory}
-          isDeviceConnected={isDeviceConnected}
-          hasHardwareTransport={hasHardwareTransport}
-          onCommand={onCommand}
-          onConnect={onConnect}
-          onCopyUid={onCopyUid}
-          onOpenMemory={onOpenMemory}
-          onRefreshTag={onRefreshTag}
-        />
+        {panelOpen ? null : (
+          <SidebarPane
+            tagInfo={tagInfo}
+            canRunCommands={canRunCommands}
+            commandHistory={commandHistory}
+            isDeviceConnected={isDeviceConnected}
+            hasHardwareTransport={hasHardwareTransport}
+            onCommand={onCommand}
+            onConnect={onConnect}
+            onCopyUid={onCopyUid}
+            onOpenMemory={onOpenMemory}
+            onRefreshTag={onRefreshTag}
+          />
+        )}
       </div>
     </div>
   );

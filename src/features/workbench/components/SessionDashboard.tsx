@@ -28,7 +28,6 @@ export function SessionDashboard({
   isConnecting,
   isDeviceConnected,
   hasHardwareTransport,
-  activeTransportLabel,
   activeDumpName,
   cacheCount,
   dumpCount,
@@ -64,18 +63,11 @@ export function SessionDashboard({
       <CardContent className="flex flex-col gap-3 p-4 sm:p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={canRunCommands ? "success" : isLoading ? "warning" : "secondary"}>
-                {canRunCommands ? "Engine Ready" : isLoading ? "Booting" : "Offline"}
-              </Badge>
-              <Badge variant="outline">{activeTransportLabel}</Badge>
-              <Badge variant="outline">
-                {isDeviceConnected ? "Reader Connected" : "Reader Disconnected"}
-              </Badge>
-              {activeDumpName ? (
+            {activeDumpName ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">Active Dump: {activeDumpName}</Badge>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             <div>
               <h2 className="text-lg font-semibold tracking-tight">{sessionHeadline}</h2>
               <p className="max-w-3xl text-sm text-muted-foreground">{sessionDescription}</p>
