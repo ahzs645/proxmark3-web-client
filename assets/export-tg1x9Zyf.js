@@ -1,1 +1,0 @@
-function e(e){let t=new Blob([JSON.stringify(e.data,null,2)],{type:`application/json`}),n=URL.createObjectURL(t),r=document.createElement(`a`);r.href=n,r.download=`${e.name.replace(/[^a-z0-9-_]+/gi,`_`)||`pm3-dump`}.json`,r.click(),URL.revokeObjectURL(n)}export{e as t};
