@@ -205,7 +205,6 @@ export function MainPanelRouter({
         <div className="h-full max-w-5xl mx-auto">
           <LibraryPanel
             activeDump={activeDump}
-            cachedDumps={cachedDumps}
             onDumpLoad={onDumpLoad}
             onDumpRename={onDumpRename}
             onDumpDelete={onDumpDelete}

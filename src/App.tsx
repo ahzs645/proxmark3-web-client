@@ -10,16 +10,12 @@ import pm3WebUSB from "@/lib/pm3WebUSB";
 import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory";
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
-import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
-import {
-  importDumpKeysToLibrary,
-  buildKeyDictionary,
-  loadStoredState,
-  KEYS_STORAGE_KEY,
-  LIBRARY_KEYS_UPDATED_EVENT,
-} from "@/components/panels/library/utils";
+import { type EmscriptenFSLike } from "@/features/workbench/types";
+import { buildKeyDictionary } from "@/components/panels/library/utils";
 import { vaultStats } from "@/features/vault/vault";
-import type { StoredKey } from "@/components/panels/library/types";
+import { useVaultAssets, useVaultCards, useVaultKeys } from "@/features/vault/hooks";
+import { clearAssets, deleteAsset, importDumpKeys, putAsset } from "@/features/vault/operations";
+import type { AssetRecord } from "@/features/vault/db";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
@@ -28,7 +24,6 @@ import { CardTargetContext } from "@/features/target/context";
 import { CardTargetBar } from "@/features/target/CardTargetBar";
 import { NextStepBar } from "@/features/target/NextStepBar";
 
-const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
@@ -75,34 +70,22 @@ function App() {
       onActivateMemory: () => setActiveTab("memory"),
       onLog: writeTerminalLine,
     });
-  const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(CACHE_STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as CachedAssetWithData[]) : [];
-      return parsed
-        .filter((item) => Boolean((item as CachedAssetWithData).base64))
-        .map((item) => ({ ...item, base64: (item as CachedAssetWithData).base64 || "" }));
-    } catch (e) {
-      console.error("Failed to parse cache", e);
-      return [];
-    }
-  });
+  // All vault data is now Dexie-backed live queries — no localStorage state here.
+  const cachedAssets = useVaultAssets();
+  const vaultKeys = useVaultKeys();
+  const vaultCards = useVaultCards();
   const [isSyncingCache, setIsSyncingCache] = useState(false);
-  // Bumped when the library (keys/cards) changes so the vault summary refreshes.
-  const [vaultVersion, setVaultVersion] = useState(0);
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    const handler = () => setVaultVersion((value) => value + 1);
-    window.addEventListener(LIBRARY_KEYS_UPDATED_EVENT, handler);
-    return () => window.removeEventListener(LIBRARY_KEYS_UPDATED_EVENT, handler);
-  }, []);
 
   // The active "card target" — the single source of truth for the card the
   // whole workbench is operating on. Scan/dump results flow into it here; every
   // panel reads it through CardTargetContext. It also carries the card's vault
-  // bundle (saved keys, related dumps and files) resolved from the stores below.
-  const cardTarget = useCardTarget({ activeDump, cachedDumps, cachedAssets });
+  // bundle (saved keys, related dumps and files) resolved from the live stores.
+  const cardTarget = useCardTarget({
+    activeDump,
+    cachedDumps,
+    cachedAssets,
+    allKeys: vaultKeys,
+  });
   const { mergeIdentity, clearTarget } = cardTarget;
   const tagInfo = cardTarget.target.identity;
 
@@ -151,18 +134,9 @@ function App() {
     return "raw";
   }, []);
 
-  const upsertCachedAsset = useCallback((asset: CachedAssetWithData) => {
-    const cacheKey = asset.relativePath || asset.name;
-
-    setCachedAssets((prev) => {
-      const existing = prev.find((item) => (item.relativePath || item.name) === cacheKey);
-      const nextItem = existing ? { ...existing, ...asset, id: existing.id } : asset;
-
-      return [
-        nextItem,
-        ...prev.filter((item) => (item.relativePath || item.name) !== cacheKey),
-      ].slice(0, 30);
-    });
+  const upsertCachedAsset = useCallback((asset: AssetRecord) => {
+    // Fire-and-forget; the useVaultAssets() live query refreshes the list.
+    void putAsset(asset);
   }, []);
 
   const uint8ToBase64 = useCallback((bytes: Uint8Array) => {
@@ -237,7 +211,7 @@ function App() {
           const parsed = JSON.parse(new TextDecoder().decode(bytes)) as PM3DumpJson;
           if (parsed.blocks || parsed.Card) {
             const cachedDump = upsertCachedDump(parsed, name, { activate: false, announce: false });
-            importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+            void importDumpKeys(cachedDump.data, cachedDump.id);
             const derived = tagInfoFromDump(parsed);
             if (derived) mergeIdentity(derived, "dump");
           }
@@ -281,7 +255,7 @@ function App() {
   const handleDumpLoad = useCallback(
     (dump: PM3DumpJson, name: string) => {
       const cachedDump = upsertCachedDump(dump, name, { activate: true, announce: true });
-      importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+      void importDumpKeys(cachedDump.data, cachedDump.id);
       const derived = tagInfoFromDump(dump);
       if (derived) mergeIdentity(derived, "dump");
     },
@@ -436,13 +410,12 @@ function App() {
   const handleCacheUpload = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
-      const uploads: CachedAssetWithData[] = [];
 
       for (const file of Array.from(files)) {
         const base64 = await fileToBase64(file);
         const relativePath = sanitizeRelativePath(file);
         const detectionName = relativePath.split("/").pop() || file.name;
-        uploads.push({
+        await putAsset({
           id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${file.name}`,
           name: file.name,
           relativePath,
@@ -453,14 +426,13 @@ function App() {
         });
       }
 
-      setCachedAssets((prev) => [...uploads, ...prev].slice(0, 30));
       setTimeout(syncCacheToFS, 50);
     },
     [detectKind, fileToBase64, sanitizeRelativePath, syncCacheToFS],
   );
 
   const handleCacheDelete = useCallback((id: string) => {
-    setCachedAssets((prev) => prev.filter((item) => item.id !== id));
+    void deleteAsset(id);
   }, []);
 
   // Handle loading a dump (from file or cache)
@@ -544,8 +516,7 @@ function App() {
         terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
         return;
       }
-      const storedKeys = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
-      const dictionary = buildKeyDictionary(storedKeys, uid);
+      const dictionary = buildKeyDictionary(vaultKeys, uid);
       if (!dictionary) {
         terminalRef.current?.writeln(
           "\x1b[33mNo saved keys for this card yet — run Autopwn or Check Keys first.\x1b[0m",
@@ -566,7 +537,7 @@ function App() {
       );
       handleCommand(`hf mf autopwn --${cardType} -f ${path}`);
     },
-    [handleCommand, writeCacheTextFile, wasmState.isReady],
+    [handleCommand, vaultKeys, writeCacheTextFile, wasmState.isReady],
   );
 
   const handleCacheUse = useCallback(
@@ -582,12 +553,6 @@ function App() {
     },
     [cachePathFor, handleCommand, syncCacheToFS],
   );
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(cachedAssets));
-    }
-  }, [cachedAssets]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -617,7 +582,7 @@ function App() {
 
   useEffect(() => {
     cachedDumps.forEach((dump) => {
-      importDumpKeysToLibrary(dump.data, dump.id);
+      void importDumpKeys(dump.data, dump.id);
     });
   }, [cachedDumps]);
 
@@ -700,10 +665,10 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
-  // Unified vault headline counts across all three stores (see features/vault).
+  // Unified vault headline counts across all stores (see features/vault).
   const vaultSummary = useMemo(
-    () => vaultStats(cachedDumps, cachedAssets),
-    [cachedDumps, cachedAssets, vaultVersion],
+    () => vaultStats(cachedDumps, cachedAssets, vaultKeys, vaultCards),
+    [cachedDumps, cachedAssets, vaultKeys, vaultCards],
   );
 
   const hasHardwareTransport = wasmState.availableTransports.length > 0;
@@ -802,7 +767,7 @@ function App() {
           onDumpLoad={handleDumpLoad}
           onDumpRename={handleDumpRename}
           onDumpDelete={handleDumpDelete}
-          onClearCache={() => setCachedAssets([])}
+          onClearCache={() => void clearAssets()}
         />
 
         {/* Status Bar */}

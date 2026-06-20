@@ -3,27 +3,6 @@ import { sanitizeHex } from "@/lib/rfidUtils";
 import { exportDumpJson } from "@/features/memory/lib/export";
 import type { CardDraft, KeyDraft, StoredCard, StoredKey } from "./types";
 
-export const CARDS_STORAGE_KEY = "pm3-library-cards";
-export const KEYS_STORAGE_KEY = "pm3-library-keys";
-export const DUMPS_STORAGE_KEY = "pm3-library-dump-meta";
-export const LIBRARY_KEYS_UPDATED_EVENT = "pm3-library-keys-updated";
-
-export function loadStoredState<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-export function saveStoredState<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -193,40 +172,6 @@ export function extractDumpKeysFromData(
 
 export function extractDumpKeys(activeDump: CachedDump | null): KeyDraft[] {
   return extractDumpKeysFromData(activeDump?.data, activeDump?.id ?? null);
-}
-
-export function importDumpKeysToLibrary(
-  dump: PM3DumpJson | null | undefined,
-  sourceDumpId?: string | null,
-): number {
-  const drafts = extractDumpKeysFromData(dump, sourceDumpId);
-  if (drafts.length === 0) return 0;
-
-  const existing = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
-  let imported = 0;
-  const next = drafts.reduce((items, draft) => {
-    const cleanValue = sanitizeHex(draft.value, 12);
-    const cleanUid = sanitizeHex(draft.uidFilter, 20);
-    if (items.some((key) => matchesKeyDraft(key, draft, cleanValue, cleanUid))) {
-      return items;
-    }
-
-    imported += 1;
-    return upsertKeyRecord(items, draft);
-  }, existing);
-  if (imported === 0) return 0;
-
-  saveStoredState(KEYS_STORAGE_KEY, next);
-
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(
-      new CustomEvent(LIBRARY_KEYS_UPDATED_EVENT, {
-        detail: { sourceDumpId, imported },
-      }),
-    );
-  }
-
-  return imported;
 }
 
 export function exportDump(dump: CachedDump) {

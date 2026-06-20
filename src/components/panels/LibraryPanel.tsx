@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,24 +19,20 @@ import type {
   StoredDumpMeta,
   StoredKey,
 } from "./library/types";
+import { defaultCardName, exportStoredKeys, extractDumpKeys, getDumpUid } from "./library/utils";
+import { useVaultCards, useVaultDumps, useVaultKeys } from "@/features/vault/hooks";
 import {
-  CARDS_STORAGE_KEY,
-  DUMPS_STORAGE_KEY,
-  KEYS_STORAGE_KEY,
-  defaultCardName,
-  extractDumpKeys,
-  exportStoredKeys,
-  getDumpUid,
-  LIBRARY_KEYS_UPDATED_EVENT,
-  loadStoredState,
-  saveStoredState,
-  upsertCardRecord,
-  upsertKeyRecord,
-} from "./library/utils";
+  deleteCard,
+  deleteKey,
+  importKeyDrafts,
+  saveCard,
+  saveKey,
+  setCardFavorite,
+  setDumpMeta,
+} from "@/features/vault/operations";
 
 interface LibraryPanelProps {
   activeDump: CachedDump | null;
-  cachedDumps: CachedDump[];
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
   onDumpRename?: (id: string, newName: string) => void;
   onDumpDelete?: (id: string) => void;
@@ -44,17 +40,17 @@ interface LibraryPanelProps {
 
 export function LibraryPanel({
   activeDump,
-  cachedDumps,
   onDumpLoad,
   onDumpRename,
   onDumpDelete,
 }: LibraryPanelProps) {
   const currentTag = useTarget().target.identity;
-  const [cards, setCards] = useState<StoredCard[]>(() => loadStoredState(CARDS_STORAGE_KEY, []));
-  const [keys, setKeys] = useState<StoredKey[]>(() => loadStoredState(KEYS_STORAGE_KEY, []));
-  const [dumpMeta, setDumpMeta] = useState<StoredDumpMeta[]>(() =>
-    loadStoredState(DUMPS_STORAGE_KEY, []),
-  );
+
+  // All library data is Dexie-backed live queries — they update automatically
+  // when keys are imported from a dump, a card is saved, etc.
+  const cards = useVaultCards();
+  const keys = useVaultKeys();
+  const cachedDumps = useVaultDumps();
 
   const [cardSearch, setCardSearch] = useState("");
   const [keySearch, setKeySearch] = useState("");
@@ -64,34 +60,22 @@ export function LibraryPanel({
   const [keyDraft, setKeyDraft] = useState<KeyDraft | null>(null);
   const [dumpDraft, setDumpDraft] = useState<DumpDraft | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(cards));
-  }, [cards]);
-
-  useEffect(() => {
-    saveStoredState(KEYS_STORAGE_KEY, keys);
-  }, [keys]);
-
-  useEffect(() => {
-    localStorage.setItem(DUMPS_STORAGE_KEY, JSON.stringify(dumpMeta));
-  }, [dumpMeta]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    const syncKeysFromStorage = () => {
-      setKeys(loadStoredState(KEYS_STORAGE_KEY, []));
-    };
-
-    window.addEventListener(LIBRARY_KEYS_UPDATED_EVENT, syncKeysFromStorage);
-    return () => {
-      window.removeEventListener(LIBRARY_KEYS_UPDATED_EVENT, syncKeysFromStorage);
-    };
-  }, []);
-
+  // Favorite/notes now live on the dump record itself; rebuild the map the
+  // dumps tab expects from those fields.
   const dumpMetaMap = useMemo(
-    () => new Map(dumpMeta.map((meta) => [meta.dumpId, meta])),
-    [dumpMeta],
+    () =>
+      new Map<string, StoredDumpMeta>(
+        cachedDumps.map((dump) => [
+          dump.id,
+          {
+            dumpId: dump.id,
+            favorite: dump.favorite,
+            notes: dump.notes,
+            updatedAt: dump.updatedAt,
+          },
+        ]),
+      ),
+    [cachedDumps],
   );
   const dumpMap = useMemo(() => new Map(cachedDumps.map((dump) => [dump.id, dump])), [cachedDumps]);
 
@@ -134,9 +118,7 @@ export function LibraryPanel({
   const filteredDumps = useMemo(() => {
     const filter = dumpSearch.trim().toUpperCase();
     const next = [...cachedDumps].sort((a, b) => {
-      const aFavorite = dumpMetaMap.get(a.id)?.favorite ?? false;
-      const bFavorite = dumpMetaMap.get(b.id)?.favorite ?? false;
-      if (aFavorite !== bFavorite) return Number(bFavorite) - Number(aFavorite);
+      if (a.favorite !== b.favorite) return Number(b.favorite) - Number(a.favorite);
       return b.cachedAt - a.cachedAt;
     });
 
@@ -184,25 +166,20 @@ export function LibraryPanel({
   const activeDumpKeyDrafts = useMemo(() => extractDumpKeys(activeDump), [activeDump]);
 
   const importDefaultKeys = () => {
-    setKeys((prev) =>
-      DEFAULT_MIFARE_KEYS.reduce(
-        (items, value) =>
-          upsertKeyRecord(items, {
-            label: `Common ${value}`,
-            value,
-            kind: "public",
-            uidFilter: "",
-          }),
-        prev,
-      ),
+    void importKeyDrafts(
+      DEFAULT_MIFARE_KEYS.map((value) => ({
+        label: `Common ${value}`,
+        value,
+        kind: "public" as const,
+        uidFilter: "",
+      })),
+      keys,
     );
   };
 
   const importActiveDumpKeys = () => {
     if (!activeDumpKeyDrafts.length) return;
-    setKeys((prev) =>
-      activeDumpKeyDrafts.reduce((items, draft) => upsertKeyRecord(items, draft), prev),
-    );
+    void importKeyDrafts(activeDumpKeyDrafts, keys);
   };
 
   // Called with null/undefined to start a blank manual entry
@@ -245,7 +222,7 @@ export function LibraryPanel({
     if (!cardDraft) return;
     if (!sanitizeHex(cardDraft.uid, 20)) return;
 
-    setCards((prev) => upsertCardRecord(prev, cardDraft));
+    void saveCard(cardDraft, cards);
     setCardDraft(null);
   };
 
@@ -253,26 +230,14 @@ export function LibraryPanel({
     if (!keyDraft) return;
     if (sanitizeHex(keyDraft.value, 12).length !== 12) return;
 
-    setKeys((prev) => upsertKeyRecord(prev, keyDraft));
+    void saveKey(keyDraft, keys);
     setKeyDraft(null);
   };
 
   const saveDumpDraft = () => {
     if (!dumpDraft) return;
 
-    setDumpMeta((prev) => {
-      const existing = prev.find((meta) => meta.dumpId === dumpDraft.id);
-      const nextMeta: StoredDumpMeta = {
-        dumpId: dumpDraft.id,
-        favorite: dumpDraft.favorite,
-        notes: dumpDraft.notes,
-        updatedAt: Date.now(),
-      };
-
-      return existing
-        ? [nextMeta, ...prev.filter((meta) => meta.dumpId !== dumpDraft.id)]
-        : [nextMeta, ...prev];
-    });
+    void setDumpMeta(dumpDraft.id, { favorite: dumpDraft.favorite, notes: dumpDraft.notes });
 
     const dump = dumpMap.get(dumpDraft.id);
     if (dump && dumpDraft.name.trim() && dumpDraft.name.trim() !== dump.name) {
@@ -315,20 +280,13 @@ export function LibraryPanel({
               filteredCards={filteredCards}
               dumpMap={dumpMap}
               onCardSearchChange={setCardSearch}
-              onDeleteCard={(cardId) =>
-                setCards((prev) => prev.filter((entry) => entry.id !== cardId))
-              }
+              onDeleteCard={(cardId) => void deleteCard(cardId)}
               onDumpLoad={onDumpLoad}
               onOpenCardEditor={openCardEditor}
-              onToggleFavorite={(cardId) =>
-                setCards((prev) =>
-                  prev.map((entry) =>
-                    entry.id === cardId
-                      ? { ...entry, favorite: !entry.favorite, updatedAt: Date.now() }
-                      : entry,
-                  ),
-                )
-              }
+              onToggleFavorite={(cardId) => {
+                const card = cards.find((entry) => entry.id === cardId);
+                if (card) void setCardFavorite(cardId, !card.favorite);
+              }}
             />
           </TabsContent>
 
@@ -339,7 +297,7 @@ export function LibraryPanel({
               canImportActiveDumpKeys={activeDumpKeyDrafts.length > 0}
               onKeySearchChange={setKeySearch}
               onOpenKeyEditor={openKeyEditor}
-              onDeleteKey={(keyId) => setKeys((prev) => prev.filter((entry) => entry.id !== keyId))}
+              onDeleteKey={(keyId) => void deleteKey(keyId)}
               onImportDefaultKeys={importDefaultKeys}
               onImportActiveDumpKeys={importActiveDumpKeys}
               onExportKeys={() => exportStoredKeys(filteredKeys)}
