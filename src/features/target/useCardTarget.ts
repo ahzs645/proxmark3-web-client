@@ -1,39 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CachedDump } from "@/components/panels/CardMemoryMap";
-import type { StoredKey } from "@/components/panels/library/types";
-import {
-  KEYS_STORAGE_KEY,
-  LIBRARY_KEYS_UPDATED_EVENT,
-  buildKeyDictionary,
-  loadStoredState,
-} from "@/components/panels/library/utils";
+import { LIBRARY_KEYS_UPDATED_EVENT, buildKeyDictionary } from "@/components/panels/library/utils";
+import type { CachedAsset } from "@/features/key-cache/types";
 import type { TagInfo } from "@/features/tag-info/types";
+import { assetsForUid, dumpsForUid, keysForUid } from "@/features/vault/vault";
 import { sanitizeHex } from "@/lib/rfidUtils";
 import { classifyCard } from "./classify";
 import type { CardSource, CardTarget, CardTargetContextValue } from "./types";
 
-function countSavedKeys(uid: string): number {
-  if (typeof window === "undefined") return 0;
-  const keys = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
-  const dictionary = buildKeyDictionary(keys, uid);
-  return dictionary ? dictionary.split("\n").filter(Boolean).length : 0;
-}
-
 interface UseCardTargetArgs {
   /** Active dump from the dump store, bridged in as the target's memory. */
   activeDump: CachedDump | null;
+  /** All cached dumps, so the target can surface ones sharing its UID. */
+  cachedDumps?: CachedDump[];
+  /** All cached files, so the target can surface ones referencing its UID. */
+  cachedAssets?: CachedAsset[];
 }
 
 /**
  * Owns the single "active card" the workbench operates on. App.tsx calls this
  * once, feeds scan/dump results into it, and shares the result through
- * {@link CardTargetContext} so every panel reads the same card.
+ * {@link CardTargetContext} so every panel reads the same card. The target also
+ * carries the card's whole vault bundle — saved keys, related dumps, and related
+ * files — resolved through the vault read surface.
  */
-export function useCardTarget({ activeDump }: UseCardTargetArgs): CardTargetContextValue {
+export function useCardTarget({
+  activeDump,
+  cachedDumps = [],
+  cachedAssets = [],
+}: UseCardTargetArgs): CardTargetContextValue {
   const [identity, setIdentityState] = useState<TagInfo | null>(null);
   const [source, setSource] = useState<CardSource>(null);
   const [updatedAt, setUpdatedAt] = useState(() => Date.now());
-  // Bumped whenever the library's keys change, so savedKeyCount recomputes.
+  // Bumped whenever the library's keys change, so the key bundle recomputes.
   const [keysVersion, setKeysVersion] = useState(0);
 
   useEffect(() => {
@@ -71,7 +70,14 @@ export function useCardTarget({ activeDump }: UseCardTargetArgs): CardTargetCont
     return activeDump?.data.Card?.UID ? sanitizeHex(activeDump.data.Card.UID, 20) : "";
   }, [identity?.uid, activeDump]);
 
-  const savedKeyCount = useMemo(() => countSavedKeys(uid), [uid, keysVersion]);
+  // The card's vault bundle, resolved through the single vault read surface.
+  const savedKeys = useMemo(() => keysForUid(uid), [uid, keysVersion]);
+  const savedKeyCount = useMemo(() => {
+    const dictionary = buildKeyDictionary(savedKeys, uid);
+    return dictionary ? dictionary.split("\n").filter(Boolean).length : 0;
+  }, [savedKeys, uid]);
+  const relatedDumps = useMemo(() => dumpsForUid(uid, cachedDumps), [uid, cachedDumps]);
+  const relatedAssets = useMemo(() => assetsForUid(uid, cachedAssets), [uid, cachedAssets]);
 
   const target = useMemo<CardTarget>(() => {
     const hasCard = Boolean(identity || activeDump);
@@ -81,11 +87,24 @@ export function useCardTarget({ activeDump }: UseCardTargetArgs): CardTargetCont
       source: hasCard ? source : null,
       classification: classifyCard(identity),
       uid,
+      savedKeys,
       savedKeyCount,
+      relatedDumps,
+      relatedAssets,
       hasCard,
       updatedAt,
     };
-  }, [identity, activeDump, source, uid, savedKeyCount, updatedAt]);
+  }, [
+    identity,
+    activeDump,
+    source,
+    uid,
+    savedKeys,
+    savedKeyCount,
+    relatedDumps,
+    relatedAssets,
+    updatedAt,
+  ]);
 
   return useMemo(
     () => ({ target, mergeIdentity, setIdentity, clearTarget }),

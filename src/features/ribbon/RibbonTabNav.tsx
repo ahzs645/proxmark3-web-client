@@ -5,7 +5,7 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RefreshCw, StopCircle } from "lucide-react";
-import { RIBBON_TABS, getIcon } from "./config";
+import { RIBBON_TABS, getIcon, groupRibbonTabs } from "./config";
 import type { ConnectionStatus } from "./types";
 import type { Theme } from "@/hooks/useTheme";
 
@@ -34,10 +34,24 @@ export function RibbonTabNav({
   return (
     <div className="relative flex items-center gap-2 px-2 py-1.5">
       <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-card via-card/85 to-transparent" />
-      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-hide">
-        <TabsList className="h-auto min-w-max gap-1 bg-transparent p-0">
-          {RIBBON_TABS.map((tab) => (
-            <RibbonNavTrigger key={tab.value} tab={tab} />
+      <div className="flex min-w-0 flex-1 items-end gap-2 overflow-x-auto scrollbar-hide">
+        <TabsList className="h-auto min-w-max items-stretch gap-0 bg-transparent p-0">
+          {groupRibbonTabs().map((group, index) => (
+            <div key={group.name} className="flex items-stretch">
+              {index > 0 ? (
+                <Separator orientation="vertical" className="mx-1.5 h-8 shrink-0 self-center" />
+              ) : null}
+              <div className="flex flex-col gap-0.5">
+                <span className="px-3 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/55">
+                  {group.name}
+                </span>
+                <div className="flex items-center gap-1">
+                  {group.tabs.map((tab) => (
+                    <RibbonNavTrigger key={tab.value} tab={tab} />
+                  ))}
+                </div>
+              </div>
+            </div>
           ))}
         </TabsList>
       </div>
@@ -93,18 +107,13 @@ export function RibbonTabNav({
 
 function RibbonNavTrigger({ tab }: { tab: (typeof RIBBON_TABS)[number] }) {
   return (
-    <>
-      {tab.separatorBefore ? (
-        <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
-      ) : null}
-      <TabsTrigger
-        value={tab.value}
-        className="shrink-0 gap-1 rounded-none bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-2px_0_0_hsl(var(--primary))]"
-      >
-        {tab.icon ? getIcon(tab.icon, "h-3 w-3") : null}
-        {tab.label}
-      </TabsTrigger>
-    </>
+    <TabsTrigger
+      value={tab.value}
+      className="shrink-0 gap-1 rounded-none bg-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-2px_0_0_hsl(var(--primary))]"
+    >
+      {tab.icon ? getIcon(tab.icon, "h-3 w-3") : null}
+      {tab.label}
+    </TabsTrigger>
   );
 }
 

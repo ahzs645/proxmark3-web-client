@@ -16,7 +16,9 @@ import {
   buildKeyDictionary,
   loadStoredState,
   KEYS_STORAGE_KEY,
+  LIBRARY_KEYS_UPDATED_EVENT,
 } from "@/components/panels/library/utils";
+import { vaultStats } from "@/features/vault/vault";
 import type { StoredKey } from "@/components/panels/library/types";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
@@ -73,12 +75,6 @@ function App() {
       onActivateMemory: () => setActiveTab("memory"),
       onLog: writeTerminalLine,
     });
-  // The active "card target" — the single source of truth for the card the
-  // whole workbench is operating on. Scan/dump results flow into it here; every
-  // panel reads it through CardTargetContext.
-  const cardTarget = useCardTarget({ activeDump });
-  const { mergeIdentity, clearTarget } = cardTarget;
-  const tagInfo = cardTarget.target.identity;
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -93,6 +89,22 @@ function App() {
     }
   });
   const [isSyncingCache, setIsSyncingCache] = useState(false);
+  // Bumped when the library (keys/cards) changes so the vault summary refreshes.
+  const [vaultVersion, setVaultVersion] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handler = () => setVaultVersion((value) => value + 1);
+    window.addEventListener(LIBRARY_KEYS_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(LIBRARY_KEYS_UPDATED_EVENT, handler);
+  }, []);
+
+  // The active "card target" — the single source of truth for the card the
+  // whole workbench is operating on. Scan/dump results flow into it here; every
+  // panel reads it through CardTargetContext. It also carries the card's vault
+  // bundle (saved keys, related dumps and files) resolved from the stores below.
+  const cardTarget = useCardTarget({ activeDump, cachedDumps, cachedAssets });
+  const { mergeIdentity, clearTarget } = cardTarget;
+  const tagInfo = cardTarget.target.identity;
 
   // Parse tag information from output and feed it into the active card target.
   const parseTagInfo = useCallback(
@@ -688,6 +700,12 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
+  // Unified vault headline counts across all three stores (see features/vault).
+  const vaultSummary = useMemo(
+    () => vaultStats(cachedDumps, cachedAssets),
+    [cachedDumps, cachedAssets, vaultVersion],
+  );
+
   const hasHardwareTransport = wasmState.availableTransports.length > 0;
   const activeTransportType =
     selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
@@ -803,8 +821,10 @@ function App() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span>Commands: {commandHistory.length}</span>
-              <span>Cache: {cachedAssets.length}</span>
-              <span>Dumps: {cachedDumps.length}</span>
+              <span title="Saved cards, keys, dumps and files across the vault">
+                Vault: {vaultSummary.cards} cards · {vaultSummary.keys} keys · {vaultSummary.dumps}{" "}
+                dumps · {vaultSummary.files} files
+              </span>
             </div>
           </div>
         </div>

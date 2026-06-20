@@ -1,4 +1,6 @@
 import type { CachedDump } from "@/components/panels/CardMemoryMap";
+import type { StoredKey } from "@/components/panels/library/types";
+import type { CachedAsset } from "@/features/key-cache/types";
 import type { TagInfo } from "@/features/tag-info/types";
 
 export type CardSize = "1k" | "4k" | "mini" | "unknown";
@@ -35,8 +37,14 @@ export interface CardTarget {
   classification: CardClassification;
   /** The card's UID (from identity, falling back to the active dump). */
   uid: string;
-  /** Number of keys saved in the library for this card's UID. */
+  /** Library keys that apply to this card (UID-tagged plus global). */
+  savedKeys: StoredKey[];
+  /** Number of unique, usable keys saved for this card's UID. */
   savedKeyCount: number;
+  /** Other cached dumps in the vault sharing this card's UID. */
+  relatedDumps: CachedDump[];
+  /** Cached files in the vault whose name references this card's UID. */
+  relatedAssets: CachedAsset[];
   /** True once we know anything about a card (identity and/or a dump). */
   hasCard: boolean;
   updatedAt: number;

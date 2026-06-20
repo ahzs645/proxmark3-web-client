@@ -1,4 +1,4 @@
-import { Copy, CreditCard, KeyRound, Layers, RefreshCw, Radio, X } from "lucide-react";
+import { Copy, CreditCard, FileText, KeyRound, Layers, RefreshCw, Radio, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTarget } from "./context";
@@ -29,7 +29,16 @@ export function CardTargetBar({ onRefresh, onCopyUid, disabled = false }: CardTa
   const { target, clearTarget } = useTarget();
   if (!target.hasCard) return null;
 
-  const { identity, dump, classification, uid, savedKeyCount, source } = target;
+  const {
+    identity,
+    dump,
+    classification,
+    uid,
+    savedKeyCount,
+    relatedDumps,
+    relatedAssets,
+    source,
+  } = target;
   const ProtocolIcon = classification.protocol === "LF" ? Radio : CreditCard;
   const typeLabel = identity?.type || FAMILY_LABEL[classification.family] || "Card";
   const displayUid = identity?.uid || dump?.data.Card?.UID || "—";
@@ -76,10 +85,29 @@ export function CardTargetBar({ onRefresh, onCopyUid, disabled = false }: CardTa
       {dump ? (
         <span
           className="flex items-center gap-1 text-muted-foreground"
-          title={`Dump: ${dump.name}`}
+          title={`Active dump: ${dump.name}`}
         >
           <Layers className="h-3.5 w-3.5" />
           <span className="max-w-[16ch] truncate">{dump.name}</span>
+          {relatedDumps.length > 1 ? <span>+{relatedDumps.length - 1}</span> : null}
+        </span>
+      ) : relatedDumps.length > 0 ? (
+        <span
+          className="flex items-center gap-1 text-muted-foreground"
+          title={`${relatedDumps.length} cached dump${relatedDumps.length === 1 ? "" : "s"} for this card`}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          {relatedDumps.length}
+        </span>
+      ) : null}
+
+      {relatedAssets.length > 0 ? (
+        <span
+          className="flex items-center gap-1 text-muted-foreground"
+          title={`${relatedAssets.length} cached file${relatedAssets.length === 1 ? "" : "s"} for this card`}
+        >
+          <FileText className="h-3.5 w-3.5" />
+          {relatedAssets.length}
         </span>
       ) : null}
 
