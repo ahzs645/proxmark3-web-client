@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TagInfo } from "./TagInfoPanel";
+import { useTarget } from "@/features/target/context";
 import type { CachedDump, PM3DumpJson } from "./CardMemoryMap";
 import { DEFAULT_MIFARE_KEYS, sanitizeHex } from "@/lib/rfidUtils";
 import { FolderOpen } from "lucide-react";
@@ -35,7 +35,6 @@ import {
 } from "./library/utils";
 
 interface LibraryPanelProps {
-  currentTag: TagInfo | null;
   activeDump: CachedDump | null;
   cachedDumps: CachedDump[];
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
@@ -44,13 +43,13 @@ interface LibraryPanelProps {
 }
 
 export function LibraryPanel({
-  currentTag,
   activeDump,
   cachedDumps,
   onDumpLoad,
   onDumpRename,
   onDumpDelete,
 }: LibraryPanelProps) {
+  const currentTag = useTarget().target.identity;
   const [cards, setCards] = useState<StoredCard[]>(() => loadStoredState(CARDS_STORAGE_KEY, []));
   const [keys, setKeys] = useState<StoredKey[]>(() => loadStoredState(KEYS_STORAGE_KEY, []));
   const [dumpMeta, setDumpMeta] = useState<StoredDumpMeta[]>(() =>

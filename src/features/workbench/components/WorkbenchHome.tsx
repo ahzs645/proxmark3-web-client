@@ -3,7 +3,6 @@ import type { TerminalHandle } from "@/components/terminal/Terminal";
 import { SidebarPane } from "./SidebarPane";
 import { SessionDashboard } from "./SessionDashboard";
 import { TerminalPane } from "./TerminalPane";
-import type { TagInfo } from "@/components/panels/TagInfoPanel";
 
 interface WorkbenchHomeProps {
   terminalRef: RefObject<TerminalHandle | null>;
@@ -11,7 +10,6 @@ interface WorkbenchHomeProps {
   panelOpen?: boolean;
   /** Collapse the terminal dock (only meaningful while panelOpen). */
   onCollapseTerminal?: () => void;
-  tagInfo: TagInfo | null;
   canRunCommands: boolean;
   isLoading: boolean;
   isConnecting: boolean;
@@ -41,7 +39,6 @@ export function WorkbenchHome({
   terminalRef,
   panelOpen = false,
   onCollapseTerminal,
-  tagInfo,
   canRunCommands,
   isLoading,
   isConnecting,
@@ -131,7 +128,6 @@ export function WorkbenchHome({
 
         {panelOpen ? null : (
           <SidebarPane
-            tagInfo={tagInfo}
             canRunCommands={canRunCommands}
             commandHistory={commandHistory}
             isDeviceConnected={isDeviceConnected}

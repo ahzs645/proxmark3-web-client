@@ -4,9 +4,6 @@ export type KeyType = "A" | "B";
 export interface MagicCardPanelProps {
   onCommand: (cmd: string) => void;
   disabled?: boolean;
-  currentUid?: string;
-  currentAtqa?: string;
-  currentSak?: string;
 }
 
 export interface CardTypeConfig {

@@ -24,6 +24,7 @@ import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
 import { CardTargetContext } from "@/features/target/context";
 import { CardTargetBar } from "@/features/target/CardTargetBar";
+import { NextStepBar } from "@/features/target/NextStepBar";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
@@ -742,6 +743,12 @@ function App() {
           onCopyUid={handleCopyUid}
           disabled={!canRunCommands}
         />
+        {/* Guided next-step spine, driven by the active card target. */}
+        <NextStepBar
+          onCommand={handleCommand}
+          onOpenTab={setActiveTab}
+          commandsDisabled={!canRunCommands}
+        />
         <MainPanelRouter
           activeTab={activeTab}
           terminalDockOpen={terminalDockOpen}
@@ -750,7 +757,6 @@ function App() {
           theme={theme}
           onThemeChange={setTheme}
           terminalRef={terminalRef}
-          tagInfo={tagInfo}
           activeDump={activeDump}
           cachedDumps={cachedDumps}
           cachedAssets={cachedAssets}
