@@ -1,7 +1,6 @@
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { RibbonToolbar } from "@/components/ribbon/RibbonToolbar";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
-import type { TagInfo } from "@/components/panels/TagInfoPanel";
 import { useProxmarkWasm } from "@/hooks/useProxmarkWasm";
 import { useTheme } from "@/hooks/useTheme";
 import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyCachePanel";
@@ -11,19 +10,20 @@ import pm3WebUSB from "@/lib/pm3WebUSB";
 import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory";
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
-import { type CachedAssetWithData, type EmscriptenFSLike } from "@/features/workbench/types";
-import {
-  importDumpKeysToLibrary,
-  buildKeyDictionary,
-  loadStoredState,
-  KEYS_STORAGE_KEY,
-} from "@/components/panels/library/utils";
-import type { StoredKey } from "@/components/panels/library/types";
+import { type EmscriptenFSLike } from "@/features/workbench/types";
+import { buildKeyDictionary } from "@/components/panels/library/utils";
+import { vaultStats } from "@/features/vault/vault";
+import { useVaultAssets, useVaultCards, useVaultKeys } from "@/features/vault/hooks";
+import { clearAssets, deleteAsset, importDumpKeys, putAsset } from "@/features/vault/operations";
+import type { AssetRecord } from "@/features/vault/db";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
+import { useCardTarget } from "@/features/target/useCardTarget";
+import { CardTargetContext } from "@/features/target/context";
+import { CardTargetBar } from "@/features/target/CardTargetBar";
+import { NextStepBar } from "@/features/target/NextStepBar";
 
-const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
@@ -43,7 +43,6 @@ function stripAnsi(value: string): string {
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
-  const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window === "undefined") return "connect";
     const saved = localStorage.getItem(TAB_STORAGE_KEY);
@@ -71,62 +70,55 @@ function App() {
       onActivateMemory: () => setActiveTab("memory"),
       onLog: writeTerminalLine,
     });
-  const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(CACHE_STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as CachedAssetWithData[]) : [];
-      return parsed
-        .filter((item) => Boolean((item as CachedAssetWithData).base64))
-        .map((item) => ({ ...item, base64: (item as CachedAssetWithData).base64 || "" }));
-    } catch (e) {
-      console.error("Failed to parse cache", e);
-      return [];
-    }
-  });
+  // All vault data is now Dexie-backed live queries — no localStorage state here.
+  const cachedAssets = useVaultAssets();
+  const vaultKeys = useVaultKeys();
+  const vaultCards = useVaultCards();
   const [isSyncingCache, setIsSyncingCache] = useState(false);
 
-  // Parse tag information from output
-  const parseTagInfo = useCallback((text: string) => {
-    if (text.includes("UID:") || text.includes("uid:")) {
-      const uidMatch = text.match(/[Uu][Ii][Dd][:\s]+([A-Fa-f0-9\s:]+)/);
-      if (uidMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          uid: uidMatch[1].trim().replace(/\s+/g, ":"),
-        }));
+  // The active "card target" — the single source of truth for the card the
+  // whole workbench is operating on. Scan/dump results flow into it here; every
+  // panel reads it through CardTargetContext. It also carries the card's vault
+  // bundle (saved keys, related dumps and files) resolved from the live stores.
+  const cardTarget = useCardTarget({
+    activeDump,
+    cachedDumps,
+    cachedAssets,
+    allKeys: vaultKeys,
+  });
+  const { mergeIdentity, clearTarget } = cardTarget;
+  const tagInfo = cardTarget.target.identity;
+
+  // Parse tag information from output and feed it into the active card target.
+  const parseTagInfo = useCallback(
+    (text: string) => {
+      if (text.includes("UID:") || text.includes("uid:")) {
+        const uidMatch = text.match(/[Uu][Ii][Dd][:\s]+([A-Fa-f0-9\s:]+)/);
+        if (uidMatch) {
+          mergeIdentity({ uid: uidMatch[1].trim().replace(/\s+/g, ":") });
+        }
       }
-    }
-    if (text.includes("MIFARE")) {
-      const typeMatch = text.match(/(MIFARE\s+\w+(?:\s+\w+)?)/i);
-      if (typeMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          type: typeMatch[1],
-          protocol: "HF",
-          subtype: "MIFARE",
-        }));
+      if (text.includes("MIFARE")) {
+        const typeMatch = text.match(/(MIFARE\s+\w+(?:\s+\w+)?)/i);
+        if (typeMatch) {
+          mergeIdentity({ type: typeMatch[1], protocol: "HF", subtype: "MIFARE" });
+        }
       }
-    }
-    if (text.includes("SAK:") || text.includes("sak:")) {
-      const sakMatch = text.match(/[Ss][Aa][Kk][:\s]+([A-Fa-f0-9]+)/);
-      if (sakMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          sak: sakMatch[1],
-        }));
+      if (text.includes("SAK:") || text.includes("sak:")) {
+        const sakMatch = text.match(/[Ss][Aa][Kk][:\s]+([A-Fa-f0-9]+)/);
+        if (sakMatch) {
+          mergeIdentity({ sak: sakMatch[1] });
+        }
       }
-    }
-    if (text.includes("ATQA:") || text.includes("atqa:")) {
-      const atqaMatch = text.match(/[Aa][Tt][Qq][Aa][:\s]+([A-Fa-f0-9\s]+)/);
-      if (atqaMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          atqa: atqaMatch[1].trim(),
-        }));
+      if (text.includes("ATQA:") || text.includes("atqa:")) {
+        const atqaMatch = text.match(/[Aa][Tt][Qq][Aa][:\s]+([A-Fa-f0-9\s]+)/);
+        if (atqaMatch) {
+          mergeIdentity({ atqa: atqaMatch[1].trim() });
+        }
       }
-    }
-  }, []);
+    },
+    [mergeIdentity],
+  );
 
   const detectKind = useCallback((fileName: string): CachedAssetKind => {
     const ext = fileName.toLowerCase();
@@ -142,18 +134,9 @@ function App() {
     return "raw";
   }, []);
 
-  const upsertCachedAsset = useCallback((asset: CachedAssetWithData) => {
-    const cacheKey = asset.relativePath || asset.name;
-
-    setCachedAssets((prev) => {
-      const existing = prev.find((item) => (item.relativePath || item.name) === cacheKey);
-      const nextItem = existing ? { ...existing, ...asset, id: existing.id } : asset;
-
-      return [
-        nextItem,
-        ...prev.filter((item) => (item.relativePath || item.name) !== cacheKey),
-      ].slice(0, 30);
-    });
+  const upsertCachedAsset = useCallback((asset: AssetRecord) => {
+    // Fire-and-forget; the useVaultAssets() live query refreshes the list.
+    void putAsset(asset);
   }, []);
 
   const uint8ToBase64 = useCallback((bytes: Uint8Array) => {
@@ -228,9 +211,9 @@ function App() {
           const parsed = JSON.parse(new TextDecoder().decode(bytes)) as PM3DumpJson;
           if (parsed.blocks || parsed.Card) {
             const cachedDump = upsertCachedDump(parsed, name, { activate: false, announce: false });
-            importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+            void importDumpKeys(cachedDump.data, cachedDump.id);
             const derived = tagInfoFromDump(parsed);
-            if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
+            if (derived) mergeIdentity(derived, "dump");
           }
         } catch (error) {
           console.error(`Failed to parse generated dump JSON: ${name}`, error);
@@ -241,6 +224,7 @@ function App() {
     },
     [
       detectKind,
+      mergeIdentity,
       readFsBytes,
       uint8ToBase64,
       upsertCachedAsset,
@@ -271,11 +255,11 @@ function App() {
   const handleDumpLoad = useCallback(
     (dump: PM3DumpJson, name: string) => {
       const cachedDump = upsertCachedDump(dump, name, { activate: true, announce: true });
-      importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
+      void importDumpKeys(cachedDump.data, cachedDump.id);
       const derived = tagInfoFromDump(dump);
-      if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
+      if (derived) mergeIdentity(derived, "dump");
     },
-    [upsertCachedDump],
+    [mergeIdentity, upsertCachedDump],
   );
 
   // WASM output handler
@@ -426,13 +410,12 @@ function App() {
   const handleCacheUpload = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
-      const uploads: CachedAssetWithData[] = [];
 
       for (const file of Array.from(files)) {
         const base64 = await fileToBase64(file);
         const relativePath = sanitizeRelativePath(file);
         const detectionName = relativePath.split("/").pop() || file.name;
-        uploads.push({
+        await putAsset({
           id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${file.name}`,
           name: file.name,
           relativePath,
@@ -443,14 +426,13 @@ function App() {
         });
       }
 
-      setCachedAssets((prev) => [...uploads, ...prev].slice(0, 30));
       setTimeout(syncCacheToFS, 50);
     },
     [detectKind, fileToBase64, sanitizeRelativePath, syncCacheToFS],
   );
 
   const handleCacheDelete = useCallback((id: string) => {
-    setCachedAssets((prev) => prev.filter((item) => item.id !== id));
+    void deleteAsset(id);
   }, []);
 
   // Handle loading a dump (from file or cache)
@@ -534,8 +516,7 @@ function App() {
         terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
         return;
       }
-      const storedKeys = loadStoredState<StoredKey[]>(KEYS_STORAGE_KEY, []);
-      const dictionary = buildKeyDictionary(storedKeys, uid);
+      const dictionary = buildKeyDictionary(vaultKeys, uid);
       if (!dictionary) {
         terminalRef.current?.writeln(
           "\x1b[33mNo saved keys for this card yet — run Autopwn or Check Keys first.\x1b[0m",
@@ -556,7 +537,7 @@ function App() {
       );
       handleCommand(`hf mf autopwn --${cardType} -f ${path}`);
     },
-    [handleCommand, writeCacheTextFile, wasmState.isReady],
+    [handleCommand, vaultKeys, writeCacheTextFile, wasmState.isReady],
   );
 
   const handleCacheUse = useCallback(
@@ -572,12 +553,6 @@ function App() {
     },
     [cachePathFor, handleCommand, syncCacheToFS],
   );
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(cachedAssets));
-    }
-  }, [cachedAssets]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -607,7 +582,7 @@ function App() {
 
   useEffect(() => {
     cachedDumps.forEach((dump) => {
-      importDumpKeysToLibrary(dump.data, dump.id);
+      void importDumpKeys(dump.data, dump.id);
     });
   }, [cachedDumps]);
 
@@ -657,8 +632,8 @@ function App() {
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
     terminalRef.current?.writeln("\x1b[33mDisconnected.\x1b[0m");
-    setTagInfo(null);
-  }, [wasmState]);
+    clearTarget();
+  }, [wasmState, clearTarget]);
 
   const handleCopyUid = useCallback(() => {
     if (tagInfo?.uid) {
@@ -690,6 +665,12 @@ function App() {
     handleCommand(quickCommand.trim());
   }, [handleCommand, quickCommand]);
 
+  // Unified vault headline counts across all stores (see features/vault).
+  const vaultSummary = useMemo(
+    () => vaultStats(cachedDumps, cachedAssets, vaultKeys, vaultCards),
+    [cachedDumps, cachedAssets, vaultKeys, vaultCards],
+  );
+
   const hasHardwareTransport = wasmState.availableTransports.length > 0;
   const activeTransportType =
     selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
@@ -710,97 +691,110 @@ function App() {
           ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
           : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
-    <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
-      {/* Ribbon Toolbar */}
-      <RibbonToolbar
-        connectionStatus={
-          wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
-        }
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        onCommand={handleCommand}
-        onStopOperation={wasmState.sendBreak}
-        onHardReset={wasmState.hardReset}
-        theme={theme}
-        onThemeChange={setTheme}
-        canRunCommands={canRunCommands}
-        cacheItems={cachedAssets}
-        cacheSyncing={isSyncingCache}
-        onCacheUpload={handleCacheUpload}
-        onCacheUse={handleCacheUse}
-        onCacheDelete={handleCacheDelete}
-        onCacheSync={syncCacheToFS}
-        cachePathPrefix={CACHE_PATH_PREFIX}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        availableTransports={wasmState.availableTransports}
-        selectedTransport={selectedTransport || wasmState.activeTransportType}
-        onTransportChange={setSelectedTransport}
-        onJsonUpload={handleJsonUpload}
-      />
-      <MainPanelRouter
-        activeTab={activeTab}
-        terminalDockOpen={terminalDockOpen}
-        onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
-        onDumpWithSavedKeys={handleDumpWithSavedKeys}
-        theme={theme}
-        onThemeChange={setTheme}
-        terminalRef={terminalRef}
-        tagInfo={tagInfo}
-        activeDump={activeDump}
-        cachedDumps={cachedDumps}
-        cachedAssets={cachedAssets}
-        cachePathPrefix={CACHE_PATH_PREFIX}
-        canRunCommands={canRunCommands}
-        isLoading={wasmState.isLoading}
-        isConnecting={isConnecting}
-        isDeviceConnected={wasmState.isDeviceConnected}
-        hasHardwareTransport={hasHardwareTransport}
-        activeTransportLabel={activeTransportLabel}
-        commandHistory={commandHistory}
-        quickCommand={quickCommand}
-        onQuickCommandChange={setQuickCommand}
-        onRunQuickCommand={runQuickCommand}
-        onCommand={handleCommand}
-        onInput={handleTerminalInput}
-        onConnect={() => void handleConnect()}
-        onDisconnect={() => void handleDisconnect()}
-        onCopyUid={handleCopyUid}
-        onOpenMemory={() => setActiveTab("memory")}
-        onOpenShortcuts={() => setActiveTab("actions")}
-        onOpenTab={setActiveTab}
-        onLoadSample={() =>
-          handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
-        }
-        onRefreshTag={handleRefreshTag}
-        onDumpLoad={handleDumpLoad}
-        onDumpRename={handleDumpRename}
-        onDumpDelete={handleDumpDelete}
-        onClearCache={() => setCachedAssets([])}
-      />
+    <CardTargetContext.Provider value={cardTarget}>
+      <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
+        {/* Ribbon Toolbar */}
+        <RibbonToolbar
+          connectionStatus={
+            wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
+          }
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+          onCommand={handleCommand}
+          onStopOperation={wasmState.sendBreak}
+          onHardReset={wasmState.hardReset}
+          theme={theme}
+          onThemeChange={setTheme}
+          canRunCommands={canRunCommands}
+          cacheItems={cachedAssets}
+          cacheSyncing={isSyncingCache}
+          onCacheUpload={handleCacheUpload}
+          onCacheUse={handleCacheUse}
+          onCacheDelete={handleCacheDelete}
+          onCacheSync={syncCacheToFS}
+          cachePathPrefix={CACHE_PATH_PREFIX}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          availableTransports={wasmState.availableTransports}
+          selectedTransport={selectedTransport || wasmState.activeTransportType}
+          onTransportChange={setSelectedTransport}
+          onJsonUpload={handleJsonUpload}
+        />
+        {/* Persistent active-card strip — visible across every panel. */}
+        <CardTargetBar
+          onRefresh={handleRefreshTag}
+          onCopyUid={handleCopyUid}
+          disabled={!canRunCommands}
+        />
+        {/* Guided next-step spine, driven by the active card target. */}
+        <NextStepBar
+          onCommand={handleCommand}
+          onOpenTab={setActiveTab}
+          commandsDisabled={!canRunCommands}
+        />
+        <MainPanelRouter
+          activeTab={activeTab}
+          terminalDockOpen={terminalDockOpen}
+          onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+          onDumpWithSavedKeys={handleDumpWithSavedKeys}
+          theme={theme}
+          onThemeChange={setTheme}
+          terminalRef={terminalRef}
+          activeDump={activeDump}
+          cachedDumps={cachedDumps}
+          cachedAssets={cachedAssets}
+          cachePathPrefix={CACHE_PATH_PREFIX}
+          canRunCommands={canRunCommands}
+          isLoading={wasmState.isLoading}
+          isConnecting={isConnecting}
+          isDeviceConnected={wasmState.isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
+          activeTransportLabel={activeTransportLabel}
+          commandHistory={commandHistory}
+          quickCommand={quickCommand}
+          onQuickCommandChange={setQuickCommand}
+          onRunQuickCommand={runQuickCommand}
+          onCommand={handleCommand}
+          onInput={handleTerminalInput}
+          onConnect={() => void handleConnect()}
+          onDisconnect={() => void handleDisconnect()}
+          onCopyUid={handleCopyUid}
+          onOpenMemory={() => setActiveTab("memory")}
+          onOpenShortcuts={() => setActiveTab("actions")}
+          onOpenTab={setActiveTab}
+          onLoadSample={() => handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
+          onRefreshTag={handleRefreshTag}
+          onDumpLoad={handleDumpLoad}
+          onDumpRename={handleDumpRename}
+          onDumpDelete={handleDumpDelete}
+          onClearCache={() => void clearAssets()}
+        />
 
-      {/* Status Bar */}
-      <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
-        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2 md:gap-4">
-            <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
-            <span className="flex items-center gap-1.5" title={wasmStatus.text}>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
-                aria-hidden="true"
-              />
-              <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
-            </span>
-            <span>{activeTransportLabel}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span>Commands: {commandHistory.length}</span>
-            <span>Cache: {cachedAssets.length}</span>
-            <span>Dumps: {cachedDumps.length}</span>
+        {/* Status Bar */}
+        <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
+              <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
+              <span className="flex items-center gap-1.5" title={wasmStatus.text}>
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
+                  aria-hidden="true"
+                />
+                <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
+              </span>
+              <span>{activeTransportLabel}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span>Commands: {commandHistory.length}</span>
+              <span title="Saved cards, keys, dumps and files across the vault">
+                Vault: {vaultSummary.cards} cards · {vaultSummary.keys} keys · {vaultSummary.dumps}{" "}
+                dumps · {vaultSummary.files} files
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </CardTargetContext.Provider>
   );
 }
 

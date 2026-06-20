@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useTarget } from "@/features/target/context";
 import { MagicHeader } from "@/features/magic/components/MagicHeader";
 import { MagicCardTypeSection } from "@/features/magic/components/MagicCardTypeSection";
 import { MagicUidSection } from "@/features/magic/components/MagicUidSection";
@@ -20,17 +21,29 @@ import { CARD_TYPES } from "@/features/magic/constants";
 import { calculateBcc, generateRandomUid, validateUid } from "@/features/magic/uid";
 import type { KeyType, MagicCardPanelProps, MagicCardType } from "@/features/magic/types";
 
-export function MagicCardPanel({
-  onCommand,
-  disabled = false,
-  currentUid = "",
-  currentAtqa = "0004",
-  currentSak = "08",
-}: MagicCardPanelProps) {
+export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelProps) {
+  // Pull the card to clone from the shared target rather than props, so a scan
+  // performed after this panel mounts still flows in.
+  const { target } = useTarget();
+  const detectedUid = target.identity?.uid?.replace(/:/g, "") ?? "";
+  const detectedAtqa = target.identity?.atqa?.replace(/\s/g, "") ?? "";
+  const detectedSak = target.identity?.sak ?? "";
+
   const [cardType, setCardType] = useState<MagicCardType>("gen1a");
-  const [uid, setUid] = useState(currentUid || "");
-  const [atqa, setAtqa] = useState(currentAtqa);
-  const [sak, setSak] = useState(currentSak);
+  const [uid, setUid] = useState(detectedUid);
+  const [atqa, setAtqa] = useState(detectedAtqa || "0004");
+  const [sak, setSak] = useState(detectedSak || "08");
+
+  // Adopt the detected card's identity whenever a *new* card becomes the target,
+  // without overwriting fields the user is editing for the same card.
+  const syncedUidRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!detectedUid || syncedUidRef.current === detectedUid) return;
+    syncedUidRef.current = detectedUid;
+    setUid(detectedUid);
+    if (detectedAtqa) setAtqa(detectedAtqa);
+    if (detectedSak) setSak(detectedSak);
+  }, [detectedUid, detectedAtqa, detectedSak]);
   const [gen4Password, setGen4Password] = useState("00000000");
   const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
   const [authKeyType, setAuthKeyType] = useState<KeyType>("A");

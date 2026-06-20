@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Eye } from "lucide-react";
+import { useTarget } from "@/features/target/context";
 import { DumpCacheBrowser } from "@/features/memory/components/DumpCacheBrowser";
 import { BlockInspector } from "@/features/memory/components/BlockInspector";
 import { MemoryMapHeader } from "@/features/memory/components/MemoryMapHeader";
@@ -41,7 +42,7 @@ export function CardMemoryMap({
   onCommand,
   onDumpWithSavedKeys,
   disabled = false,
-  cardType = "classic-1k",
+  cardType: cardTypeProp,
   initialData,
   cachedDumps = [],
   onDumpLoad,
@@ -49,6 +50,17 @@ export function CardMemoryMap({
   onDumpDelete,
   activeDump,
 }: CardMemoryMapProps) {
+  // Fall back to the active target's detected type so labels and the Autopwn
+  // size flag match the scanned card instead of always assuming Classic 1K.
+  const { target } = useTarget();
+  const cardType: CardType =
+    cardTypeProp ??
+    (target.classification.isUltralight
+      ? "ultralight"
+      : target.classification.size === "4k"
+        ? "classic-4k"
+        : "classic-1k");
+
   const [blocks, setBlocks] = useState<Block[]>(
     initialData || (cardType === "ultralight" ? generateUltralightData() : generateClassic1KData()),
   );

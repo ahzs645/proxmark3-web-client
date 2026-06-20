@@ -7,7 +7,6 @@ import { WorkbenchHome } from "./WorkbenchHome";
 import type { CachedAssetWithData } from "../types";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
 import type { RefObject } from "react";
-import type { TagInfo } from "@/components/panels/TagInfoPanel";
 
 const CardMemoryMap = lazy(() =>
   import("@/components/panels/CardMemoryMap").then((m) => ({ default: m.CardMemoryMap })),
@@ -63,7 +62,6 @@ interface MainPanelRouterProps {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   terminalRef: RefObject<TerminalHandle | null>;
-  tagInfo: TagInfo | null;
   activeDump: CachedDump | null;
   cachedDumps: CachedDump[];
   cachedAssets: CachedAssetWithData[];
@@ -102,7 +100,6 @@ export function MainPanelRouter({
   theme,
   onThemeChange,
   terminalRef,
-  tagInfo,
   activeDump,
   cachedDumps,
   cachedAssets,
@@ -174,13 +171,7 @@ export function MainPanelRouter({
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
-          <MagicCardPanel
-            onCommand={onCommand}
-            disabled={!canRunCommands}
-            currentUid={tagInfo?.uid?.replace(/:/g, "")}
-            currentAtqa={tagInfo?.atqa?.replace(/\s/g, "")}
-            currentSak={tagInfo?.sak}
-          />
+          <MagicCardPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
     );
@@ -213,9 +204,7 @@ export function MainPanelRouter({
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
           <LibraryPanel
-            currentTag={tagInfo}
             activeDump={activeDump}
-            cachedDumps={cachedDumps}
             onDumpLoad={onDumpLoad}
             onDumpRename={onDumpRename}
             onDumpDelete={onDumpDelete}
@@ -271,7 +260,6 @@ export function MainPanelRouter({
           terminalRef={terminalRef}
           panelOpen={!!panel}
           onCollapseTerminal={panel ? onTerminalDockToggle : undefined}
-          tagInfo={tagInfo}
           canRunCommands={canRunCommands}
           isLoading={isLoading}
           isConnecting={isConnecting}

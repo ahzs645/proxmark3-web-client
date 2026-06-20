@@ -39,7 +39,8 @@ export interface RibbonTabDefinition {
   value: string;
   label: string;
   icon?: string;
-  separatorBefore?: boolean;
+  /** Named cluster this tab belongs to in the ribbon nav. */
+  group: string;
 }
 
 const ICONS: Record<string, LucideIcon> = {
@@ -71,24 +72,45 @@ export function getIcon(iconName: string, className = "h-3 w-3") {
   return Icon ? <Icon className={className} /> : <Radio className={className} />;
 }
 
+// Tabs are ordered by task domain and clustered into named groups. Two kinds of
+// tab live here: command launchers that keep you on the workbench (Connect, HF,
+// LF, Data, Tools, Shortcuts) and workspace destinations that open a panel
+// (Attacks, Magic, Memory, Library, …). Grouping by domain keeps related ones
+// adjacent instead of one flat undifferentiated row.
 export const RIBBON_TABS: RibbonTabDefinition[] = [
-  { value: "connect", label: "Connect" },
-  { value: "hf", label: "HF" },
-  { value: "lf", label: "LF" },
-  { value: "data", label: "Data" },
-  { value: "tools", label: "Tools" },
-  { value: "actions", label: "Shortcuts" },
-  { value: "attacks", label: "Attacks", icon: "target", separatorBefore: true },
-  { value: "magic", label: "Magic", icon: "wand2" },
-  { value: "traffic", label: "Traffic", icon: "activity" },
-  { value: "lfops", label: "LF Ops", icon: "radio", separatorBefore: true },
-  { value: "t55xx", label: "T55xx", icon: "cpu" },
-  { value: "memory", label: "Memory", icon: "layers", separatorBefore: true },
-  { value: "hex", label: "Hex", icon: "fileCode2" },
-  { value: "library", label: "Library", icon: "book" },
-  { value: "utilities", label: "Utilities", icon: "cpu" },
-  { value: "settings", label: "Settings", icon: "settings" },
+  { value: "connect", label: "Connect", group: "Session" },
+
+  { value: "hf", label: "HF", group: "High Frequency" },
+  { value: "attacks", label: "Attacks", icon: "target", group: "High Frequency" },
+  { value: "magic", label: "Magic", icon: "wand2", group: "High Frequency" },
+  { value: "traffic", label: "Traffic", icon: "activity", group: "High Frequency" },
+
+  { value: "lf", label: "LF", group: "Low Frequency" },
+  { value: "lfops", label: "LF Ops", icon: "radio", group: "Low Frequency" },
+  { value: "t55xx", label: "T55xx", icon: "cpu", group: "Low Frequency" },
+
+  { value: "memory", label: "Memory", icon: "layers", group: "Analyze" },
+  { value: "hex", label: "Hex", icon: "fileCode2", group: "Analyze" },
+  { value: "library", label: "Library", icon: "book", group: "Analyze" },
+
+  { value: "data", label: "Data", group: "Tools" },
+  { value: "tools", label: "Tools", group: "Tools" },
+  { value: "actions", label: "Shortcuts", group: "Tools" },
+  { value: "utilities", label: "Utilities", icon: "cpu", group: "Tools" },
+
+  { value: "settings", label: "Settings", icon: "settings", group: "System" },
 ];
+
+/** Group consecutive {@link RIBBON_TABS} that share a group, preserving order. */
+export function groupRibbonTabs(tabs: RibbonTabDefinition[] = RIBBON_TABS) {
+  const groups: { name: string; tabs: RibbonTabDefinition[] }[] = [];
+  for (const tab of tabs) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === tab.group) last.tabs.push(tab);
+    else groups.push({ name: tab.group, tabs: [tab] });
+  }
+  return groups;
+}
 
 export const LF_CARD_TYPES: RibbonCardType[] = [
   { value: "em4x", label: "EM4x" },

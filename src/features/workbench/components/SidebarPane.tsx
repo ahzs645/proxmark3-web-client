@@ -1,10 +1,10 @@
 import { Activity } from "lucide-react";
-import { TagInfoPanel, type TagInfo } from "@/components/panels/TagInfoPanel";
+import { TagInfoPanel } from "@/components/panels/TagInfoPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useTarget } from "@/features/target/context";
 
 interface SidebarPaneProps {
-  tagInfo: TagInfo | null;
   canRunCommands: boolean;
   commandHistory: string[];
   isDeviceConnected: boolean;
@@ -17,7 +17,6 @@ interface SidebarPaneProps {
 }
 
 export function SidebarPane({
-  tagInfo,
   canRunCommands,
   commandHistory,
   isDeviceConnected,
@@ -28,6 +27,7 @@ export function SidebarPane({
   onOpenMemory,
   onRefreshTag,
 }: SidebarPaneProps) {
+  const tagInfo = useTarget().target.identity;
   return (
     <div className="order-1 flex min-h-0 flex-col gap-4 md:order-1">
       <TagInfoPanel

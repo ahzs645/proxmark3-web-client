@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CachedAsset } from "@/components/panels/KeyCachePanel";
 import { ATTACK_CONFIGS, DEFAULT_KEYS } from "./config";
 import type { AttackType, CardType, KeyType } from "./types";
@@ -6,14 +6,31 @@ import type { AttackType, CardType, KeyType } from "./types";
 interface UseMifareAttacksStateArgs {
   cachedAssets: CachedAsset[];
   cachePathPrefix: string;
+  /** Card size detected for the active target, used to pre-select 1k/4k. */
+  detectedCardType?: CardType | null;
+  /** UID of the active target; a change means a new card was scanned. */
+  detectedUid?: string | null;
 }
 
 export function useMifareAttacksState({
   cachedAssets,
   cachePathPrefix,
+  detectedCardType = null,
+  detectedUid = null,
 }: UseMifareAttacksStateArgs) {
   const [activeAttack, setActiveAttack] = useState<AttackType>("autopwn");
-  const [cardType, setCardType] = useState<CardType>("1k");
+  const [cardType, setCardType] = useState<CardType>(detectedCardType ?? "1k");
+
+  // Adopt the detected card size whenever a *different* card becomes the target,
+  // without clobbering a manual 1k/4k toggle the user made for the same card.
+  const syncedCardRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!detectedCardType) return;
+    const cardKey = detectedUid ?? "__no-uid__";
+    if (syncedCardRef.current === cardKey) return;
+    syncedCardRef.current = cardKey;
+    setCardType(detectedCardType);
+  }, [detectedCardType, detectedUid]);
   const [knownBlock, setKnownBlock] = useState("0");
   const [knownKeyType, setKnownKeyType] = useState<KeyType>("A");
   const [knownKey, setKnownKey] = useState("FFFFFFFFFFFF");
