@@ -1,7 +1,6 @@
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { RibbonToolbar } from "@/components/ribbon/RibbonToolbar";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
-import type { TagInfo } from "@/components/panels/TagInfoPanel";
 import { useProxmarkWasm } from "@/hooks/useProxmarkWasm";
 import { useTheme } from "@/hooks/useTheme";
 import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyCachePanel";
@@ -22,6 +21,9 @@ import type { StoredKey } from "@/components/panels/library/types";
 import { RIBBON_TABS } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
+import { useCardTarget } from "@/features/target/useCardTarget";
+import { CardTargetContext } from "@/features/target/context";
+import { CardTargetBar } from "@/features/target/CardTargetBar";
 
 const CACHE_STORAGE_KEY = "pm3-cache";
 const TAB_STORAGE_KEY = "pm3-active-tab";
@@ -43,7 +45,6 @@ function stripAnsi(value: string): string {
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
-  const [tagInfo, setTagInfo] = useState<TagInfo | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window === "undefined") return "connect";
     const saved = localStorage.getItem(TAB_STORAGE_KEY);
@@ -71,6 +72,12 @@ function App() {
       onActivateMemory: () => setActiveTab("memory"),
       onLog: writeTerminalLine,
     });
+  // The active "card target" — the single source of truth for the card the
+  // whole workbench is operating on. Scan/dump results flow into it here; every
+  // panel reads it through CardTargetContext.
+  const cardTarget = useCardTarget({ activeDump });
+  const { mergeIdentity, clearTarget } = cardTarget;
+  const tagInfo = cardTarget.target.identity;
   const [cachedAssets, setCachedAssets] = useState<CachedAssetWithData[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -86,47 +93,36 @@ function App() {
   });
   const [isSyncingCache, setIsSyncingCache] = useState(false);
 
-  // Parse tag information from output
-  const parseTagInfo = useCallback((text: string) => {
-    if (text.includes("UID:") || text.includes("uid:")) {
-      const uidMatch = text.match(/[Uu][Ii][Dd][:\s]+([A-Fa-f0-9\s:]+)/);
-      if (uidMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          uid: uidMatch[1].trim().replace(/\s+/g, ":"),
-        }));
+  // Parse tag information from output and feed it into the active card target.
+  const parseTagInfo = useCallback(
+    (text: string) => {
+      if (text.includes("UID:") || text.includes("uid:")) {
+        const uidMatch = text.match(/[Uu][Ii][Dd][:\s]+([A-Fa-f0-9\s:]+)/);
+        if (uidMatch) {
+          mergeIdentity({ uid: uidMatch[1].trim().replace(/\s+/g, ":") });
+        }
       }
-    }
-    if (text.includes("MIFARE")) {
-      const typeMatch = text.match(/(MIFARE\s+\w+(?:\s+\w+)?)/i);
-      if (typeMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          type: typeMatch[1],
-          protocol: "HF",
-          subtype: "MIFARE",
-        }));
+      if (text.includes("MIFARE")) {
+        const typeMatch = text.match(/(MIFARE\s+\w+(?:\s+\w+)?)/i);
+        if (typeMatch) {
+          mergeIdentity({ type: typeMatch[1], protocol: "HF", subtype: "MIFARE" });
+        }
       }
-    }
-    if (text.includes("SAK:") || text.includes("sak:")) {
-      const sakMatch = text.match(/[Ss][Aa][Kk][:\s]+([A-Fa-f0-9]+)/);
-      if (sakMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          sak: sakMatch[1],
-        }));
+      if (text.includes("SAK:") || text.includes("sak:")) {
+        const sakMatch = text.match(/[Ss][Aa][Kk][:\s]+([A-Fa-f0-9]+)/);
+        if (sakMatch) {
+          mergeIdentity({ sak: sakMatch[1] });
+        }
       }
-    }
-    if (text.includes("ATQA:") || text.includes("atqa:")) {
-      const atqaMatch = text.match(/[Aa][Tt][Qq][Aa][:\s]+([A-Fa-f0-9\s]+)/);
-      if (atqaMatch) {
-        setTagInfo((prev) => ({
-          ...prev,
-          atqa: atqaMatch[1].trim(),
-        }));
+      if (text.includes("ATQA:") || text.includes("atqa:")) {
+        const atqaMatch = text.match(/[Aa][Tt][Qq][Aa][:\s]+([A-Fa-f0-9\s]+)/);
+        if (atqaMatch) {
+          mergeIdentity({ atqa: atqaMatch[1].trim() });
+        }
       }
-    }
-  }, []);
+    },
+    [mergeIdentity],
+  );
 
   const detectKind = useCallback((fileName: string): CachedAssetKind => {
     const ext = fileName.toLowerCase();
@@ -230,7 +226,7 @@ function App() {
             const cachedDump = upsertCachedDump(parsed, name, { activate: false, announce: false });
             importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
             const derived = tagInfoFromDump(parsed);
-            if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
+            if (derived) mergeIdentity(derived, "dump");
           }
         } catch (error) {
           console.error(`Failed to parse generated dump JSON: ${name}`, error);
@@ -241,6 +237,7 @@ function App() {
     },
     [
       detectKind,
+      mergeIdentity,
       readFsBytes,
       uint8ToBase64,
       upsertCachedAsset,
@@ -273,9 +270,9 @@ function App() {
       const cachedDump = upsertCachedDump(dump, name, { activate: true, announce: true });
       importDumpKeysToLibrary(cachedDump.data, cachedDump.id);
       const derived = tagInfoFromDump(dump);
-      if (derived) setTagInfo((prev) => ({ ...prev, ...derived }));
+      if (derived) mergeIdentity(derived, "dump");
     },
-    [upsertCachedDump],
+    [mergeIdentity, upsertCachedDump],
   );
 
   // WASM output handler
@@ -657,8 +654,8 @@ function App() {
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
     terminalRef.current?.writeln("\x1b[33mDisconnected.\x1b[0m");
-    setTagInfo(null);
-  }, [wasmState]);
+    clearTarget();
+  }, [wasmState, clearTarget]);
 
   const handleCopyUid = useCallback(() => {
     if (tagInfo?.uid) {
@@ -710,97 +707,103 @@ function App() {
           ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
           : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
-    <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
-      {/* Ribbon Toolbar */}
-      <RibbonToolbar
-        connectionStatus={
-          wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
-        }
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        onCommand={handleCommand}
-        onStopOperation={wasmState.sendBreak}
-        onHardReset={wasmState.hardReset}
-        theme={theme}
-        onThemeChange={setTheme}
-        canRunCommands={canRunCommands}
-        cacheItems={cachedAssets}
-        cacheSyncing={isSyncingCache}
-        onCacheUpload={handleCacheUpload}
-        onCacheUse={handleCacheUse}
-        onCacheDelete={handleCacheDelete}
-        onCacheSync={syncCacheToFS}
-        cachePathPrefix={CACHE_PATH_PREFIX}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        availableTransports={wasmState.availableTransports}
-        selectedTransport={selectedTransport || wasmState.activeTransportType}
-        onTransportChange={setSelectedTransport}
-        onJsonUpload={handleJsonUpload}
-      />
-      <MainPanelRouter
-        activeTab={activeTab}
-        terminalDockOpen={terminalDockOpen}
-        onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
-        onDumpWithSavedKeys={handleDumpWithSavedKeys}
-        theme={theme}
-        onThemeChange={setTheme}
-        terminalRef={terminalRef}
-        tagInfo={tagInfo}
-        activeDump={activeDump}
-        cachedDumps={cachedDumps}
-        cachedAssets={cachedAssets}
-        cachePathPrefix={CACHE_PATH_PREFIX}
-        canRunCommands={canRunCommands}
-        isLoading={wasmState.isLoading}
-        isConnecting={isConnecting}
-        isDeviceConnected={wasmState.isDeviceConnected}
-        hasHardwareTransport={hasHardwareTransport}
-        activeTransportLabel={activeTransportLabel}
-        commandHistory={commandHistory}
-        quickCommand={quickCommand}
-        onQuickCommandChange={setQuickCommand}
-        onRunQuickCommand={runQuickCommand}
-        onCommand={handleCommand}
-        onInput={handleTerminalInput}
-        onConnect={() => void handleConnect()}
-        onDisconnect={() => void handleDisconnect()}
-        onCopyUid={handleCopyUid}
-        onOpenMemory={() => setActiveTab("memory")}
-        onOpenShortcuts={() => setActiveTab("actions")}
-        onOpenTab={setActiveTab}
-        onLoadSample={() =>
-          handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
-        }
-        onRefreshTag={handleRefreshTag}
-        onDumpLoad={handleDumpLoad}
-        onDumpRename={handleDumpRename}
-        onDumpDelete={handleDumpDelete}
-        onClearCache={() => setCachedAssets([])}
-      />
+    <CardTargetContext.Provider value={cardTarget}>
+      <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
+        {/* Ribbon Toolbar */}
+        <RibbonToolbar
+          connectionStatus={
+            wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
+          }
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+          onCommand={handleCommand}
+          onStopOperation={wasmState.sendBreak}
+          onHardReset={wasmState.hardReset}
+          theme={theme}
+          onThemeChange={setTheme}
+          canRunCommands={canRunCommands}
+          cacheItems={cachedAssets}
+          cacheSyncing={isSyncingCache}
+          onCacheUpload={handleCacheUpload}
+          onCacheUse={handleCacheUse}
+          onCacheDelete={handleCacheDelete}
+          onCacheSync={syncCacheToFS}
+          cachePathPrefix={CACHE_PATH_PREFIX}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          availableTransports={wasmState.availableTransports}
+          selectedTransport={selectedTransport || wasmState.activeTransportType}
+          onTransportChange={setSelectedTransport}
+          onJsonUpload={handleJsonUpload}
+        />
+        {/* Persistent active-card strip — visible across every panel. */}
+        <CardTargetBar
+          onRefresh={handleRefreshTag}
+          onCopyUid={handleCopyUid}
+          disabled={!canRunCommands}
+        />
+        <MainPanelRouter
+          activeTab={activeTab}
+          terminalDockOpen={terminalDockOpen}
+          onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+          onDumpWithSavedKeys={handleDumpWithSavedKeys}
+          theme={theme}
+          onThemeChange={setTheme}
+          terminalRef={terminalRef}
+          tagInfo={tagInfo}
+          activeDump={activeDump}
+          cachedDumps={cachedDumps}
+          cachedAssets={cachedAssets}
+          cachePathPrefix={CACHE_PATH_PREFIX}
+          canRunCommands={canRunCommands}
+          isLoading={wasmState.isLoading}
+          isConnecting={isConnecting}
+          isDeviceConnected={wasmState.isDeviceConnected}
+          hasHardwareTransport={hasHardwareTransport}
+          activeTransportLabel={activeTransportLabel}
+          commandHistory={commandHistory}
+          quickCommand={quickCommand}
+          onQuickCommandChange={setQuickCommand}
+          onRunQuickCommand={runQuickCommand}
+          onCommand={handleCommand}
+          onInput={handleTerminalInput}
+          onConnect={() => void handleConnect()}
+          onDisconnect={() => void handleDisconnect()}
+          onCopyUid={handleCopyUid}
+          onOpenMemory={() => setActiveTab("memory")}
+          onOpenShortcuts={() => setActiveTab("actions")}
+          onOpenTab={setActiveTab}
+          onLoadSample={() => handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
+          onRefreshTag={handleRefreshTag}
+          onDumpLoad={handleDumpLoad}
+          onDumpRename={handleDumpRename}
+          onDumpDelete={handleDumpDelete}
+          onClearCache={() => setCachedAssets([])}
+        />
 
-      {/* Status Bar */}
-      <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
-        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-2 md:gap-4">
-            <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
-            <span className="flex items-center gap-1.5" title={wasmStatus.text}>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
-                aria-hidden="true"
-              />
-              <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
-            </span>
-            <span>{activeTransportLabel}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span>Commands: {commandHistory.length}</span>
-            <span>Cache: {cachedAssets.length}</span>
-            <span>Dumps: {cachedDumps.length}</span>
+        {/* Status Bar */}
+        <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
+              <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
+              <span className="flex items-center gap-1.5" title={wasmStatus.text}>
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
+                  aria-hidden="true"
+                />
+                <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
+              </span>
+              <span>{activeTransportLabel}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span>Commands: {commandHistory.length}</span>
+              <span>Cache: {cachedAssets.length}</span>
+              <span>Dumps: {cachedDumps.length}</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </CardTargetContext.Provider>
   );
 }
 
