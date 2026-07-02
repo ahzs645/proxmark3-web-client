@@ -21,8 +21,7 @@ import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
 import { CardTargetContext } from "@/features/target/context";
-import { CardTargetBar } from "@/features/target/CardTargetBar";
-import { NextStepBar } from "@/features/target/NextStepBar";
+import { TargetBar } from "@/features/target/TargetBar";
 
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
@@ -692,7 +691,7 @@ function App() {
           : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
   return (
     <CardTargetContext.Provider value={cardTarget}>
-      <div className="h-dvh overflow-hidden flex flex-col bg-background bg-[radial-gradient(circle_at_20%_20%,rgba(34,197,94,0.08),transparent_25%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.06),transparent_25%)]">
+      <div className="h-dvh overflow-hidden flex flex-col bg-background">
         {/* Ribbon Toolbar */}
         <RibbonToolbar
           connectionStatus={
@@ -720,17 +719,14 @@ function App() {
           onTransportChange={setSelectedTransport}
           onJsonUpload={handleJsonUpload}
         />
-        {/* Persistent active-card strip — visible across every panel. */}
-        <CardTargetBar
+        {/* Persistent active-card strip + guided next steps — one lean band,
+            visible across every panel. */}
+        <TargetBar
+          onCommand={handleCommand}
+          onOpenTab={setActiveTab}
           onRefresh={handleRefreshTag}
           onCopyUid={handleCopyUid}
           disabled={!canRunCommands}
-        />
-        {/* Guided next-step spine, driven by the active card target. */}
-        <NextStepBar
-          onCommand={handleCommand}
-          onOpenTab={setActiveTab}
-          commandsDisabled={!canRunCommands}
         />
         <MainPanelRouter
           activeTab={activeTab}
@@ -782,7 +778,6 @@ function App() {
                 />
                 <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
               </span>
-              <span>{activeTransportLabel}</span>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span>Commands: {commandHistory.length}</span>
