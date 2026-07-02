@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, FileJson, FolderOpen, Key, Play, RefreshCw, Upload } from "lucide-react";
+import { Download, FileJson, FolderOpen, Play, RefreshCw, Upload } from "lucide-react";
 import { RibbonButton, CompactGroup } from "../primitives";
 
 interface MemoryTabProps {
@@ -85,19 +85,6 @@ export function MemoryTab({
       <Separator orientation="vertical" className="h-14 shrink-0" />
 
       <CompactGroup title="Card Operations">
-        <RibbonButton
-          icon={<Key className="h-3 w-3" />}
-          label="Autopwn"
-          onClick={() => onCommand("hf mf autopwn --1k")}
-          disabled={!commandsEnabled}
-          variant="default"
-        />
-        <RibbonButton
-          icon={<Download className="h-3 w-3" />}
-          label="Read Card"
-          onClick={() => onCommand("hf mf dump")}
-          disabled={!commandsEnabled}
-        />
         <RibbonButton
           icon={<Upload className="h-3 w-3" />}
           label="Restore"

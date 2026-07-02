@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye } from "lucide-react";
 import { useTarget } from "@/features/target/context";
 import { DumpCacheBrowser } from "@/features/memory/components/DumpCacheBrowser";
@@ -267,10 +267,10 @@ export function CardMemoryMap({
 
       <Card className="flex w-full flex-col lg:w-80">
         <CardHeader className="border-b pb-2">
-          <div className="flex items-center gap-2 text-sm font-semibold">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <Eye className="h-4 w-4 text-primary" />
             Block Inspector
-          </div>
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="flex-1 space-y-4 pt-4">
