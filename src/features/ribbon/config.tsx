@@ -7,10 +7,12 @@ import {
   Download,
   Edit3,
   FileCode2,
+  FolderOpen,
   Key,
   Layers,
   ListChecks,
   Play,
+  Plug,
   Radio,
   Search,
   Settings,
@@ -19,6 +21,7 @@ import {
   Target,
   Upload,
   Wand2,
+  Wrench,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -35,12 +38,63 @@ export interface RibbonCardType {
   label: string;
 }
 
-export interface RibbonTabDefinition {
+/**
+ * A ribbon strip is a band of command buttons. Strips are *tools*, not places —
+ * showing one never changes what you are looking at.
+ */
+export type RibbonStripId =
+  | "connect"
+  | "hf"
+  | "lf"
+  | "attacks"
+  | "magic"
+  | "traffic"
+  | "lfops"
+  | "t55xx"
+  | "memory"
+  | "hex"
+  | "library"
+  | "utilities"
+  | "data"
+  | "tools"
+  | "shortcuts"
+  | "settings";
+
+export const RIBBON_STRIP_LABELS: Record<RibbonStripId, string> = {
+  connect: "Connect",
+  hf: "HF",
+  lf: "LF",
+  attacks: "Attacks",
+  magic: "Magic",
+  traffic: "Traffic",
+  lfops: "LF Ops",
+  t55xx: "T55xx",
+  memory: "Memory",
+  hex: "Hex",
+  library: "Library",
+  utilities: "Utilities",
+  data: "Data",
+  tools: "Tools",
+  shortcuts: "Shortcuts",
+  settings: "Settings",
+};
+
+/**
+ * A workspace is a *place*: picking one always swaps the main panel, and never
+ * anything else. This is the split the old ribbon lacked — six of its sixteen
+ * tabs quietly threw away whatever workspace you had open, because they were
+ * command strips masquerading as destinations.
+ */
+export interface WorkspaceDefinition {
   value: string;
   label: string;
-  icon?: string;
-  /** Named cluster this tab belongs to in the ribbon nav. */
+  icon: string;
+  /** Named cluster in the workspace switcher. */
   group: string;
+  /** One-line description, shown as the tab's tooltip. */
+  hint: string;
+  /** Command strips offered here; the first is the default. */
+  strips: RibbonStripId[];
 }
 
 const ICONS: Record<string, LucideIcon> = {
@@ -65,6 +119,9 @@ const ICONS: Record<string, LucideIcon> = {
   edit: Edit3,
   listchecks: ListChecks,
   zap: Zap,
+  plug: Plug,
+  folderOpen: FolderOpen,
+  wrench: Wrench,
 };
 
 export function getIcon(iconName: string, className = "h-3 w-3") {
@@ -72,42 +129,141 @@ export function getIcon(iconName: string, className = "h-3 w-3") {
   return Icon ? <Icon className={className} /> : <Radio className={className} />;
 }
 
-// Tabs are ordered by task domain and clustered into named groups. Two kinds of
-// tab live here: command launchers that keep you on the workbench (Connect, HF,
-// LF, Data, Tools, Shortcuts) and workspace destinations that open a panel
-// (Attacks, Magic, Memory, Library, …). Grouping by domain keeps related ones
-// adjacent instead of one flat undifferentiated row.
-export const RIBBON_TABS: RibbonTabDefinition[] = [
-  { value: "connect", label: "Connect", group: "Session" },
+export const WORKSPACES: WorkspaceDefinition[] = [
+  {
+    value: "connect",
+    label: "Session",
+    icon: "plug",
+    group: "Session",
+    hint: "Reader connection, terminal and quick commands",
+    strips: ["connect", "hf", "lf", "data", "tools", "shortcuts"],
+  },
 
-  { value: "hf", label: "HF", group: "High Frequency" },
-  { value: "attacks", label: "Attacks", icon: "target", group: "High Frequency" },
-  { value: "magic", label: "Magic", icon: "wand2", group: "High Frequency" },
-  { value: "traffic", label: "Traffic", icon: "activity", group: "High Frequency" },
+  {
+    value: "attacks",
+    label: "Attacks",
+    icon: "target",
+    group: "High Frequency",
+    hint: "MIFARE key recovery: autopwn, nested, darkside, dictionaries",
+    strips: ["attacks", "hf"],
+  },
+  {
+    value: "magic",
+    label: "Magic",
+    icon: "wand2",
+    group: "High Frequency",
+    hint: "Write block 0 and clone onto magic / gen1a cards",
+    strips: ["magic", "hf"],
+  },
+  {
+    value: "traffic",
+    label: "Traffic",
+    icon: "activity",
+    group: "High Frequency",
+    hint: "Sniff and replay reader / card traffic",
+    strips: ["traffic", "hf"],
+  },
 
-  { value: "lf", label: "LF", group: "Low Frequency" },
-  { value: "lfops", label: "LF Ops", icon: "radio", group: "Low Frequency" },
-  { value: "t55xx", label: "T55xx", icon: "cpu", group: "Low Frequency" },
+  {
+    value: "lfops",
+    label: "LF Ops",
+    icon: "radio",
+    group: "Low Frequency",
+    hint: "125 kHz read, clone and simulate",
+    strips: ["lfops", "lf"],
+  },
+  {
+    value: "t55xx",
+    label: "T55xx",
+    icon: "cpu",
+    group: "Low Frequency",
+    hint: "T55xx configuration blocks and writes",
+    strips: ["t55xx", "lf"],
+  },
 
-  { value: "memory", label: "Memory", icon: "layers", group: "Analyze" },
-  { value: "hex", label: "Hex", icon: "fileCode2", group: "Analyze" },
-  { value: "library", label: "Library", icon: "book", group: "Analyze" },
+  {
+    value: "memory",
+    label: "Memory",
+    icon: "layers",
+    group: "Analyze",
+    hint: "Block and sector map of the active dump",
+    strips: ["memory", "data"],
+  },
+  {
+    value: "hex",
+    label: "Hex",
+    icon: "fileCode2",
+    group: "Analyze",
+    hint: "Hex / ASCII view of dumps and cached files",
+    strips: ["hex", "data"],
+  },
+  {
+    value: "library",
+    label: "Library",
+    icon: "book",
+    group: "Analyze",
+    hint: "Saved cards, keys and dumps in the browser vault",
+    strips: ["library", "shortcuts"],
+  },
+  {
+    value: "utilities",
+    label: "Utilities",
+    icon: "wrench",
+    group: "Analyze",
+    hint: "Offline APDU, PN532, UID and checksum helpers",
+    strips: ["utilities", "tools"],
+  },
 
-  { value: "data", label: "Data", group: "Tools" },
-  { value: "tools", label: "Tools", group: "Tools" },
-  { value: "actions", label: "Shortcuts", group: "Tools" },
-  { value: "utilities", label: "Utilities", icon: "cpu", group: "Tools" },
-
-  { value: "settings", label: "Settings", icon: "settings", group: "System" },
+  {
+    value: "settings",
+    label: "Settings",
+    icon: "settings",
+    group: "System",
+    hint: "Theme and cached-file management",
+    strips: ["settings"],
+  },
 ];
 
-/** Group consecutive {@link RIBBON_TABS} that share a group, preserving order. */
-export function groupRibbonTabs(tabs: RibbonTabDefinition[] = RIBBON_TABS) {
-  const groups: { name: string; tabs: RibbonTabDefinition[] }[] = [];
-  for (const tab of tabs) {
+const WORKSPACE_BY_VALUE = new Map(WORKSPACES.map((workspace) => [workspace.value, workspace]));
+
+export const DEFAULT_WORKSPACE = "connect";
+
+export function getWorkspace(value: string): WorkspaceDefinition {
+  return WORKSPACE_BY_VALUE.get(value) ?? WORKSPACES[0];
+}
+
+/**
+ * Workspace ids that no longer exist, mapped onto the workspace and strip that
+ * took over their content. Keeps saved tabs — and in-app links such as the old
+ * "Shortcuts" entry point — landing somewhere sensible.
+ */
+const RETIRED_WORKSPACES: Record<string, { workspace: string; strip: RibbonStripId }> = {
+  hf: { workspace: "connect", strip: "hf" },
+  lf: { workspace: "connect", strip: "lf" },
+  data: { workspace: "connect", strip: "data" },
+  tools: { workspace: "connect", strip: "tools" },
+  actions: { workspace: "connect", strip: "shortcuts" },
+};
+
+/** Resolve any historical or current tab id to a live workspace + strip. */
+export function resolveWorkspace(value: string | null | undefined): {
+  workspace: string;
+  strip?: RibbonStripId;
+} {
+  if (!value) return { workspace: DEFAULT_WORKSPACE };
+  const retired = RETIRED_WORKSPACES[value];
+  if (retired) return retired;
+  if (WORKSPACE_BY_VALUE.has(value)) return { workspace: value };
+  return { workspace: DEFAULT_WORKSPACE };
+}
+
+/** Group consecutive {@link WORKSPACES} that share a group, preserving order. */
+export function groupWorkspaces(workspaces: WorkspaceDefinition[] = WORKSPACES) {
+  const groups: { name: string; workspaces: WorkspaceDefinition[] }[] = [];
+  for (const workspace of workspaces) {
     const last = groups[groups.length - 1];
-    if (last && last.name === tab.group) last.tabs.push(tab);
-    else groups.push({ name: tab.group, tabs: [tab] });
+    if (last && last.name === workspace.group) last.workspaces.push(workspace);
+    else groups.push({ name: workspace.group, workspaces: [workspace] });
   }
   return groups;
 }

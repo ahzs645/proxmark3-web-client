@@ -1,10 +1,11 @@
 import type { KeyboardEvent, RefObject } from "react";
-import { ChevronDown, Send, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Send, Sparkles, SquareStop, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Terminal, type TerminalHandle } from "@/components/terminal/Terminal";
+import { useCommands } from "@/features/commands/context";
 
 interface TerminalPaneProps {
   terminalRef: RefObject<TerminalHandle | null>;
@@ -32,13 +33,21 @@ export function TerminalPane({
   onInput,
   onCollapse,
 }: TerminalPaneProps) {
+  const { activeJob, queuedJobs, stopActive } = useCommands();
+
   return (
     <Card className="flex flex-1 flex-col overflow-hidden border-border/80 bg-card/80 backdrop-blur">
       <CardHeader className="space-y-3 border-b border-border/60 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <span>Terminal</span>
-            {canRunCommands ? (
+            {activeJob ? (
+              <Badge variant="warning" className="gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="font-mono">{activeJob.command}</span>
+                {queuedJobs.length > 0 ? <span>+{queuedJobs.length}</span> : null}
+              </Badge>
+            ) : canRunCommands ? (
               <Badge variant="success">Ready</Badge>
             ) : isLoading ? (
               <Badge variant="warning">Loading...</Badge>
@@ -48,6 +57,17 @@ export function TerminalPane({
             {isDeviceConnected ? <Badge variant="outline">Device Connected</Badge> : null}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
+            {activeJob ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:bg-destructive/10"
+                onClick={stopActive}
+              >
+                <SquareStop className="mr-1 h-3 w-3" />
+                Stop
+              </Button>
+            ) : null}
             <Button size="sm" variant="ghost" onClick={() => onCommand("help")}>
               Help
             </Button>
@@ -80,9 +100,18 @@ export function TerminalPane({
               placeholder="Send raw pm3 commands (hf mf autopwn --1k -f /pm3-cache/mfc_default_keys)"
               className="min-w-0 flex-1"
             />
-            <Button size="sm" onClick={onRunQuickCommand} className="shrink-0">
+            <Button
+              size="sm"
+              onClick={onRunQuickCommand}
+              className="shrink-0"
+              title={
+                activeJob
+                  ? "The client runs commands one at a time — this will queue behind the running one"
+                  : undefined
+              }
+            >
               <Send className="mr-1 h-3 w-3" />
-              Send
+              {activeJob ? "Queue" : "Send"}
             </Button>
           </div>
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">

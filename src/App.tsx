@@ -16,19 +16,28 @@ import { vaultStats } from "@/features/vault/vault";
 import { useVaultAssets, useVaultCards, useVaultKeys } from "@/features/vault/hooks";
 import { clearAssets, deleteAsset, importDumpKeys, putAsset } from "@/features/vault/operations";
 import type { AssetRecord } from "@/features/vault/db";
-import { RIBBON_TABS } from "@/features/ribbon/config";
+import {
+  DEFAULT_WORKSPACE,
+  getWorkspace,
+  resolveWorkspace,
+  type RibbonStripId,
+} from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
 import { CardTargetContext } from "@/features/target/context";
 import { TargetBar } from "@/features/target/TargetBar";
+import { CommandCenterContext } from "@/features/commands/context";
+import { isPromptLine } from "@/features/commands/prompt";
+import type { CommandCenter } from "@/features/commands/types";
+import { useCommandCenter } from "@/features/commands/useCommandCenter";
+import { deriveConnectionState } from "@/features/connection/model";
+import { ActivityBar } from "@/features/workbench/components/ActivityBar";
 
 const TAB_STORAGE_KEY = "pm3-active-tab";
+const TERMINAL_DOCK_STORAGE_KEY = "pm3-terminal-dock";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
 const CACHE_PATH_PREFIX = "/pm3-cache";
-// Panel tabs that run pm3 commands → show the terminal dock by default. Others
-// (memory, hex, library, utilities, settings) hide it until a command runs.
-const COMMAND_PANEL_TABS = new Set(["attacks", "magic", "lfops", "t55xx", "traffic"]);
 const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
 const ANSI_ESCAPE_REGEX = new RegExp(
@@ -42,15 +51,26 @@ function stripAnsi(value: string): string {
 
 function App() {
   const terminalRef = useRef<TerminalHandle>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => {
+  // Two independent pieces of navigation state: the workspace decides which
+  // panel fills the view, the strip decides which command band the ribbon
+  // shows. Fusing them is what used to make the ribbon throw away your panel.
+  const [activeWorkspace, setActiveWorkspace] = useState<string>(() => {
+    if (typeof window === "undefined") return DEFAULT_WORKSPACE;
+    return resolveWorkspace(localStorage.getItem(TAB_STORAGE_KEY)).workspace;
+  });
+  const [activeStrip, setActiveStrip] = useState<RibbonStripId>(() => {
     if (typeof window === "undefined") return "connect";
-    const saved = localStorage.getItem(TAB_STORAGE_KEY);
-    return saved && RIBBON_TABS.some((tab) => tab.value === saved) ? saved : "connect";
+    const saved = resolveWorkspace(localStorage.getItem(TAB_STORAGE_KEY));
+    return saved.strip ?? getWorkspace(saved.workspace).strips[0];
   });
   const [quickCommand, setQuickCommand] = useState("hf search");
-  // Terminal dock visibility under a panel: defaults per-tab, can be toggled, and
-  // pops open whenever a command is dispatched (see handleCommand).
-  const [terminalDockOpen, setTerminalDockOpen] = useState(true);
+  // Terminal dock visibility is a persisted, global preference. It deliberately
+  // does *not* reset per workspace: a command started in Attacks has to stay
+  // watchable while you read its results in Memory or Library.
+  const [terminalDockOpen, setTerminalDockOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(TERMINAL_DOCK_STORAGE_KEY) !== "0";
+  });
   const [selectedTransport, setSelectedTransport] = useState<TransportType | null>(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem(TRANSPORT_STORAGE_KEY) as TransportType | null;
@@ -64,9 +84,21 @@ function App() {
     terminalRef.current?.writeln(line);
   }, []);
 
+  // Switching workspace keeps the current command strip when the destination
+  // also offers it, so navigating never silently changes what you can run.
+  const openWorkspace = useCallback((value: string) => {
+    const resolved = resolveWorkspace(value);
+    const workspace = getWorkspace(resolved.workspace);
+    setActiveWorkspace(workspace.value);
+    setActiveStrip(
+      (current) =>
+        resolved.strip ?? (workspace.strips.includes(current) ? current : workspace.strips[0]),
+    );
+  }, []);
+
   const { activeDump, cachedDumps, handleDumpDelete, handleDumpRename, upsertCachedDump } =
     useDumpStore({
-      onActivateMemory: () => setActiveTab("memory"),
+      onActivateMemory: () => openWorkspace("memory"),
       onLog: writeTerminalLine,
     });
   // All vault data is now Dexie-backed live queries — no localStorage state here.
@@ -261,6 +293,10 @@ function App() {
     [mergeIdentity, upsertCachedDump],
   );
 
+  // The command center is created below (it needs the WASM handles), but the
+  // output handler has to reach it, so it is bridged through a ref.
+  const commandCenterRef = useRef<CommandCenter | null>(null);
+
   // WASM output handler
   const handleWasmOutput = useCallback(
     (text: string) => {
@@ -270,7 +306,20 @@ function App() {
       const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       const lines = `${outputLineBufferRef.current}${normalized}`.split("\n");
       outputLineBufferRef.current = lines.pop() ?? "";
-      lines.forEach(processGeneratedOutputLine);
+      lines.forEach((line) => {
+        processGeneratedOutputLine(line);
+        commandCenterRef.current?.noteOutputLine(line);
+      });
+
+      // The pm3 prompt is printed without a trailing newline, so it only ever
+      // shows up as the buffered tail — and it is exactly the signal that says
+      // the running command finished. Consume it here rather than waiting for a
+      // newline that never comes.
+      const tail = outputLineBufferRef.current;
+      if (tail && isPromptLine(tail)) {
+        commandCenterRef.current?.noteOutputLine(tail);
+        outputLineBufferRef.current = "";
+      }
     },
     [parseTagInfo, processGeneratedOutputLine],
   );
@@ -288,6 +337,23 @@ function App() {
       terminalRef.current?.writeln(`\x1b[31mWASM Error: ${err.message}\x1b[0m`);
     },
   });
+
+  // Every command in the session goes through here, so the shell always knows
+  // what is running, what is queued behind it, and how long it has been going.
+  const commandCenter = useCommandCenter({
+    dispatch: (command) => {
+      if (wasmState.isReady) return wasmState.sendCommand(command);
+      terminalRef.current?.writeln(
+        wasmState.isLoading
+          ? "\x1b[33mWASM client is still loading...\x1b[0m"
+          : "\x1b[31mWASM client failed to load.\x1b[0m",
+      );
+      return null;
+    },
+    interrupt: wasmState.sendBreak,
+    flushOutput: wasmState.flushOutput,
+  });
+  commandCenterRef.current = commandCenter;
 
   const fileToBase64 = useCallback(
     (file: File) =>
@@ -457,30 +523,22 @@ function App() {
     [handleDumpLoad],
   );
 
-  // Handle command execution
+  // Handle command execution. Note what it deliberately no longer does: force
+  // the terminal dock open. The activity bar reports the running command from
+  // every workspace, so firing one never yanks the view you were using.
   const handleCommand = useCallback(
     (cmd: string) => {
       pushCommand(cmd);
-      // Pop the terminal dock open so output is visible, even on panels that
-      // hide it by default (e.g. running a command from Memory).
-      setTerminalDockOpen(true);
 
-      // Handle local clear command
+      // `clear` is a client-side convenience, not a pm3 command.
       if (cmd === "clear") {
         terminalRef.current?.clear();
         return;
       }
 
-      // Send command to WASM client
-      if (wasmState.isReady) {
-        wasmState.sendCommand(cmd);
-      } else if (wasmState.isLoading) {
-        terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
-      } else {
-        terminalRef.current?.writeln("\x1b[31mWASM client failed to load.\x1b[0m");
-      }
+      commandCenter.run(cmd);
     },
-    [pushCommand, wasmState],
+    [commandCenter, pushCommand],
   );
 
   // Write a small text file straight into the cache FS (no React-state round
@@ -555,14 +613,15 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+      localStorage.setItem(TAB_STORAGE_KEY, activeWorkspace);
     }
-  }, [activeTab]);
+  }, [activeWorkspace]);
 
-  // Reset terminal dock visibility to the active panel's default on tab change.
   useEffect(() => {
-    setTerminalDockOpen(COMMAND_PANEL_TABS.has(activeTab));
-  }, [activeTab]);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TERMINAL_DOCK_STORAGE_KEY, terminalDockOpen ? "1" : "0");
+    }
+  }, [terminalDockOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -670,125 +729,127 @@ function App() {
     [cachedDumps, cachedAssets, vaultKeys, vaultCards],
   );
 
-  const hasHardwareTransport = wasmState.availableTransports.length > 0;
-  const activeTransportType =
-    selectedTransport || wasmState.activeTransportType || wasmState.availableTransports[0]?.type;
-  const activeTransportLabel = getTransportLabel(
-    activeTransportType,
-    wasmState.availableTransports,
+  // One derived description of "can this reach the hardware, and if not, where
+  // is it stuck" — shared by the header chip, the activity bar and the panels.
+  const connection = useMemo(
+    () =>
+      deriveConnectionState({
+        isReady: wasmState.isReady,
+        error: wasmState.error,
+        isDeviceConnected: wasmState.isDeviceConnected,
+        isClientAttached: wasmState.isClientAttached,
+        isAttaching: wasmState.isAttaching,
+        isConnecting,
+        availableTransports: wasmState.availableTransports,
+        activeTransportType: selectedTransport || wasmState.activeTransportType,
+      }),
+    [
+      isConnecting,
+      selectedTransport,
+      wasmState.activeTransportType,
+      wasmState.availableTransports,
+      wasmState.error,
+      wasmState.isAttaching,
+      wasmState.isClientAttached,
+      wasmState.isDeviceConnected,
+      wasmState.isReady,
+    ],
   );
-  const wasmStatus = wasmState.isLoading
-    ? { text: "Loading WASM…", dot: "bg-amber-500 status-pulse" }
-    : !wasmState.isReady
-      ? {
-          text: wasmState.error ? `WASM Error: ${wasmState.error.message}` : "WASM Error",
-          dot: "bg-red-500",
-        }
-      : wasmState.isDeviceConnected
-        ? { text: "Device Connected", dot: "bg-green-500" }
-        : isConnecting
-          ? { text: "Connecting…", dot: "bg-amber-500 status-pulse" }
-          : { text: "WASM Ready (Offline)", dot: "bg-blue-500" };
+
+  const hasHardwareTransport = connection.hasHardwareTransport;
+  const activeTransportLabel = connection.transportLabel;
+  // On the Session workspace the terminal *is* the layout, so there is nothing
+  // to dock or undock.
+  const isSessionWorkspace = getWorkspace(activeWorkspace).value === DEFAULT_WORKSPACE;
+
   return (
     <CardTargetContext.Provider value={cardTarget}>
-      <div className="h-dvh overflow-hidden flex flex-col bg-background">
-        {/* Ribbon Toolbar */}
-        <RibbonToolbar
-          connectionStatus={
-            wasmState.isDeviceConnected ? "connected" : isConnecting ? "connecting" : "disconnected"
-          }
-          onConnect={handleConnect}
-          onDisconnect={handleDisconnect}
-          onCommand={handleCommand}
-          onStopOperation={wasmState.sendBreak}
-          onHardReset={wasmState.hardReset}
-          theme={theme}
-          onThemeChange={setTheme}
-          canRunCommands={canRunCommands}
-          cacheItems={cachedAssets}
-          cacheSyncing={isSyncingCache}
-          onCacheUpload={handleCacheUpload}
-          onCacheUse={handleCacheUse}
-          onCacheDelete={handleCacheDelete}
-          onCacheSync={syncCacheToFS}
-          cachePathPrefix={CACHE_PATH_PREFIX}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          availableTransports={wasmState.availableTransports}
-          selectedTransport={selectedTransport || wasmState.activeTransportType}
-          onTransportChange={setSelectedTransport}
-          onJsonUpload={handleJsonUpload}
-        />
-        {/* Persistent active-card strip + guided next steps — one lean band,
+      <CommandCenterContext.Provider value={commandCenter}>
+        <div className="h-dvh overflow-hidden flex flex-col bg-background">
+          {/* Ribbon Toolbar */}
+          <RibbonToolbar
+            connection={connection}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onCommand={handleCommand}
+            onStopOperation={commandCenter.stopActive}
+            onHardReset={wasmState.hardReset}
+            theme={theme}
+            onThemeChange={setTheme}
+            isBusy={commandCenter.isBusy}
+            cacheItems={cachedAssets}
+            cacheSyncing={isSyncingCache}
+            onCacheUpload={handleCacheUpload}
+            onCacheUse={handleCacheUse}
+            onCacheDelete={handleCacheDelete}
+            onCacheSync={syncCacheToFS}
+            cachePathPrefix={CACHE_PATH_PREFIX}
+            activeWorkspace={activeWorkspace}
+            onWorkspaceChange={openWorkspace}
+            activeStrip={activeStrip}
+            onStripChange={setActiveStrip}
+            availableTransports={wasmState.availableTransports}
+            selectedTransport={selectedTransport || wasmState.activeTransportType}
+            onTransportChange={setSelectedTransport}
+            onJsonUpload={handleJsonUpload}
+          />
+          {/* Persistent active-card strip + guided next steps — one lean band,
             visible across every panel. */}
-        <TargetBar
-          onCommand={handleCommand}
-          onOpenTab={setActiveTab}
-          onRefresh={handleRefreshTag}
-          onCopyUid={handleCopyUid}
-          disabled={!canRunCommands}
-        />
-        <MainPanelRouter
-          activeTab={activeTab}
-          terminalDockOpen={terminalDockOpen}
-          onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
-          onDumpWithSavedKeys={handleDumpWithSavedKeys}
-          theme={theme}
-          onThemeChange={setTheme}
-          terminalRef={terminalRef}
-          activeDump={activeDump}
-          cachedDumps={cachedDumps}
-          cachedAssets={cachedAssets}
-          cachePathPrefix={CACHE_PATH_PREFIX}
-          canRunCommands={canRunCommands}
-          isLoading={wasmState.isLoading}
-          isConnecting={isConnecting}
-          isDeviceConnected={wasmState.isDeviceConnected}
-          hasHardwareTransport={hasHardwareTransport}
-          activeTransportLabel={activeTransportLabel}
-          commandHistory={commandHistory}
-          quickCommand={quickCommand}
-          onQuickCommandChange={setQuickCommand}
-          onRunQuickCommand={runQuickCommand}
-          onCommand={handleCommand}
-          onInput={handleTerminalInput}
-          onConnect={() => void handleConnect()}
-          onDisconnect={() => void handleDisconnect()}
-          onCopyUid={handleCopyUid}
-          onOpenMemory={() => setActiveTab("memory")}
-          onOpenShortcuts={() => setActiveTab("actions")}
-          onOpenTab={setActiveTab}
-          onLoadSample={() => handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
-          onRefreshTag={handleRefreshTag}
-          onDumpLoad={handleDumpLoad}
-          onDumpRename={handleDumpRename}
-          onDumpDelete={handleDumpDelete}
-          onClearCache={() => void clearAssets()}
-        />
+          <TargetBar
+            onCommand={handleCommand}
+            onOpenTab={openWorkspace}
+            onRefresh={handleRefreshTag}
+            onCopyUid={handleCopyUid}
+            disabled={!canRunCommands}
+          />
+          <MainPanelRouter
+            activeWorkspace={activeWorkspace}
+            terminalDockOpen={terminalDockOpen}
+            onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+            onDumpWithSavedKeys={handleDumpWithSavedKeys}
+            theme={theme}
+            onThemeChange={setTheme}
+            terminalRef={terminalRef}
+            activeDump={activeDump}
+            cachedDumps={cachedDumps}
+            cachedAssets={cachedAssets}
+            cachePathPrefix={CACHE_PATH_PREFIX}
+            canRunCommands={canRunCommands}
+            isLoading={wasmState.isLoading}
+            isConnecting={isConnecting}
+            isDeviceConnected={wasmState.isDeviceConnected}
+            hasHardwareTransport={hasHardwareTransport}
+            activeTransportLabel={activeTransportLabel}
+            commandHistory={commandHistory}
+            quickCommand={quickCommand}
+            onQuickCommandChange={setQuickCommand}
+            onRunQuickCommand={runQuickCommand}
+            onCommand={handleCommand}
+            onInput={handleTerminalInput}
+            onConnect={() => void handleConnect()}
+            onDisconnect={() => void handleDisconnect()}
+            onCopyUid={handleCopyUid}
+            onOpenTab={openWorkspace}
+            onLoadSample={() => handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
+            onRefreshTag={handleRefreshTag}
+            onDumpLoad={handleDumpLoad}
+            onDumpRename={handleDumpRename}
+            onDumpDelete={handleDumpDelete}
+            onClearCache={() => void clearAssets()}
+          />
 
-        {/* Status Bar */}
-        <div className="border-t border-border bg-card/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
-          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2 md:gap-4">
-              <span className="font-medium text-foreground/90">Proxmark3 Web Client</span>
-              <span className="flex items-center gap-1.5" title={wasmStatus.text}>
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${wasmStatus.dot}`}
-                  aria-hidden="true"
-                />
-                <span className="max-w-[40ch] truncate">{wasmStatus.text}</span>
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span>Commands: {commandHistory.length}</span>
-              <span title="Saved cards, keys, dumps and files across the vault">
-                Vault: {vaultSummary.cards} cards · {vaultSummary.keys} keys · {vaultSummary.dumps}{" "}
-                dumps · {vaultSummary.files} files
-              </span>
-            </div>
-          </div>
+          {/* Activity bar: connection, the running command and the terminal
+            toggle, present on every workspace. */}
+          <ActivityBar
+            connection={connection}
+            vault={vaultSummary}
+            terminalOpen={terminalDockOpen}
+            onToggleTerminal={
+              isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
+            }
+          />
         </div>
-      </div>
+      </CommandCenterContext.Provider>
     </CardTargetContext.Provider>
   );
 }

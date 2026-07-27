@@ -1,10 +1,13 @@
+import type { ConnectionState } from "@/features/connection/model";
 import type { Theme } from "@/hooks/useTheme";
 import type { TransportInfo, TransportType } from "@/lib/transports";
+import type { RibbonStripId } from "./config";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
 export interface RibbonToolbarProps {
-  connectionStatus: ConnectionStatus;
+  /** The single derived connection state (runtime → transport → client). */
+  connection: ConnectionState;
   onConnect: () => void;
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
@@ -12,7 +15,8 @@ export interface RibbonToolbarProps {
   onHardReset?: () => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
-  canRunCommands?: boolean;
+  /** A command is currently executing. */
+  isBusy: boolean;
   cacheItems: import("@/components/panels/KeyCachePanel").CachedAsset[];
   cacheSyncing?: boolean;
   onCacheUpload: (files: FileList | null) => void;
@@ -23,8 +27,12 @@ export interface RibbonToolbarProps {
   onCacheDelete: (id: string) => void;
   onCacheSync: () => void;
   cachePathPrefix?: string;
-  activeTab: string;
-  onTabChange: (value: string) => void;
+  /** Which panel is open. */
+  activeWorkspace: string;
+  onWorkspaceChange: (value: string) => void;
+  /** Which command strip the ribbon is showing (does not affect the panel). */
+  activeStrip: RibbonStripId;
+  onStripChange: (strip: RibbonStripId) => void;
   onJsonUpload?: (files: FileList | null) => void;
   availableTransports?: TransportInfo[];
   selectedTransport?: TransportType | null;
