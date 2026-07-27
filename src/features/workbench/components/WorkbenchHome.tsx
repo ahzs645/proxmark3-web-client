@@ -28,8 +28,6 @@ interface WorkbenchHomeProps {
   onConnect: () => void;
   onDisconnect: () => void;
   onCopyUid: () => void;
-  onOpenMemory: () => void;
-  onOpenShortcuts: () => void;
   onOpenTab: (tab: string) => void;
   onLoadSample: () => void;
   onRefreshTag: () => void;
@@ -57,8 +55,6 @@ export function WorkbenchHome({
   onConnect,
   onDisconnect,
   onCopyUid,
-  onOpenMemory,
-  onOpenShortcuts,
   onOpenTab,
   onLoadSample,
   onRefreshTag,
@@ -90,8 +86,6 @@ export function WorkbenchHome({
               onConnect();
             }
           }}
-          onOpenMemory={onOpenMemory}
-          onOpenShortcuts={onOpenShortcuts}
           onOpenTab={onOpenTab}
           onLoadSample={onLoadSample}
           onRunHfSearch={() => onCommand("hf search")}
@@ -135,7 +129,7 @@ export function WorkbenchHome({
             onCommand={onCommand}
             onConnect={onConnect}
             onCopyUid={onCopyUid}
-            onOpenMemory={onOpenMemory}
+            onOpenTab={onOpenTab}
             onRefreshTag={onRefreshTag}
           />
         )}

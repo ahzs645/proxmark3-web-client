@@ -1,8 +1,32 @@
-import { Activity } from "lucide-react";
+import { Activity, Check, Clock, Loader2, SquareStop } from "lucide-react";
 import { TagInfoPanel } from "@/components/panels/TagInfoPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useCommands } from "@/features/commands/context";
+import type { CommandJob, CommandJobStatus } from "@/features/commands/types";
 import { useTarget } from "@/features/target/context";
+
+const JOB_STATUS_LABEL: Record<CommandJobStatus, string> = {
+  running: "running",
+  queued: "queued",
+  done: "done",
+  stopped: "stopped",
+};
+
+function JobStatusIcon({ status }: { status: CommandJobStatus }) {
+  if (status === "running")
+    return <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />;
+  if (status === "queued") return <Clock className="h-3 w-3 shrink-0 text-muted-foreground/70" />;
+  if (status === "stopped") return <SquareStop className="h-3 w-3 shrink-0 text-destructive" />;
+  return <Check className="h-3 w-3 shrink-0 text-green-500" />;
+}
+
+/** Wall-clock duration of a finished job, e.g. `12s`. */
+function jobDuration(job: CommandJob): string | null {
+  if (!job.startedAt || !job.endedAt) return null;
+  const seconds = Math.max(0, Math.round((job.endedAt - job.startedAt) / 1000));
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}m${seconds % 60}s` : `${seconds}s`;
+}
 
 interface SidebarPaneProps {
   canRunCommands: boolean;
@@ -12,7 +36,7 @@ interface SidebarPaneProps {
   onCommand: (cmd: string) => void;
   onConnect: () => void;
   onCopyUid: () => void;
-  onOpenMemory: () => void;
+  onOpenTab: (tab: string) => void;
   onRefreshTag: () => void;
 }
 
@@ -24,10 +48,11 @@ export function SidebarPane({
   onCommand,
   onConnect,
   onCopyUid,
-  onOpenMemory,
+  onOpenTab,
   onRefreshTag,
 }: SidebarPaneProps) {
   const tagInfo = useTarget().target.identity;
+  const { jobs } = useCommands();
   return (
     <div className="order-1 flex min-h-0 flex-col gap-4 md:order-1">
       <TagInfoPanel
@@ -42,12 +67,38 @@ export function SidebarPane({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Recent Commands
+            This Session
+            {jobs.length > 0 ? (
+              <span className="ml-auto text-[10px] font-normal uppercase tracking-wide text-muted-foreground/70">
+                {jobs.length} command{jobs.length === 1 ? "" : "s"}
+              </span>
+            ) : null}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto">
-          {commandHistory.length > 0 ? (
+          {jobs.length > 0 ? (
             <div className="space-y-1.5">
+              {jobs.slice(0, 12).map((job) => (
+                <button
+                  key={job.id}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left text-xs font-mono text-muted-foreground transition-colors hover:border-border hover:bg-secondary/40 hover:text-foreground"
+                  onClick={() => onCommand(job.command)}
+                  title={`${JOB_STATUS_LABEL[job.status]} · click to run again`}
+                >
+                  <JobStatusIcon status={job.status} />
+                  <span className="min-w-0 flex-1 truncate">{job.command}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                    {jobDuration(job) ?? JOB_STATUS_LABEL[job.status]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : commandHistory.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                From earlier sessions
+              </p>
               {commandHistory
                 .slice(-12)
                 .reverse()
@@ -103,7 +154,7 @@ export function SidebarPane({
                   size="sm"
                   variant="outline"
                   className="justify-start"
-                  onClick={onOpenMemory}
+                  onClick={() => onOpenTab("memory")}
                 >
                   Open Memory Workspace
                 </Button>

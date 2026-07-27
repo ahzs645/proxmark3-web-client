@@ -13,7 +13,7 @@ import {
   type TransportType,
 } from "../../lib/transports";
 import { getGlobalModule } from "./runtimeState";
-import type { WasmModule } from "./types";
+import type { CommandDispatchResult, WasmModule } from "./types";
 import {
   getDevicePath,
   hasExport,
@@ -29,6 +29,8 @@ interface UsePm3CommandChannelParams {
   onErrorRef: MutableRefObject<((error: Error) => void) | undefined>;
   setActiveTransportType: Dispatch<SetStateAction<TransportType | null>>;
   setIsDeviceConnected: Dispatch<SetStateAction<boolean>>;
+  setIsClientAttached: Dispatch<SetStateAction<boolean>>;
+  setIsAttaching: Dispatch<SetStateAction<boolean>>;
   transportManager: ReturnType<typeof getTransportManager>;
 }
 
@@ -38,6 +40,8 @@ export function usePm3CommandChannel({
   onErrorRef,
   setActiveTransportType,
   setIsDeviceConnected,
+  setIsClientAttached,
+  setIsAttaching,
   transportManager,
 }: UsePm3CommandChannelParams) {
   const commandQueueRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -53,6 +57,8 @@ export function usePm3CommandChannel({
       onDisconnect: () => {
         pendingDevicePathRef.current = null;
         setIsDeviceConnected(false);
+        setIsClientAttached(false);
+        setIsAttaching(false);
         setActiveTransportType(null);
       },
       onError: (err) => {
@@ -60,7 +66,14 @@ export function usePm3CommandChannel({
         onErrorRef.current?.(err);
       },
     });
-  }, [onErrorRef, setActiveTransportType, setIsDeviceConnected, transportManager]);
+  }, [
+    onErrorRef,
+    setActiveTransportType,
+    setIsAttaching,
+    setIsClientAttached,
+    setIsDeviceConnected,
+    transportManager,
+  ]);
 
   const normalizeAndReportError = useCallback(
     (error: unknown): Error => {
@@ -102,8 +115,8 @@ export function usePm3CommandChannel({
   }, []);
 
   const enqueueCommand = useCallback(
-    (command: string): Promise<number | void> => {
-      const run = async (): Promise<number | void> => {
+    (command: string): Promise<CommandDispatchResult> => {
+      const run = async (): Promise<CommandDispatchResult> => {
         const module = getGlobalModule();
         if (!module || !isReadyRef.current) {
           throw new Error("WASM client is not ready");
@@ -115,10 +128,14 @@ export function usePm3CommandChannel({
           pendingDevicePathRef.current !== "/dev/webserial";
 
         if (shouldUseStructuredApi) {
-          return executeStructuredCommand(module, command);
+          // Resolves when the command actually returns, so the caller gets a
+          // real completion signal rather than a guess.
+          await executeStructuredCommand(module, command);
+          return "completed";
         }
 
         pushCommandToStdin(command);
+        return "queued";
       };
 
       const queued = commandQueueRef.current.then(run, run);
@@ -150,16 +167,19 @@ export function usePm3CommandChannel({
       });
 
       pendingDeviceConnectRef.current = connectPromise;
+      setIsAttaching(true);
 
       try {
         await connectPromise;
+        setIsClientAttached(true);
       } catch (error) {
         throw normalizeAndReportError(error);
       } finally {
         pendingDeviceConnectRef.current = null;
+        setIsAttaching(false);
       }
     }
-  }, [enqueueCommand, isReadyRef, normalizeAndReportError]);
+  }, [enqueueCommand, isReadyRef, normalizeAndReportError, setIsAttaching, setIsClientAttached]);
 
   useEffect(() => {
     if (!isReady) {
@@ -170,10 +190,11 @@ export function usePm3CommandChannel({
   }, [flushPendingDeviceConnect, isReady]);
 
   const sendCommand = useCallback(
-    (command: string) => {
-      if (!isReadyRef.current) return;
-      void enqueueCommand(command).catch((error) => {
+    (command: string): Promise<CommandDispatchResult> => {
+      if (!isReadyRef.current) return Promise.resolve<CommandDispatchResult>("failed");
+      return enqueueCommand(command).catch((error) => {
         normalizeAndReportError(error);
+        return "failed" as const;
       });
     },
     [enqueueCommand, isReadyRef, normalizeAndReportError],
@@ -204,6 +225,8 @@ export function usePm3CommandChannel({
       console.error("Error disconnecting during hard reset:", e);
     }
     setIsDeviceConnected(false);
+    setIsClientAttached(false);
+    setIsAttaching(false);
 
     const module = getGlobalModule();
     if (module?.HEAPU32) {
@@ -232,7 +255,7 @@ export function usePm3CommandChannel({
 
     await wait(100);
     window.location.reload();
-  }, [setIsDeviceConnected, transportManager]);
+  }, [setIsAttaching, setIsClientAttached, setIsDeviceConnected, transportManager]);
 
   const connectDevice = useCallback(
     async (transportType?: TransportType, device?: TransportDevice): Promise<boolean> => {
@@ -263,8 +286,10 @@ export function usePm3CommandChannel({
 
   const disconnectDevice = useCallback(async (): Promise<void> => {
     pendingDevicePathRef.current = null;
+    setIsClientAttached(false);
+    setIsAttaching(false);
     await transportManager.disconnect();
-  }, [transportManager]);
+  }, [setIsAttaching, setIsClientAttached, transportManager]);
 
   return {
     sendCommand,

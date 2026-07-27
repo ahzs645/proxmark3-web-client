@@ -16,6 +16,8 @@ export function useProxmarkWasm({
   const [isLoading, setIsLoading] = useState(!initialLoaded);
   const [isReady, setIsReady] = useState(initialLoaded);
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
+  const [isClientAttached, setIsClientAttached] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
   const [activeTransportType, setActiveTransportType] = useState<TransportType | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
@@ -58,6 +60,8 @@ export function useProxmarkWasm({
       isReadyRef,
       onErrorRef,
       setActiveTransportType,
+      setIsAttaching,
+      setIsClientAttached,
       setIsDeviceConnected,
       transportManager,
     });
@@ -66,10 +70,13 @@ export function useProxmarkWasm({
     isLoading,
     isReady,
     isDeviceConnected,
+    isClientAttached,
+    isAttaching,
     error,
     sendCommand,
     sendInput,
     sendBreak,
+    flushOutput,
     hardReset,
     connectDevice,
     disconnectDevice,

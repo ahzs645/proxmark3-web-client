@@ -3,6 +3,7 @@ import { ChevronUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Theme } from "@/hooks/useTheme";
 import type { CachedDump, PM3DumpJson } from "@/components/panels/CardMemoryMap";
+import { useCommands } from "@/features/commands/context";
 import { WorkbenchHome } from "./WorkbenchHome";
 import type { CachedAssetWithData } from "../types";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
@@ -55,7 +56,7 @@ function PanelLoading() {
 }
 
 interface MainPanelRouterProps {
-  activeTab: string;
+  activeWorkspace: string;
   terminalDockOpen: boolean;
   onTerminalDockToggle: () => void;
   onDumpWithSavedKeys: (uid: string, cardType: "1k" | "4k") => void;
@@ -81,8 +82,6 @@ interface MainPanelRouterProps {
   onConnect: () => void;
   onDisconnect: () => void;
   onCopyUid: () => void;
-  onOpenMemory: () => void;
-  onOpenShortcuts: () => void;
   onOpenTab: (tab: string) => void;
   onLoadSample: () => void;
   onRefreshTag: () => void;
@@ -93,7 +92,7 @@ interface MainPanelRouterProps {
 }
 
 export function MainPanelRouter({
-  activeTab,
+  activeWorkspace,
   terminalDockOpen,
   onTerminalDockToggle,
   onDumpWithSavedKeys,
@@ -119,8 +118,6 @@ export function MainPanelRouter({
   onConnect,
   onDisconnect,
   onCopyUid,
-  onOpenMemory,
-  onOpenShortcuts,
   onOpenTab,
   onLoadSample,
   onRefreshTag,
@@ -129,9 +126,10 @@ export function MainPanelRouter({
   onDumpDelete,
   onClearCache,
 }: MainPanelRouterProps) {
+  const { isBusy } = useCommands();
   let panel = null;
 
-  if (activeTab === "memory") {
+  if (activeWorkspace === "memory") {
     panel = (
       <div className="flex-1 flex flex-col overflow-hidden p-4">
         <CardMemoryMap
@@ -146,15 +144,15 @@ export function MainPanelRouter({
         />
       </div>
     );
-  } else if (activeTab === "hex") {
+  } else if (activeWorkspace === "hex") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-4xl mx-auto">
-          <HexAsciiViewer dumps={cachedAssets} />
+          <HexAsciiViewer dumps={cachedAssets} activeDump={activeDump} />
         </div>
       </div>
     );
-  } else if (activeTab === "attacks") {
+  } else if (activeWorkspace === "attacks") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
@@ -167,7 +165,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "magic") {
+  } else if (activeWorkspace === "magic") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
@@ -175,7 +173,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "lfops") {
+  } else if (activeWorkspace === "lfops") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
@@ -183,7 +181,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "t55xx") {
+  } else if (activeWorkspace === "t55xx") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-2xl mx-auto">
@@ -191,7 +189,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "traffic") {
+  } else if (activeWorkspace === "traffic") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-4xl mx-auto">
@@ -199,7 +197,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "library") {
+  } else if (activeWorkspace === "library") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
@@ -212,7 +210,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "utilities") {
+  } else if (activeWorkspace === "utilities") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
@@ -220,7 +218,7 @@ export function MainPanelRouter({
         </div>
       </div>
     );
-  } else if (activeTab === "settings") {
+  } else if (activeWorkspace === "settings") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full max-w-xl mx-auto">
@@ -245,9 +243,9 @@ export function MainPanelRouter({
       ) : null}
 
       {/* Keep the workbench (and its terminal) mounted while a panel is open so
-          terminal scrollback and live WASM output survive tab switches. Under a
-          panel it becomes a terminal dock; when the dock is hidden it stays
-          mounted (display:none) so streaming output is never lost. */}
+          terminal scrollback and live WASM output survive workspace switches.
+          Under a panel it becomes a terminal dock; when the dock is hidden it
+          stays mounted (display:none) so streaming output is never lost. */}
       <div
         className={cn(
           "flex min-h-0 flex-col",
@@ -278,23 +276,25 @@ export function MainPanelRouter({
           onConnect={onConnect}
           onDisconnect={onDisconnect}
           onCopyUid={onCopyUid}
-          onOpenMemory={onOpenMemory}
-          onOpenShortcuts={onOpenShortcuts}
           onOpenTab={onOpenTab}
           onLoadSample={onLoadSample}
           onRefreshTag={onRefreshTag}
         />
       </div>
 
-      {/* When the dock is hidden under a panel, offer a slim reopen affordance. */}
+      {/* When the dock is hidden under a panel, offer a slim reopen affordance
+          that also says whether anything is still running down there. */}
       {panel && !terminalDockOpen ? (
         <button
           type="button"
           onClick={onTerminalDockToggle}
-          className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border bg-card/60 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className={cn(
+            "flex shrink-0 items-center justify-center gap-1.5 border-t border-border bg-card/60 py-1.5 text-[11px] font-medium transition-colors hover:bg-accent hover:text-foreground",
+            isBusy ? "text-primary" : "text-muted-foreground",
+          )}
         >
           <ChevronUp className="h-3 w-3" />
-          Show terminal
+          {isBusy ? "Show terminal — command running" : "Show terminal"}
         </button>
       ) : null}
     </div>

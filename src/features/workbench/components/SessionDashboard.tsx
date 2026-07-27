@@ -15,8 +15,6 @@ interface SessionDashboardProps {
   dumpCount: number;
   commandCount: number;
   onToggleConnection: () => void;
-  onOpenMemory: () => void;
-  onOpenShortcuts: () => void;
   onOpenTab: (tab: string) => void;
   onLoadSample: () => void;
   onRunHfSearch: () => void;
@@ -33,8 +31,6 @@ export function SessionDashboard({
   dumpCount,
   commandCount,
   onToggleConnection,
-  onOpenMemory,
-  onOpenShortcuts,
   onOpenTab,
   onLoadSample,
   onRunHfSearch,
@@ -132,11 +128,11 @@ export function SessionDashboard({
           <Button size="sm" variant="secondary" onClick={onRunHfSearch} disabled={!canRunCommands}>
             HF Search
           </Button>
-          <Button size="sm" variant="outline" onClick={onOpenMemory}>
+          <Button size="sm" variant="outline" onClick={() => onOpenTab("memory")}>
             Open Memory
           </Button>
-          <Button size="sm" variant="ghost" onClick={onOpenShortcuts}>
-            Shortcuts
+          <Button size="sm" variant="outline" onClick={() => onOpenTab("library")}>
+            Open Library
           </Button>
         </div>
       </CardContent>
