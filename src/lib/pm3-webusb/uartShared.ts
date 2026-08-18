@@ -118,9 +118,15 @@ export class UartShared {
     }
   }
 
-  pushRx(src: Uint8Array) {
+  /**
+   * Copy as much device data as currently fits in the WASM RX ring buffer.
+   *
+   * Returning the number of copied bytes lets asynchronous transports apply
+   * backpressure instead of dropping the remainder of a serial packet.
+   */
+  pushRx(src: Uint8Array, warnOnPartial = true): number {
     const heap = this.getHeap();
-    if (!heap) return;
+    if (!heap) return 0;
 
     const { heapU8, heapU32 } = heap;
     const cap = this.capacity;
@@ -150,9 +156,11 @@ export class UartShared {
       free = cap - used;
     }
 
-    if (srcOff < src.length) {
+    if (warnOnPartial && srcOff < src.length) {
       console.warn(`pushRx: dropped ${src.length - srcOff} bytes (buffer full)`);
     }
+
+    return srcOff;
   }
 
   popTx(maxBytes: number, out: Uint8Array): number {

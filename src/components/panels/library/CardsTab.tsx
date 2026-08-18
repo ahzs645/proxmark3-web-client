@@ -5,6 +5,7 @@ import type { CachedDump, PM3DumpJson } from "../CardMemoryMap";
 import {
   Clock,
   Copy,
+  CreditCard,
   Edit3,
   FolderOpen,
   HardDrive,
@@ -89,75 +90,80 @@ export function CardsTab({
             const sourceDump = card.sourceDumpId ? dumpMap.get(card.sourceDumpId) : null;
 
             return (
-              <div key={card.id} className="rounded-xl border bg-card/40 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold">{card.name}</h3>
-                      {card.favorite ? <Badge variant="warning">Favorite</Badge> : null}
-                      <Badge variant="outline">{card.type || "Unknown"}</Badge>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="font-mono text-foreground">{card.uid}</span>
-                      {card.sak ? <span>SAK {card.sak}</span> : null}
-                      {card.atqa ? <span>ATQA {card.atqa}</span> : null}
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {relativeTime(card.updatedAt)}
-                      </span>
-                    </div>
-                    <NotesPreview text={card.notes} />
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant={card.favorite ? "default" : "ghost"}
-                      className="h-8 w-8 p-0"
-                      onClick={() => onToggleFavorite(card.id)}
-                    >
-                      <Star className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => copyText(card.uid)}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => onOpenCardEditor(card)}
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
-                      onClick={() => onDeleteCard(card.id)}
-                      aria-label="Delete card"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+              <div key={card.id} className="flex gap-3 rounded-xl border bg-card/40 p-4">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CreditCard className="h-4 w-4" />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold">{card.name}</h3>
+                        {card.favorite ? <Badge variant="warning">Favorite</Badge> : null}
+                        <Badge variant="outline">{card.type || "Unknown"}</Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span className="font-mono text-foreground">{card.uid}</span>
+                        {card.sak ? <span>SAK {card.sak}</span> : null}
+                        {card.atqa ? <span>ATQA {card.atqa}</span> : null}
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {relativeTime(card.updatedAt)}
+                        </span>
+                      </div>
+                      <NotesPreview text={card.notes} />
+                    </div>
 
-                {sourceDump ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onDumpLoad?.(sourceDump.data, sourceDump.name)}
-                    >
-                      <FolderOpen className="h-3 w-3 mr-1" />
-                      Open Source Dump
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant={card.favorite ? "default" : "ghost"}
+                        className="h-8 w-8 p-0"
+                        onClick={() => onToggleFavorite(card.id)}
+                      >
+                        <Star className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => copyText(card.uid)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => onOpenCardEditor(card)}
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+                        onClick={() => onDeleteCard(card.id)}
+                        aria-label="Delete card"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
+
+                  {sourceDump ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onDumpLoad?.(sourceDump.data, sourceDump.name)}
+                      >
+                        <FolderOpen className="h-3 w-3 mr-1" />
+                        Open Source Dump
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             );
           })

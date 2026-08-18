@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execFileSync } = require('child_process');
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
 let SerialPort = null;
 
 try {
-  ({ SerialPort } = require('serialport'));
+  ({ SerialPort } = require("serialport"));
 } catch {
   SerialPort = null;
 }
 
-const repoRoot = path.resolve(__dirname, '..');
-const defaultWasmDir = path.join(repoRoot, 'public', 'wasm');
+const repoRoot = path.resolve(__dirname, "..");
+const defaultWasmDir = path.join(repoRoot, "public", "wasm");
 
 function fail(message) {
   console.error(message);
@@ -32,58 +32,58 @@ function parseArgs(argv) {
     wasmDir: process.env.PM3_WASM_DIR || defaultWasmDir,
     autoQuit: true,
     quiet: false,
-    debugSerial: process.env.PM3_DEBUG_SERIAL === '1',
-    waitForPrompt: process.env.PM3_WAIT_FOR_PROMPT === '1',
-    timings: process.env.PM3_TIMINGS === '1',
+    debugSerial: process.env.PM3_DEBUG_SERIAL === "1",
+    waitForPrompt: process.env.PM3_WAIT_FOR_PROMPT === "1",
+    timings: process.env.PM3_TIMINGS === "1",
   };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
-      case '--port':
-        options.port = argv[++i] || fail('missing value for --port');
+      case "--port":
+        options.port = argv[++i] || fail("missing value for --port");
         break;
-      case '--baud':
-        options.baud = Number(argv[++i] || fail('missing value for --baud'));
+      case "--baud":
+        options.baud = Number(argv[++i] || fail("missing value for --baud"));
         break;
-      case '--timeout-ms':
-        options.timeoutMs = Number(argv[++i] || fail('missing value for --timeout-ms'));
+      case "--timeout-ms":
+        options.timeoutMs = Number(argv[++i] || fail("missing value for --timeout-ms"));
         break;
-      case '--startup-delay-ms':
-        options.startupDelayMs = Number(argv[++i] || fail('missing value for --startup-delay-ms'));
+      case "--startup-delay-ms":
+        options.startupDelayMs = Number(argv[++i] || fail("missing value for --startup-delay-ms"));
         break;
-      case '--settle-ms':
-        options.settleMs = Number(argv[++i] || fail('missing value for --settle-ms'));
+      case "--settle-ms":
+        options.settleMs = Number(argv[++i] || fail("missing value for --settle-ms"));
         break;
-      case '--advance-idle-ms':
-        options.advanceIdleMs = Number(argv[++i] || fail('missing value for --advance-idle-ms'));
+      case "--advance-idle-ms":
+        options.advanceIdleMs = Number(argv[++i] || fail("missing value for --advance-idle-ms"));
         break;
-      case '--wasm-dir':
-        options.wasmDir = path.resolve(argv[++i] || fail('missing value for --wasm-dir'));
+      case "--wasm-dir":
+        options.wasmDir = path.resolve(argv[++i] || fail("missing value for --wasm-dir"));
         break;
-      case '--command':
-        options.commands.push(argv[++i] || fail('missing value for --command'));
+      case "--command":
+        options.commands.push(argv[++i] || fail("missing value for --command"));
         break;
-      case '--expect':
-        options.expect.push(argv[++i] || fail('missing value for --expect'));
+      case "--expect":
+        options.expect.push(argv[++i] || fail("missing value for --expect"));
         break;
-      case '--no-auto-quit':
+      case "--no-auto-quit":
         options.autoQuit = false;
         break;
-      case '--quiet':
+      case "--quiet":
         options.quiet = true;
         break;
-      case '--debug-serial':
+      case "--debug-serial":
         options.debugSerial = true;
         break;
-      case '--wait-for-prompt':
+      case "--wait-for-prompt":
         options.waitForPrompt = true;
         break;
-      case '--timings':
+      case "--timings":
         options.timings = true;
         break;
-      case '--help':
-      case '-h':
+      case "--help":
+      case "-h":
         printHelp();
         process.exit(0);
         break;
@@ -112,18 +112,15 @@ function parseArgs(argv) {
     options.port = autoDetectPort();
   }
   if (!options.port) {
-    fail('no serial port found, pass --port or set PM3_SERIAL_PORT');
+    fail("no serial port found, pass --port or set PM3_SERIAL_PORT");
   }
 
   if (options.commands.length === 0) {
-    options.commands = [
-      'hw connect -p /dev/webserial',
-      'hw version',
-    ];
+    options.commands = ["hw connect -p /dev/webserial", "hw version"];
   }
 
-  if (options.autoQuit && options.commands[options.commands.length - 1] !== 'quit') {
-    options.commands.push('quit');
+  if (options.autoQuit && options.commands[options.commands.length - 1] !== "quit") {
+    options.commands.push("quit");
   }
 
   return options;
@@ -158,7 +155,7 @@ Examples:
 
 function autoDetectPort() {
   try {
-    const devEntries = fs.readdirSync('/dev');
+    const devEntries = fs.readdirSync("/dev");
     const patterns = [
       /^cu\.usbmodem/i,
       /^cu\.usbserial/i,
@@ -172,7 +169,7 @@ function autoDetectPort() {
     for (const pattern of patterns) {
       const match = devEntries.find((entry) => pattern.test(entry));
       if (match) {
-        return path.join('/dev', match);
+        return path.join("/dev", match);
       }
     }
   } catch {
@@ -183,7 +180,8 @@ function autoDetectPort() {
 }
 
 function stripAnsi(text) {
-  return String(text).replace(/\x1b\[[0-9;]*m/g, '');
+  const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+  return String(text).replace(ansiEscape, "");
 }
 
 function formatDuration(ms) {
@@ -216,8 +214,12 @@ class WasmSmokeRunner {
     const line = String(text);
     this.output.push(line);
     if (this.commandSent) {
-      if (this.currentCommand && this.isQuitCommand(this.currentCommand.command) && line.includes('program exited')) {
-        this.completeCurrentCommand('exit');
+      if (
+        this.currentCommand &&
+        this.isQuitCommand(this.currentCommand.command) &&
+        line.includes("program exited")
+      ) {
+        this.completeCurrentCommand("exit");
         this.scheduleFinish();
       }
       if (this.awaitingPrompt && this.currentCommand && !this.isPromptLine(line)) {
@@ -233,7 +235,7 @@ class WasmSmokeRunner {
           clearTimeout(this.commandAdvanceTimer);
           this.commandAdvanceTimer = null;
         }
-        this.completeCurrentCommand('prompt');
+        this.completeCurrentCommand("prompt");
         this.dispatchNextCommand();
       } else if (
         this.awaitingPrompt &&
@@ -244,17 +246,17 @@ class WasmSmokeRunner {
       }
     }
     if (!this.options.quiet) {
-      const printer = kind === 'err' ? console.error : console.log;
+      const printer = kind === "err" ? console.error : console.log;
       printer(line);
     }
   }
 
   isPromptLine(line) {
-    return stripAnsi(line).trimEnd().endsWith('pm3 -->');
+    return stripAnsi(line).trimEnd().endsWith("pm3 -->");
   }
 
   isQuitCommand(command) {
-    return command.trim() === 'quit';
+    return command.trim() === "quit";
   }
 
   printRunner(text) {
@@ -291,7 +293,9 @@ class WasmSmokeRunner {
 
     if (this.options.timings) {
       const elapsedMs = Date.now() - completed.startedAt;
-      this.printRunner(`[runner] command ${completed.sequence}/${this.options.commands.length} ${reason} after ${formatDuration(elapsedMs)}: ${completed.command}`);
+      this.printRunner(
+        `[runner] command ${completed.sequence}/${this.options.commands.length} ${reason} after ${formatDuration(elapsedMs)}: ${completed.command}`,
+      );
     }
   }
 
@@ -311,7 +315,7 @@ class WasmSmokeRunner {
     this.commandAdvanceTimer = setTimeout(() => {
       this.commandAdvanceTimer = null;
       if (!this.finished && this.awaitingPrompt) {
-        this.completeCurrentCommand('idle');
+        this.completeCurrentCommand("idle");
         this.dispatchNextCommand();
       }
     }, this.options.advanceIdleMs);
@@ -320,17 +324,38 @@ class WasmSmokeRunner {
   configurePort() {
     const { port, baud } = this.options;
 
-    if (process.platform === 'darwin') {
-      execFileSync('stty', ['-f', port, String(baud), 'raw', '-echo', '-isig', '-icanon', '-opost']);
+    if (process.platform === "darwin") {
+      execFileSync("stty", [
+        "-f",
+        port,
+        String(baud),
+        "raw",
+        "-echo",
+        "-isig",
+        "-icanon",
+        "-opost",
+      ]);
       return;
     }
 
-    if (process.platform === 'linux') {
-      execFileSync('stty', ['-F', port, String(baud), 'raw', '-echo', '-isig', '-icanon', '-opost']);
+    if (process.platform === "linux") {
+      execFileSync("stty", [
+        "-F",
+        port,
+        String(baud),
+        "raw",
+        "-echo",
+        "-isig",
+        "-icanon",
+        "-opost",
+      ]);
       return;
     }
 
-    this.log('err', `warning: no stty preset for platform ${process.platform}; continuing without TTY setup`);
+    this.log(
+      "err",
+      `warning: no stty preset for platform ${process.platform}; continuing without TTY setup`,
+    );
   }
 
   pushStdin(text) {
@@ -342,12 +367,12 @@ class WasmSmokeRunner {
     const tailIdx = module._pm3_uart_stdin_tail_ptr() >> 2;
     const buf = module._pm3_uart_stdin_buf_ptr();
 
-    for (const byte of Buffer.from(text, 'utf8')) {
+    for (const byte of Buffer.from(text, "utf8")) {
       const head = Atomics.load(heapU32, headIdx) >>> 0;
       const tail = Atomics.load(heapU32, tailIdx) >>> 0;
       const free = cap - ((head - tail) >>> 0);
       if (free <= 0) {
-        throw new Error('stdin ring buffer is full');
+        throw new Error("stdin ring buffer is full");
       }
 
       heapU8[buf + (head % cap)] = byte;
@@ -386,7 +411,10 @@ class WasmSmokeRunner {
     }
 
     if (offset < chunk.length) {
-      this.log('err', `warning: dropped ${chunk.length - offset} RX bytes because the WASM ring buffer is full`);
+      this.log(
+        "err",
+        `warning: dropped ${chunk.length - offset} RX bytes because the WASM ring buffer is full`,
+      );
     }
   }
 
@@ -434,16 +462,16 @@ class WasmSmokeRunner {
         autoOpen: false,
       });
 
-      this.serialPort.on('data', (chunk) => {
+      this.serialPort.on("data", (chunk) => {
         if (this.options.debugSerial) {
-          this.log('log', `[serial] rx ${chunk.length} bytes`);
+          this.log("log", `[serial] rx ${chunk.length} bytes`);
         }
         if (!this.finished) {
           this.pushRx(new Uint8Array(chunk));
         }
       });
 
-      this.serialPort.on('error', (error) => {
+      this.serialPort.on("error", (error) => {
         if (!this.finished) {
           this.finish(1, `serial error: ${error.message}`);
         }
@@ -466,7 +494,7 @@ class WasmSmokeRunner {
           }
 
           if (this.options.debugSerial) {
-            this.log('log', `[serial] tx ${pending.length} bytes`);
+            this.log("log", `[serial] tx ${pending.length} bytes`);
           }
           this.serialPort.write(pending, (writeError) => {
             if (writeError) {
@@ -483,10 +511,7 @@ class WasmSmokeRunner {
   startRawFdBridge() {
     this.configurePort();
     const constants = fs.constants;
-    const openFlags =
-      constants.O_RDWR |
-      (constants.O_NOCTTY || 0) |
-      (constants.O_NONBLOCK || 0);
+    const openFlags = constants.O_RDWR | (constants.O_NOCTTY || 0) | (constants.O_NONBLOCK || 0);
     this.fd = fs.openSync(this.options.port, openFlags);
 
     const rxBuffer = Buffer.allocUnsafe(4096);
@@ -499,12 +524,12 @@ class WasmSmokeRunner {
         const bytesRead = fs.readSync(this.fd, rxBuffer, 0, rxBuffer.length, null);
         if (bytesRead > 0) {
           if (this.options.debugSerial) {
-            this.log('log', `[serial] rx ${bytesRead} bytes`);
+            this.log("log", `[serial] rx ${bytesRead} bytes`);
           }
           this.pushRx(new Uint8Array(rxBuffer.subarray(0, bytesRead)));
         }
       } catch (error) {
-        if (error.code === 'EAGAIN' || error.code === 'EWOULDBLOCK') {
+        if (error.code === "EAGAIN" || error.code === "EWOULDBLOCK") {
           return;
         }
         this.finish(1, `serial read failed: ${error.message}`);
@@ -523,7 +548,7 @@ class WasmSmokeRunner {
 
       try {
         if (this.options.debugSerial) {
-          this.log('log', `[serial] tx ${pending.length} bytes`);
+          this.log("log", `[serial] tx ${pending.length} bytes`);
         }
         fs.writeSync(this.fd, pending, 0, pending.length);
       } catch (error) {
@@ -558,7 +583,9 @@ class WasmSmokeRunner {
         this.quitSent = true;
       }
       if (this.options.timings) {
-        this.printRunner(`[runner] command ${this.commandIndex}/${this.options.commands.length} start: ${command}`);
+        this.printRunner(
+          `[runner] command ${this.commandIndex}/${this.options.commands.length} start: ${command}`,
+        );
       }
       this.pushStdin(`${command}\n`);
       return;
@@ -576,11 +603,11 @@ class WasmSmokeRunner {
     this.finished = true;
 
     if (reason) {
-      this.log('err', reason);
+      this.log("err", reason);
     }
 
     if (this.currentCommand) {
-      this.completeCurrentCommand(reason ? 'stopped' : 'complete');
+      this.completeCurrentCommand(reason ? "stopped" : "complete");
     }
 
     if (this.finishTimer) {
@@ -622,11 +649,11 @@ class WasmSmokeRunner {
       this.fd = null;
     }
 
-    const joined = this.output.join('\n');
+    const joined = this.output.join("\n");
     const missing = this.options.expect.filter((needle) => !joined.includes(needle));
     if (missing.length > 0) {
       for (const needle of missing) {
-        this.log('err', `missing expected output: ${needle}`);
+        this.log("err", `missing expected output: ${needle}`);
       }
       process.exit(1);
     }
@@ -642,7 +669,7 @@ class WasmSmokeRunner {
     // The generated client snapshots process.argv during bootstrap and feeds it
     // into pm3 main(). Keep only a synthetic executable path so the WASM client
     // does not try to parse the smoke runner's own CLI flags.
-    process.argv = [process.argv[0], path.join(__dirname, 'proxmark3.node.cjs')];
+    process.argv = [process.argv[0], path.join(__dirname, "proxmark3.node.cjs")];
 
     globalThis.Module = {
       locateFile: (wasmPath) => path.join(this.options.wasmDir, wasmPath),
@@ -662,18 +689,18 @@ class WasmSmokeRunner {
             this.finish(1, `bridge setup failed: ${error.message}`);
           });
       },
-      print: (...args) => this.log('log', args.join(' ')),
-      printErr: (...args) => this.log('err', args.join(' ')),
+      print: (...args) => this.log("log", args.join(" ")),
+      printErr: (...args) => this.log("err", args.join(" ")),
     };
 
-    require('./proxmark3.node.cjs');
+    require("./proxmark3.node.cjs");
   }
 }
 
 const options = parseArgs(process.argv.slice(2));
 const runner = new WasmSmokeRunner(options);
 
-process.on('SIGINT', () => runner.finish(130, 'interrupted'));
-process.on('SIGTERM', () => runner.finish(143, 'terminated'));
+process.on("SIGINT", () => runner.finish(130, "interrupted"));
+process.on("SIGTERM", () => runner.finish(143, "terminated"));
 
 runner.run();

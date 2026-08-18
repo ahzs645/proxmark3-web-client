@@ -4,6 +4,9 @@ export interface SettingsState {
   confirmDestructiveOps: boolean;
   terminalFontSize: number;
   showAdvancedOptions: boolean;
+  operationProfile: "fast" | "recommended" | "thorough";
+  nativePm3BinaryPath: string;
+  nativePm3Port: string;
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
@@ -12,4 +15,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   confirmDestructiveOps: true,
   terminalFontSize: 14,
   showAdvancedOptions: false,
+  operationProfile: "recommended",
+  nativePm3BinaryPath: "",
+  nativePm3Port: "",
 };

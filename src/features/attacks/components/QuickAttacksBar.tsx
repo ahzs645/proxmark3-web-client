@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { Zap } from "lucide-react";
 import { QUICK_ATTACKS } from "../config";
 
@@ -10,10 +11,9 @@ interface QuickAttacksBarProps {
 export function QuickAttacksBar({ onRunCommand, disabled }: QuickAttacksBarProps) {
   return (
     <div className="border-b bg-secondary/20 p-3">
-      <label className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <Zap className="h-3 w-3" />
+      <SectionLabel icon={<Zap className="h-3 w-3" />} className="mb-2">
         Quick Attacks
-      </label>
+      </SectionLabel>
       <div className="flex flex-wrap gap-2">
         {QUICK_ATTACKS.map((attack) => (
           <Button

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { Zap } from "lucide-react";
 import type { SuggestedAction } from "./types";
 
@@ -20,10 +21,7 @@ export function TagInfoSuggestedActions({
     <>
       <Separator />
       <div className="space-y-2">
-        <label className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          <Zap className="h-3 w-3" />
-          Suggested Actions
-        </label>
+        <SectionLabel icon={<Zap className="h-3 w-3" />}>Suggested Actions</SectionLabel>
         <div className="grid grid-cols-2 gap-1.5">
           {suggestedActions.slice(0, 4).map((action, idx) => (
             <Button

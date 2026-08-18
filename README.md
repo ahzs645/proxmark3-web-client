@@ -10,6 +10,10 @@ A browser-based client for the [Proxmark3](https://github.com/RfidResearchGroup/
 - GUI panels for MIFARE Classic attacks (Autopwn, Nested, Hardnested, Darkside, etc.)
 - Card detection and tag info display
 - Card memory map visualization and dump management
+- Raw Classic `.bin`/`.dump`, Proxmark `.eml`, JSON, and PM3 MFU import/export
+- NFC Type 2/NDEF reader and editor with NTAG213/215/216 safety profiles
+- Browser-native before-image backups, structured reports, and byte-for-byte verification
+- Multi-select MIFARE block read/write with key fallback and failed-block retry
 - LF/HF operations, traffic capture, magic card support
 - Optional Tauri desktop app with native serial and Bluetooth transports
 
@@ -98,6 +102,7 @@ The upstream PM3 codebase intentionally stubbed out `hf mf hardnested` for Emscr
 **File**: `proxmark3wasm/client/Makefile` line ~878
 
 The original Makefile filtered out the hardnested source for Emscripten:
+
 ```makefile
 # Original
 SRCS := $(filter-out cmdhfmfhard.c uart/..., $(SRCS))
@@ -199,18 +204,18 @@ Removed `-sSAFE_HEAP=1` from the linker flags.
 
 ### What Works
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `hw connect`, `hw version`, `hw status`, `hw ping` | Working | |
-| `hf 14a info`, `hf search`, `hf 14a reader` | Working | |
-| `hf mf info`, `hf mf chk`, `hf mf fchk` | Working | Full 4K key check in ~54s |
-| `hf mf rdbl`, `hf mf rdsc` | Working | Reads sectors with known keys |
-| `hf mf darkside` | Working | Correctly reports "not vulnerable" for hard PRNG cards |
-| `hf mf nested` | Working | Correctly reports "not vulnerable" for hard PRNG cards |
-| `hf mf nack` | Working | |
-| `hf mf isen` | Working | Static encrypted nonce collection |
-| `hf mf hardnested` | Working | Collects nonces, reduces state space, brute forces (slow without SIMD) |
-| `hf mf autopwn` | Working | Now uses hardnested for hard-PRNG cards instead of silently failing |
+| Feature                                            | Status  | Notes                                                                  |
+| -------------------------------------------------- | ------- | ---------------------------------------------------------------------- |
+| `hw connect`, `hw version`, `hw status`, `hw ping` | Working |                                                                        |
+| `hf 14a info`, `hf search`, `hf 14a reader`        | Working |                                                                        |
+| `hf mf info`, `hf mf chk`, `hf mf fchk`            | Working | Full 4K key check in ~54s                                              |
+| `hf mf rdbl`, `hf mf rdsc`                         | Working | Reads sectors with known keys                                          |
+| `hf mf darkside`                                   | Working | Correctly reports "not vulnerable" for hard PRNG cards                 |
+| `hf mf nested`                                     | Working | Correctly reports "not vulnerable" for hard PRNG cards                 |
+| `hf mf nack`                                       | Working |                                                                        |
+| `hf mf isen`                                       | Working | Static encrypted nonce collection                                      |
+| `hf mf hardnested`                                 | Working | Collects nonces, reduces state space, brute forces (slow without SIMD) |
+| `hf mf autopwn`                                    | Working | Now uses hardnested for hard-PRNG cards instead of silently failing    |
 
 ### Known Limitations
 
@@ -223,6 +228,7 @@ Removed `-sSAFE_HEAP=1` from the linker flags.
 ### Troubleshooting
 
 **"No port selected by the user"**: The Proxmark3 didn't appear in Chrome's serial picker. Check:
+
 1. Is the device plugged in? (`ls /dev/cu.usbmodem*`)
 2. Is another process holding the port? (`lsof /dev/cu.usbmodem*`)
 3. Close any other tabs/apps that previously connected to the PM3.

@@ -61,3 +61,23 @@ export type DumpDraft = {
 };
 
 export type GroupedKeys = Record<StoredKeyKind, StoredKey[]>;
+
+/**
+ * Keys organized by where they came from, rather than by kind. Each recovered
+ * autopwn/dump run becomes one "session" group tied to its card; keys tagged to
+ * a UID with no surviving dump become a "card" group; everything untagged (the
+ * common/default dictionary) collects in the single "common" group.
+ */
+export type KeyGroupKind = "session" | "card" | "common";
+
+export type KeyGroup = {
+  id: string;
+  title: string;
+  subtitle: string;
+  /** Card UID the group's keys apply to ("" for the common group). */
+  uid: string;
+  /** Id of the dump this session's keys were recovered from, if it still exists. */
+  sourceDumpId: string | null;
+  kind: KeyGroupKind;
+  keys: StoredKey[];
+};

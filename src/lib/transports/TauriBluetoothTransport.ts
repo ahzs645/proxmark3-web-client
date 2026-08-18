@@ -8,9 +8,9 @@
  * - PIN: 1234
  */
 
-import { uartShared } from '../pm3WebUSB';
-import { isTauri, invoke } from '../tauri';
-import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from './types';
+import { uartShared } from "../pm3WebUSB";
+import { isTauri, invoke } from "../tauri";
+import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from "./types";
 
 interface BluetoothDeviceInfo {
   address: string;
@@ -20,7 +20,7 @@ interface BluetoothDeviceInfo {
 }
 
 export class TauriBluetoothTransport implements Transport {
-  readonly type: TransportType = 'tauri-bluetooth';
+  readonly type: TransportType = "tauri-bluetooth";
 
   private _isConnected: boolean = false;
   private readLoopRunning: boolean = false;
@@ -28,7 +28,7 @@ export class TauriBluetoothTransport implements Transport {
   private eventHandlers: TransportEventHandlers = {};
 
   // Proxmark3 X default PIN
-  private static readonly PM3_PIN = '1234';
+  private static readonly PM3_PIN = "1234";
 
   get isConnected(): boolean {
     return this._isConnected;
@@ -42,15 +42,15 @@ export class TauriBluetoothTransport implements Transport {
     if (!this.isAvailable()) return [];
 
     try {
-      const devices = await invoke<BluetoothDeviceInfo[]>('bt_list_devices');
-      return devices.map(device => ({
+      const devices = await invoke<BluetoothDeviceInfo[]>("bt_list_devices");
+      return devices.map((device) => ({
         id: device.address,
-        name: `${device.name} ${device.paired ? '(Paired)' : ''} ${device.connected ? '[Connected]' : ''}`,
+        name: `${device.name} ${device.paired ? "(Paired)" : ""} ${device.connected ? "[Connected]" : ""}`,
         type: this.type,
         address: device.address,
       }));
     } catch (error) {
-      console.error('Failed to list Bluetooth devices:', error);
+      console.error("Failed to list Bluetooth devices:", error);
       return [];
     }
   }
@@ -59,22 +59,22 @@ export class TauriBluetoothTransport implements Transport {
     if (!this.isAvailable()) return [];
 
     try {
-      const devices = await invoke<BluetoothDeviceInfo[]>('bt_scan_devices');
-      return devices.map(device => ({
+      const devices = await invoke<BluetoothDeviceInfo[]>("bt_scan_devices");
+      return devices.map((device) => ({
         id: device.address,
-        name: `${device.name} ${device.paired ? '(Paired)' : ''} ${device.connected ? '[Connected]' : ''}`,
+        name: `${device.name} ${device.paired ? "(Paired)" : ""} ${device.connected ? "[Connected]" : ""}`,
         type: this.type,
         address: device.address,
       }));
     } catch (error) {
-      console.error('Failed to scan Bluetooth devices:', error);
+      console.error("Failed to scan Bluetooth devices:", error);
       return [];
     }
   }
 
   async connect(device?: TransportDevice): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.error('Tauri Bluetooth not available');
+      console.error("Tauri Bluetooth not available");
       return false;
     }
 
@@ -86,9 +86,8 @@ export class TauriBluetoothTransport implements Transport {
       } else {
         // Auto-detect: try to find a Proxmark3 device
         const devices = await this.scanDevices();
-        const pm3Device = devices.find(d =>
-          d.name.toLowerCase().includes('proxmark') ||
-          d.name.toLowerCase().includes('pm3')
+        const pm3Device = devices.find(
+          (d) => d.name.toLowerCase().includes("proxmark") || d.name.toLowerCase().includes("pm3"),
         );
 
         if (pm3Device) {
@@ -97,13 +96,13 @@ export class TauriBluetoothTransport implements Transport {
           // Fall back to first available device
           address = devices[0].address || devices[0].id;
         } else {
-          throw new Error('No Bluetooth devices available. Please pair Proxmark3 X first.');
+          throw new Error("No Bluetooth devices available. Please pair Proxmark3 X first.");
         }
       }
 
       console.log(`Connecting to Bluetooth device: ${address}`);
 
-      const success = await invoke<boolean>('bt_connect', {
+      const success = await invoke<boolean>("bt_connect", {
         address,
         pin: TauriBluetoothTransport.PM3_PIN,
       });
@@ -122,7 +121,7 @@ export class TauriBluetoothTransport implements Transport {
 
       return success;
     } catch (error) {
-      console.error('Bluetooth connection failed:', error);
+      console.error("Bluetooth connection failed:", error);
       this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
       return false;
     }
@@ -133,9 +132,9 @@ export class TauriBluetoothTransport implements Transport {
     this.stopTxLoop();
 
     try {
-      await invoke('bt_disconnect');
+      await invoke("bt_disconnect");
     } catch (error) {
-      console.error('Error disconnecting Bluetooth:', error);
+      console.error("Error disconnecting Bluetooth:", error);
     }
 
     this._isConnected = false;
@@ -146,7 +145,7 @@ export class TauriBluetoothTransport implements Transport {
   startReadLoop(): void {
     if (this.readLoopRunning) return;
     this.readLoopRunning = true;
-    this.runReadLoop();
+    void this.runReadLoop();
   }
 
   stopReadLoop(): void {
@@ -156,16 +155,16 @@ export class TauriBluetoothTransport implements Transport {
   private async runReadLoop(): Promise<void> {
     while (this.readLoopRunning && this._isConnected) {
       try {
-        const data = await invoke<number[]>('bt_read', { maxBytes: 4096 });
+        const data = await invoke<number[]>("bt_read", { maxBytes: 4096 });
         if (data && data.length > 0) {
           const uint8Data = new Uint8Array(data);
           uartShared.pushRx(uint8Data);
           this.eventHandlers.onData?.(uint8Data);
         }
-      } catch (error) {
+      } catch {
         // Check if still connected
         try {
-          const connected = await invoke<boolean>('bt_is_connected');
+          const connected = await invoke<boolean>("bt_is_connected");
           if (!connected) {
             this._isConnected = false;
             this.readLoopRunning = false;
@@ -178,14 +177,14 @@ export class TauriBluetoothTransport implements Transport {
       }
 
       // Small delay to prevent busy-looping
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
 
   startTxLoop(): void {
     if (this.txLoopRunning) return;
     this.txLoopRunning = true;
-    this.runTxLoop();
+    void this.runTxLoop();
   }
 
   stopTxLoop(): void {
@@ -200,13 +199,13 @@ export class TauriBluetoothTransport implements Transport {
         const n = uartShared.popTx(tmp.length, tmp);
         if (n > 0) {
           const dataToSend = Array.from(tmp.subarray(0, n));
-          await invoke('bt_write', { data: dataToSend });
+          await invoke("bt_write", { data: dataToSend });
         } else {
           // Sleep a bit to avoid busy-looping
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
       } catch (error) {
-        console.error('Bluetooth TX error:', error);
+        console.error("Bluetooth TX error:", error);
         this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     }
@@ -217,11 +216,11 @@ export class TauriBluetoothTransport implements Transport {
   }
 
   getName(): string {
-    return 'Bluetooth (SPP)';
+    return "Bluetooth (SPP)";
   }
 
   getDescription(): string {
-    return 'Connect via Bluetooth Serial Port Profile (Proxmark3 X)';
+    return "Connect via Bluetooth Serial Port Profile (Proxmark3 X)";
   }
 }
 

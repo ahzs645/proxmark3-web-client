@@ -24,11 +24,11 @@ interface MemoryMapHeaderProps {
   searchFilter: string;
   showCachePanel: boolean;
   cachedDumpCount: number;
-  onJsonUpload: (files: FileList | null) => void;
+  onDumpUpload: (files: FileList | null) => void;
   onSearchFilterChange: (value: string) => void;
   onToggleCachePanel: () => void;
   onToggleShowKeys: () => void;
-  onExportDump: () => void;
+  onExportDump: (format: "json" | "bin" | "eml") => void;
   onDump: () => void;
   onAutopwn: () => void;
   /** Dump the card seeding autopwn with keys saved in the library. */
@@ -49,7 +49,7 @@ export function MemoryMapHeader({
   searchFilter,
   showCachePanel,
   cachedDumpCount,
-  onJsonUpload,
+  onDumpUpload,
   onSearchFilterChange,
   onToggleCachePanel,
   onToggleShowKeys,
@@ -74,26 +74,41 @@ export function MemoryMapHeader({
             <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
               <span>
                 <FileJson className="mr-1 h-3 w-3" />
-                Load JSON
+                Load Dump
               </span>
             </Button>
             <input
               type="file"
-              accept=".json"
-              onChange={(e) => onJsonUpload(e.target.files)}
+              accept=".json,.bin,.dump,.eml,.txt"
+              onChange={(e) => {
+                onDumpUpload(e.target.files);
+                e.target.value = "";
+              }}
               className="hidden"
             />
           </label>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onExportDump}
-            disabled={!activeDump}
-            className="h-7 text-xs"
-          >
-            <Download className="mr-1 h-3 w-3" />
-            Export JSON
-          </Button>
+          <label className="relative">
+            <span className="pointer-events-none flex h-7 items-center rounded-md border border-input bg-background px-2 text-xs">
+              <Download className="mr-1 h-3 w-3" /> Export
+            </span>
+            <select
+              aria-label="Export dump format"
+              disabled={!activeDump}
+              value=""
+              onChange={(event) => {
+                const format = event.target.value as "json" | "bin" | "eml";
+                if (format) onExportDump(format);
+              }}
+              className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            >
+              <option value="" disabled>
+                Export format
+              </option>
+              <option value="json">PM3 JSON</option>
+              <option value="bin">Raw binary</option>
+              <option value="eml">Proxmark EML</option>
+            </select>
+          </label>
           <Button size="sm" variant="ghost" onClick={onToggleShowKeys} className="h-7 text-xs">
             {showKeys ? <EyeOff className="mr-1 h-3 w-3" /> : <Eye className="mr-1 h-3 w-3" />}
             Keys

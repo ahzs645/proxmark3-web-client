@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTarget } from "@/features/target/context";
 import type { CachedDump, PM3DumpJson } from "./CardMemoryMap";
@@ -9,18 +10,32 @@ import { FolderOpen } from "lucide-react";
 import { CardsTab } from "./library/CardsTab";
 import { DumpsTab } from "./library/DumpsTab";
 import { KeysTab } from "./library/KeysTab";
+import { LfCardsTab } from "./library/LfCardsTab";
+import { AuditTab } from "./library/AuditTab";
 import { CardDialog, DumpDialog, KeyDialog } from "./library/LibraryDialogs";
 import type {
   CardDraft,
   DumpDraft,
-  GroupedKeys,
   KeyDraft,
   StoredCard,
   StoredDumpMeta,
   StoredKey,
 } from "./library/types";
-import { defaultCardName, exportStoredKeys, extractDumpKeys, getDumpUid } from "./library/utils";
-import { useVaultCards, useVaultDumps, useVaultKeys } from "@/features/vault/hooks";
+import {
+  defaultCardName,
+  exportStoredKeys,
+  extractDumpKeys,
+  getDumpUid,
+  groupKeysBySource,
+} from "./library/utils";
+import {
+  useVaultCards,
+  useVaultDumps,
+  useVaultKeys,
+  useVaultLfCards,
+  useVaultOperations,
+  useVaultBackups,
+} from "@/features/vault/hooks";
 import {
   deleteCard,
   deleteKey,
@@ -36,6 +51,8 @@ interface LibraryPanelProps {
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
   onDumpRename?: (id: string, newName: string) => void;
   onDumpDelete?: (id: string) => void;
+  /** Navigate to another workspace (e.g. the Magic panel to write a card). */
+  onOpenTab?: (tab: string) => void;
 }
 
 export function LibraryPanel({
@@ -43,6 +60,7 @@ export function LibraryPanel({
   onDumpLoad,
   onDumpRename,
   onDumpDelete,
+  onOpenTab,
 }: LibraryPanelProps) {
   const currentTag = useTarget().target.identity;
 
@@ -51,6 +69,9 @@ export function LibraryPanel({
   const cards = useVaultCards();
   const keys = useVaultKeys();
   const cachedDumps = useVaultDumps();
+  const lfCards = useVaultLfCards();
+  const operations = useVaultOperations();
+  const backups = useVaultBackups();
 
   const [cardSearch, setCardSearch] = useState("");
   const [keySearch, setKeySearch] = useState("");
@@ -106,13 +127,9 @@ export function LibraryPanel({
     );
   }, [keySearch, keys]);
 
-  const groupedKeys = useMemo<GroupedKeys>(
-    () => ({
-      public: filteredKeys.filter((key) => key.kind === "public"),
-      private: filteredKeys.filter((key) => key.kind === "private"),
-      history: filteredKeys.filter((key) => key.kind === "history"),
-    }),
-    [filteredKeys],
+  const keyGroups = useMemo(
+    () => groupKeysBySource(filteredKeys, dumpMap, cards),
+    [filteredKeys, dumpMap, cards],
   );
 
   const filteredDumps = useMemo(() => {
@@ -133,7 +150,7 @@ export function LibraryPanel({
   }, [cachedDumps, dumpMetaMap, dumpSearch]);
 
   const currentTagCardDraft = useMemo<CardDraft | null>(() => {
-    if (!currentTag?.uid) return null;
+    if (!currentTag?.uid || currentTag.protocol === "LF") return null;
 
     const uid = sanitizeHex(currentTag.uid, 20);
     return {
@@ -180,6 +197,19 @@ export function LibraryPanel({
   const importActiveDumpKeys = () => {
     if (!activeDumpKeyDrafts.length) return;
     void importKeyDrafts(activeDumpKeyDrafts, keys);
+  };
+
+  const openDumpById = (dumpId: string) => {
+    const dump = dumpMap.get(dumpId);
+    if (dump) onDumpLoad?.(dump.data, dump.name);
+  };
+
+  // "Write card" from a key group: make the group's card the active target (via
+  // its source dump when we still have it) and hand off to the Magic/clone panel
+  // where the recovered keys and UID are already in scope.
+  const writeCardFromGroup = (group: (typeof keyGroups)[number]) => {
+    if (group.sourceDumpId) openDumpById(group.sourceDumpId);
+    onOpenTab?.("magic");
   };
 
   // Called with null/undefined to start a blank manual entry
@@ -249,13 +279,7 @@ export function LibraryPanel({
 
   return (
     <Card className="flex flex-col h-full overflow-hidden">
-      <CardHeader className="border-b pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-primary" />
-          Browser Library
-          <Badge variant="outline">Local Only</Badge>
-        </CardTitle>
-      </CardHeader>
+      <PanelHeader icon={FolderOpen} title="Browser Library" tag="Local Only" />
 
       <CardContent className="flex-1 overflow-auto p-4">
         <Tabs defaultValue="cards" className="space-y-4">
@@ -264,11 +288,16 @@ export function LibraryPanel({
               <TabsTrigger value="cards">Cards</TabsTrigger>
               <TabsTrigger value="keys">Keys</TabsTrigger>
               <TabsTrigger value="dumps">Dumps</TabsTrigger>
+              <TabsTrigger value="lf">LF</TabsTrigger>
+              <TabsTrigger value="audit">Audit & backups</TabsTrigger>
             </TabsList>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary">{cards.length} cards</Badge>
               <Badge variant="secondary">{keys.length} keys</Badge>
               <Badge variant="secondary">{cachedDumps.length} dumps</Badge>
+              <Badge variant="secondary">{lfCards.length} LF</Badge>
+              <Badge variant="secondary">{operations.length} reports</Badge>
+              <Badge variant="secondary">{backups.length} backups</Badge>
             </div>
           </div>
 
@@ -293,7 +322,8 @@ export function LibraryPanel({
           <TabsContent value="keys" className="m-0">
             <KeysTab
               keySearch={keySearch}
-              groupedKeys={groupedKeys}
+              keyGroups={keyGroups}
+              totalKeys={keys.length}
               canImportActiveDumpKeys={activeDumpKeyDrafts.length > 0}
               onKeySearchChange={setKeySearch}
               onOpenKeyEditor={openKeyEditor}
@@ -301,6 +331,8 @@ export function LibraryPanel({
               onImportDefaultKeys={importDefaultKeys}
               onImportActiveDumpKeys={importActiveDumpKeys}
               onExportKeys={() => exportStoredKeys(filteredKeys)}
+              onOpenDump={openDumpById}
+              onWriteCard={writeCardFromGroup}
             />
           </TabsContent>
 
@@ -326,6 +358,14 @@ export function LibraryPanel({
                 sourceDumpId: dump.id,
               })}
             />
+          </TabsContent>
+
+          <TabsContent value="lf" className="m-0">
+            <LfCardsTab />
+          </TabsContent>
+
+          <TabsContent value="audit" className="m-0">
+            <AuditTab />
           </TabsContent>
         </Tabs>
       </CardContent>

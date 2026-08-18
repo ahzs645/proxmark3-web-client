@@ -6,6 +6,7 @@ import { T55xxOperationsSection } from "@/features/lf-tools/t55xx/T55xxOperation
 import { T55xxAdvancedSection } from "@/features/lf-tools/t55xx/T55xxAdvancedSection";
 import { T55xxQuickCommandsSection } from "@/features/lf-tools/t55xx/T55xxQuickCommandsSection";
 import { T55xxWarningSection } from "@/features/lf-tools/t55xx/T55xxWarningSection";
+import { LFWriteSection } from "@/features/lf-tools/write/LFWriteSection";
 import { useT55xxPanelState } from "@/features/lf-tools/t55xx/useT55xxPanelState";
 import {
   buildEm410xCloneCommand,
@@ -61,6 +62,8 @@ export function T55xxPanel({ onCommand, disabled = false }: T55xxPanelProps) {
     <Card className="flex flex-col h-full overflow-hidden">
       <T55xxPanelHeader disabled={disabled} onDetect={handleDetect} />
       <CardContent className="flex-1 overflow-auto p-0">
+        <LFWriteSection onCommand={onCommand} disabled={disabled} />
+        <Separator />
         <T55xxEm410xSection
           emId={emId}
           chipType={chipType}

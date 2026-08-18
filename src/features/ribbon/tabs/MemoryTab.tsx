@@ -32,10 +32,10 @@ export function MemoryTab({
           className="relative h-7 gap-1 overflow-hidden px-2 text-xs"
         >
           <FileJson className="h-3 w-3" />
-          JSON Dump
+          Card Dump
           <input
             type="file"
-            accept=".json"
+            accept=".json,.bin,.dump,.eml,.txt"
             onChange={(e) => {
               onJsonUpload?.(e.target.files);
               e.target.value = "";

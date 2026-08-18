@@ -1,4 +1,5 @@
 mod bluetooth;
+mod native_pm3;
 mod serial;
 
 use tauri::Manager;
@@ -23,6 +24,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_platform,
+            // Optional installed-client runtime (no bundled executable)
+            native_pm3::native_pm3_probe,
+            native_pm3::native_pm3_run,
             // Serial commands
             serial::serial_list_ports,
             serial::serial_connect,

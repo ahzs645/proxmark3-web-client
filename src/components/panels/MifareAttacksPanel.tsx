@@ -1,6 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { KeyRound, Shield, Sparkles } from "lucide-react";
 import type { CachedAsset } from "./KeyCachePanel";
 import { useTarget } from "@/features/target/context";
@@ -43,18 +44,14 @@ export function MifareAttacksPanel({
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
-      <CardHeader className="border-b pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Shield className="h-4 w-4 text-primary" />
-            MIFARE Attacks
-            <Badge variant="outline" className="ml-1">
-              Key Recovery
-            </Badge>
-          </CardTitle>
+      <PanelHeader
+        icon={Shield}
+        title="MIFARE Attacks"
+        tag="Key Recovery"
+        actions={
           <AttacksHeader cardType={attacks.cardType} onCardTypeChange={attacks.setCardType} />
-        </div>
-      </CardHeader>
+        }
+      />
 
       <CardContent className="flex-1 overflow-auto p-0">
         {detectedCardType ? (

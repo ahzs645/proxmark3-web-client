@@ -1,5 +1,6 @@
-import { Separator } from "@/components/ui/separator";
 import type { ReactNode } from "react";
+import { Separator } from "@/components/ui/separator";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 
 interface SettingsSectionProps {
   icon: ReactNode;
@@ -10,10 +11,7 @@ interface SettingsSectionProps {
 export function SettingsSection({ icon, title, children }: SettingsSectionProps) {
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {title}
-      </label>
+      <SectionLabel icon={icon}>{title}</SectionLabel>
       {children}
       <Separator />
     </div>

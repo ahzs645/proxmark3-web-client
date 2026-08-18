@@ -62,8 +62,49 @@ export function buildEm410xCloneCommand(id: string): string | null {
   return `lf em 410x clone --id ${clean}`;
 }
 
+export interface HidCloneInput {
+  format?: string;
+  facilityCode?: number | string;
+  cardNumber?: number | string;
+  raw?: string;
+}
+
+/**
+ * Build the command that writes an HID Prox credential onto a T5577.
+ * Prefers the wiegand format + FC/CN form (`-w H10301 --fc .. --cn ..`); falls
+ * back to the raw form when only a raw dword is known.
+ */
+export function buildHidCloneCommand(input: HidCloneInput): string | null {
+  const format = (input.format ?? "").trim();
+  const fc = `${input.facilityCode ?? ""}`.trim();
+  const cn = `${input.cardNumber ?? ""}`.trim();
+  if (format && fc !== "" && cn !== "" && /^\d+$/.test(fc) && /^\d+$/.test(cn)) {
+    return `lf hid clone -w ${format} --fc ${fc} --cn ${cn}`;
+  }
+  const raw = sanitizeHex(input.raw ?? "", 24);
+  if (raw.length >= 8) return `lf hid clone -r ${raw}`;
+  return null;
+}
+
+/** Simulate an HID credential from the Proxmark (no blank card needed). */
+export function buildHidSimCommand(input: HidCloneInput): string | null {
+  const cmd = buildHidCloneCommand(input);
+  if (!cmd) return null;
+  return cmd.replace("lf hid clone", "lf hid sim");
+}
+
 export function buildT55xxDetectCommand(usePassword: boolean, password: string): string {
   return usePassword ? `lf t55xx detect -p ${password}` : "lf t55xx detect";
+}
+
+/** Read-only blank-card probe that tries every supported T55xx downlink mode. */
+export function buildT55xxBlankProbeCommand(): string {
+  return "lf t55xx detect --all";
+}
+
+/** Read-only identity probe for EM4205/4305/4469/4569 writable LF chips. */
+export function buildEm4x05InfoCommand(): string {
+  return "lf em 4x05 info";
 }
 
 export function buildT55xxDumpCommand(usePassword: boolean, password: string): string {

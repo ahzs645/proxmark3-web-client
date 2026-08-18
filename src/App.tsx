@@ -13,9 +13,30 @@ import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter
 import { type EmscriptenFSLike } from "@/features/workbench/types";
 import { buildKeyDictionary } from "@/components/panels/library/utils";
 import { vaultStats } from "@/features/vault/vault";
-import { useVaultAssets, useVaultCards, useVaultKeys } from "@/features/vault/hooks";
-import { clearAssets, deleteAsset, importDumpKeys, putAsset } from "@/features/vault/operations";
+import {
+  useVaultAssets,
+  useVaultCards,
+  useVaultKeys,
+  useVaultLfCards,
+  useVaultOperations,
+} from "@/features/vault/hooks";
+import {
+  clearAssets,
+  deleteAsset,
+  importDumpKeys,
+  lfMatchKey,
+  putAsset,
+  putOperation,
+  setLfCardMeta,
+  upsertLfCard,
+} from "@/features/vault/operations";
 import type { AssetRecord } from "@/features/vault/db";
+import {
+  lfCredentialToTagInfo,
+  parseLfCredential,
+  parseT55xxDetect,
+} from "@/features/lf-tools/lfParse";
+import { parseMagicInfo } from "@/features/magic/detect";
 import {
   DEFAULT_WORKSPACE,
   getWorkspace,
@@ -23,16 +44,20 @@ import {
   type RibbonStripId,
 } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
+import { importDumpFile } from "@/features/memory/lib/import";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
 import { CardTargetContext } from "@/features/target/context";
-import { TargetBar } from "@/features/target/TargetBar";
 import { CommandCenterContext } from "@/features/commands/context";
 import { isPromptLine } from "@/features/commands/prompt";
 import type { CommandCenter } from "@/features/commands/types";
 import { useCommandCenter } from "@/features/commands/useCommandCenter";
 import { deriveConnectionState } from "@/features/connection/model";
 import { ActivityBar } from "@/features/workbench/components/ActivityBar";
+import { operationFromJob } from "@/features/operations/classify";
+import { DeviceProfileContext } from "@/features/device/context";
+import { emptyDeviceProfile, inferDeviceProfile } from "@/features/device/infer";
+import type { DeviceProfile } from "@/features/device/types";
 
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TERMINAL_DOCK_STORAGE_KEY = "pm3-terminal-dock";
@@ -77,9 +102,13 @@ function App() {
     return saved && TRANSPORT_TYPES.includes(saved) ? saved : null;
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  const [deviceProfile, setDeviceProfile] = useState<DeviceProfile>(emptyDeviceProfile);
   const { commandHistory, pushCommand } = useCommandHistory();
   const { theme, setTheme } = useTheme();
   const outputLineBufferRef = useRef("");
+  const structuredOutputLinesRef = useRef<string[]>([]);
+  const activeLfCardIdRef = useRef<string | null>(null);
+  const lfUpsertQueueRef = useRef<Promise<void>>(Promise.resolve());
   const writeTerminalLine = useCallback((line: string) => {
     terminalRef.current?.writeln(line);
   }, []);
@@ -105,6 +134,8 @@ function App() {
   const cachedAssets = useVaultAssets();
   const vaultKeys = useVaultKeys();
   const vaultCards = useVaultCards();
+  const vaultLfCards = useVaultLfCards();
+  const vaultOperations = useVaultOperations();
   const [isSyncingCache, setIsSyncingCache] = useState(false);
 
   // The active "card target" — the single source of truth for the card the
@@ -117,8 +148,54 @@ function App() {
     cachedAssets,
     allKeys: vaultKeys,
   });
-  const { mergeIdentity, clearTarget } = cardTarget;
+  const { mergeIdentity, setIdentity, clearTarget, noteLfIdentify, noteMagicIdentify } = cardTarget;
   const tagInfo = cardTarget.target.identity;
+
+  // Parse LF credentials and carrier/magic detects out of terminal output.
+  // LF reads print no file, so this is what gives a read a home in the vault and
+  // feeds the write/clone UIs their "is the target writable?" gate.
+  const parseWriteTargets = useCallback(
+    (text: string) => {
+      const cred = parseLfCredential(text);
+      if (cred) {
+        const uid = cred.raw ?? lfMatchKey(cred);
+        setIdentity(lfCredentialToTagInfo(cred), "scan");
+        // The same command is parsed line-by-line and once more as a complete
+        // result. Serialize the writes so both passes converge on one row even
+        // when IndexedDB has not finished the first insert yet.
+        lfUpsertQueueRef.current = lfUpsertQueueRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            const record = await upsertLfCard({ ...cred, uid }, lfMatchKey(cred));
+            activeLfCardIdRef.current = record.id;
+          });
+      }
+      const t55 = parseT55xxDetect(text);
+      if (t55) {
+        if (t55.chip && !t55.error) {
+          if (!tagInfo || tagInfo.protocol !== "LF") {
+            setIdentity({ type: t55.chip, protocol: "LF", subtype: "T55xx" }, "scan");
+          } else if (!tagInfo.uid) {
+            mergeIdentity({ type: t55.chip, protocol: "LF", subtype: "T55xx" }, "scan");
+          }
+        }
+        noteLfIdentify({ ...t55, at: Date.now() });
+        const activeLfCardId = activeLfCardIdRef.current;
+        if (activeLfCardId && !t55.error) {
+          void setLfCardMeta(activeLfCardId, {
+            chip: t55.chip,
+            config: t55.config,
+            writable: t55.writable,
+          });
+        }
+      }
+      const magic = parseMagicInfo(text);
+      if (magic) {
+        noteMagicIdentify({ ...magic, at: Date.now() });
+      }
+    },
+    [mergeIdentity, noteLfIdentify, noteMagicIdentify, setIdentity, tagInfo],
+  );
 
   // Parse tag information from output and feed it into the active card target.
   const parseTagInfo = useCallback(
@@ -301,12 +378,22 @@ function App() {
   const handleWasmOutput = useCallback(
     (text: string) => {
       terminalRef.current?.write(text);
-      parseTagInfo(text);
+      if (text) commandCenterRef.current?.noteOutputActivity();
 
       const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       const lines = `${outputLineBufferRef.current}${normalized}`.split("\n");
       outputLineBufferRef.current = lines.pop() ?? "";
       lines.forEach((line) => {
+        // Hardware output is delivered in arbitrary chunks. Parse completed
+        // lines immediately, then parse the full command again at the prompt
+        // so multi-line values (such as HID raw data and T55xx metadata) are
+        // captured together.
+        structuredOutputLinesRef.current.push(line);
+        if (structuredOutputLinesRef.current.length > 2000) {
+          structuredOutputLinesRef.current.splice(0, 1000);
+        }
+        parseTagInfo(line);
+        parseWriteTargets(line);
         processGeneratedOutputLine(line);
         commandCenterRef.current?.noteOutputLine(line);
       });
@@ -317,11 +404,21 @@ function App() {
       // newline that never comes.
       const tail = outputLineBufferRef.current;
       if (tail && isPromptLine(tail)) {
+        const completedOutput = structuredOutputLinesRef.current.join("\n");
+        if (completedOutput) {
+          parseTagInfo(completedOutput);
+          parseWriteTargets(completedOutput);
+          const activeCommand = commandCenterRef.current?.activeJob?.command;
+          setDeviceProfile((profile) =>
+            inferDeviceProfile(profile, completedOutput, activeCommand),
+          );
+        }
+        structuredOutputLinesRef.current = [];
         commandCenterRef.current?.noteOutputLine(tail);
         outputLineBufferRef.current = "";
       }
     },
-    [parseTagInfo, processGeneratedOutputLine],
+    [parseTagInfo, parseWriteTargets, processGeneratedOutputLine],
   );
 
   // WASM hooks
@@ -500,23 +597,19 @@ function App() {
     void deleteAsset(id);
   }, []);
 
-  // Handle loading a dump (from file or cache)
+  // Handle loading any browser-supported PM3 dump (JSON, raw Classic, EML, or MFU).
   const handleJsonUpload = useCallback(
     async (files: FileList | null) => {
       if (!files || files.length === 0) return;
 
       for (const file of Array.from(files)) {
-        if (file.name.endsWith(".json")) {
-          const text = await file.text();
-          try {
-            const parsed = JSON.parse(text) as PM3DumpJson;
-            if (parsed.blocks || parsed.Card) {
-              handleDumpLoad(parsed, file.name);
-              break;
-            }
-          } catch {
-            terminalRef.current?.writeln(`\x1b[31mFailed to parse JSON: ${file.name}\x1b[0m`);
-          }
+        try {
+          const imported = await importDumpFile(file);
+          handleDumpLoad(imported.dump, imported.name);
+          return;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "unsupported dump";
+          terminalRef.current?.writeln(`\x1b[31mFailed to import ${file.name}: ${message}\x1b[0m`);
         }
       }
     },
@@ -533,13 +626,42 @@ function App() {
       // `clear` is a client-side convenience, not a pm3 command.
       if (cmd === "clear") {
         terminalRef.current?.clear();
-        return;
+        return null;
       }
 
-      commandCenter.run(cmd);
+      return commandCenter.run(cmd);
     },
     [commandCenter, pushCommand],
   );
+
+  // Probe once per attached hardware session. Parsing remains evidence based,
+  // so future PM3 models/firmware simply enrich the profile instead of falling
+  // through a hard-coded model allowlist.
+  const capabilityProbeStartedRef = useRef(false);
+  useEffect(() => {
+    if (!wasmState.isClientAttached) {
+      capabilityProbeStartedRef.current = false;
+      return;
+    }
+    if (capabilityProbeStartedRef.current) return;
+    capabilityProbeStartedRef.current = true;
+    void (async () => {
+      await commandCenter.runAndWait("hw version", "capability-probe");
+      await commandCenter.runAndWait("hw status", "firmware-health-probe");
+    })().catch((error) => {
+      console.warn("Device capability probe did not complete", error);
+    });
+  }, [commandCenter, wasmState.isClientAttached]);
+
+  const refreshDeviceProfile = useCallback(() => {
+    setDeviceProfile(emptyDeviceProfile());
+    void (async () => {
+      await commandCenter.runAndWait("hw version", "capability-probe");
+      await commandCenter.runAndWait("hw status", "firmware-health-probe");
+    })().catch((error) => {
+      console.warn("Device capability probe did not complete", error);
+    });
+  }, [commandCenter]);
 
   // Write a small text file straight into the cache FS (no React-state round
   // trip), used to drop a key dictionary in place right before a command.
@@ -691,6 +813,7 @@ function App() {
     await wasmState.disconnectDevice();
     terminalRef.current?.writeln("\x1b[33mDisconnected.\x1b[0m");
     clearTarget();
+    setDeviceProfile(emptyDeviceProfile());
   }, [wasmState, clearTarget]);
 
   const handleCopyUid = useCallback(() => {
@@ -701,8 +824,8 @@ function App() {
   }, [tagInfo]);
 
   const handleRefreshTag = useCallback(() => {
-    handleCommand("hf 14a info");
-  }, [handleCommand]);
+    handleCommand(tagInfo?.protocol === "LF" ? "lf search" : "hf search");
+  }, [handleCommand, tagInfo?.protocol]);
 
   // Handle terminal input in raw mode
   const handleTerminalInput = useCallback(
@@ -725,8 +848,9 @@ function App() {
 
   // Unified vault headline counts across all stores (see features/vault).
   const vaultSummary = useMemo(
-    () => vaultStats(cachedDumps, cachedAssets, vaultKeys, vaultCards),
-    [cachedDumps, cachedAssets, vaultKeys, vaultCards],
+    () =>
+      vaultStats(cachedDumps, cachedAssets, vaultKeys, vaultCards, vaultLfCards, vaultOperations),
+    [cachedDumps, cachedAssets, vaultKeys, vaultCards, vaultLfCards, vaultOperations],
   );
 
   // One derived description of "can this reach the hardware, and if not, where
@@ -756,6 +880,37 @@ function App() {
     ],
   );
 
+  // Persist each terminal job once it reaches a terminal state. The job id is
+  // the database primary key, making this safe if React effects replay in dev.
+  const persistedJobsRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const job of commandCenter.jobs) {
+      if (!job.endedAt || persistedJobsRef.current.has(job.id)) continue;
+      persistedJobsRef.current.add(job.id);
+      void putOperation(
+        operationFromJob(job, {
+          targetUid: cardTarget.target.uid,
+          targetType: cardTarget.target.identity?.type,
+          transport: connection.transportLabel,
+        }),
+      );
+    }
+  }, [
+    cardTarget.target.identity?.type,
+    cardTarget.target.uid,
+    commandCenter.jobs,
+    connection.transportLabel,
+  ]);
+
+  const deviceProfileContext = useMemo(
+    () => ({
+      profile: deviceProfile,
+      resetProfile: () => setDeviceProfile(emptyDeviceProfile()),
+      refreshProfile: refreshDeviceProfile,
+    }),
+    [deviceProfile, refreshDeviceProfile],
+  );
+
   const hasHardwareTransport = connection.hasHardwareTransport;
   const activeTransportLabel = connection.transportLabel;
   // On the Session workspace the terminal *is* the layout, so there is nothing
@@ -763,94 +918,98 @@ function App() {
   const isSessionWorkspace = getWorkspace(activeWorkspace).value === DEFAULT_WORKSPACE;
 
   return (
-    <CardTargetContext.Provider value={cardTarget}>
-      <CommandCenterContext.Provider value={commandCenter}>
-        <div className="h-dvh overflow-hidden flex flex-col bg-background">
-          {/* Ribbon Toolbar */}
-          <RibbonToolbar
-            connection={connection}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-            onCommand={handleCommand}
-            onStopOperation={commandCenter.stopActive}
-            onHardReset={wasmState.hardReset}
-            theme={theme}
-            onThemeChange={setTheme}
-            isBusy={commandCenter.isBusy}
-            cacheItems={cachedAssets}
-            cacheSyncing={isSyncingCache}
-            onCacheUpload={handleCacheUpload}
-            onCacheUse={handleCacheUse}
-            onCacheDelete={handleCacheDelete}
-            onCacheSync={syncCacheToFS}
-            cachePathPrefix={CACHE_PATH_PREFIX}
-            activeWorkspace={activeWorkspace}
-            onWorkspaceChange={openWorkspace}
-            activeStrip={activeStrip}
-            onStripChange={setActiveStrip}
-            availableTransports={wasmState.availableTransports}
-            selectedTransport={selectedTransport || wasmState.activeTransportType}
-            onTransportChange={setSelectedTransport}
-            onJsonUpload={handleJsonUpload}
-          />
-          {/* Persistent active-card strip + guided next steps — one lean band,
-            visible across every panel. */}
-          <TargetBar
-            onCommand={handleCommand}
-            onOpenTab={openWorkspace}
-            onRefresh={handleRefreshTag}
-            onCopyUid={handleCopyUid}
-            disabled={!canRunCommands}
-          />
-          <MainPanelRouter
-            activeWorkspace={activeWorkspace}
-            terminalDockOpen={terminalDockOpen}
-            onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
-            onDumpWithSavedKeys={handleDumpWithSavedKeys}
-            theme={theme}
-            onThemeChange={setTheme}
-            terminalRef={terminalRef}
-            activeDump={activeDump}
-            cachedDumps={cachedDumps}
-            cachedAssets={cachedAssets}
-            cachePathPrefix={CACHE_PATH_PREFIX}
-            canRunCommands={canRunCommands}
-            isLoading={wasmState.isLoading}
-            isConnecting={isConnecting}
-            isDeviceConnected={wasmState.isDeviceConnected}
-            hasHardwareTransport={hasHardwareTransport}
-            activeTransportLabel={activeTransportLabel}
-            commandHistory={commandHistory}
-            quickCommand={quickCommand}
-            onQuickCommandChange={setQuickCommand}
-            onRunQuickCommand={runQuickCommand}
-            onCommand={handleCommand}
-            onInput={handleTerminalInput}
-            onConnect={() => void handleConnect()}
-            onDisconnect={() => void handleDisconnect()}
-            onCopyUid={handleCopyUid}
-            onOpenTab={openWorkspace}
-            onLoadSample={() => handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)}
-            onRefreshTag={handleRefreshTag}
-            onDumpLoad={handleDumpLoad}
-            onDumpRename={handleDumpRename}
-            onDumpDelete={handleDumpDelete}
-            onClearCache={() => void clearAssets()}
-          />
+    <DeviceProfileContext.Provider value={deviceProfileContext}>
+      <CardTargetContext.Provider value={cardTarget}>
+        <CommandCenterContext.Provider value={commandCenter}>
+          <div className="h-dvh overflow-hidden flex flex-col bg-background">
+            {/* Ribbon Toolbar */}
+            <RibbonToolbar
+              connection={connection}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onCommand={handleCommand}
+              onStopOperation={commandCenter.stopActive}
+              onHardReset={wasmState.hardReset}
+              theme={theme}
+              onThemeChange={setTheme}
+              isBusy={commandCenter.isBusy}
+              cacheItems={cachedAssets}
+              cacheSyncing={isSyncingCache}
+              onCacheUpload={handleCacheUpload}
+              onCacheUse={handleCacheUse}
+              onCacheDelete={handleCacheDelete}
+              onCacheSync={syncCacheToFS}
+              cachePathPrefix={CACHE_PATH_PREFIX}
+              activeWorkspace={activeWorkspace}
+              onWorkspaceChange={openWorkspace}
+              activeStrip={activeStrip}
+              onStripChange={setActiveStrip}
+              availableTransports={wasmState.availableTransports}
+              selectedTransport={selectedTransport || wasmState.activeTransportType}
+              onTransportChange={setSelectedTransport}
+              onJsonUpload={handleJsonUpload}
+            />
+            <MainPanelRouter
+              activeWorkspace={activeWorkspace}
+              terminalDockOpen={terminalDockOpen}
+              onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+              onDumpWithSavedKeys={handleDumpWithSavedKeys}
+              theme={theme}
+              onThemeChange={setTheme}
+              terminalRef={terminalRef}
+              activeDump={activeDump}
+              cachedDumps={cachedDumps}
+              cachedAssets={cachedAssets}
+              cachePathPrefix={CACHE_PATH_PREFIX}
+              canRunCommands={canRunCommands}
+              isLoading={wasmState.isLoading}
+              isConnecting={isConnecting}
+              isDeviceConnected={wasmState.isDeviceConnected}
+              hasHardwareTransport={hasHardwareTransport}
+              activeTransportLabel={activeTransportLabel}
+              commandHistory={commandHistory}
+              quickCommand={quickCommand}
+              onQuickCommandChange={setQuickCommand}
+              onRunQuickCommand={runQuickCommand}
+              onCommand={handleCommand}
+              onInput={handleTerminalInput}
+              onConnect={() => void handleConnect()}
+              onDisconnect={() => void handleDisconnect()}
+              onCopyUid={handleCopyUid}
+              onOpenTab={openWorkspace}
+              onLoadSample={() =>
+                handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
+              }
+              onRefreshTag={handleRefreshTag}
+              onDumpLoad={handleDumpLoad}
+              onDumpRename={handleDumpRename}
+              onDumpDelete={handleDumpDelete}
+              onClearCache={() => void clearAssets()}
+              activeTransportType={wasmState.activeTransportType}
+              onDisconnectApplication={wasmState.disconnectDevice}
+              onReconnectApplication={() => wasmState.connectDevice("webserial")}
+              onFirmwareLog={writeTerminalLine}
+            />
 
-          {/* Activity bar: connection, the running command and the terminal
+            {/* Activity bar: connection, the running command and the terminal
             toggle, present on every workspace. */}
-          <ActivityBar
-            connection={connection}
-            vault={vaultSummary}
-            terminalOpen={terminalDockOpen}
-            onToggleTerminal={
-              isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
-            }
-          />
-        </div>
-      </CommandCenterContext.Provider>
-    </CardTargetContext.Provider>
+            <ActivityBar
+              connection={connection}
+              vault={vaultSummary}
+              terminalOpen={terminalDockOpen}
+              onToggleTerminal={
+                isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
+              }
+              onCommand={handleCommand}
+              onOpenTab={openWorkspace}
+              onRefresh={handleRefreshTag}
+              onCopyUid={handleCopyUid}
+              disabled={!canRunCommands}
+            />
+          </div>
+        </CommandCenterContext.Provider>
+      </CardTargetContext.Provider>
+    </DeviceProfileContext.Provider>
   );
 }
 

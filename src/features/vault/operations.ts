@@ -5,7 +5,14 @@ import {
   upsertCardRecord,
   upsertKeyRecord,
 } from "@/components/panels/library/utils";
-import { db, type AssetRecord, type DumpRecord } from "./db";
+import {
+  db,
+  type AssetRecord,
+  type BackupRecord,
+  type DumpRecord,
+  type LfCardRecord,
+  type OperationRecord,
+} from "./db";
 import { normalizeUid } from "./uid";
 
 export function makeVaultId(prefix = "v"): string {
@@ -116,4 +123,109 @@ export function clearAssets(): Promise<void> {
 
 export function normalizeDumpUid(dump: PM3DumpJson): string {
   return normalizeUid(dump.Card?.UID);
+}
+
+// ---------------------------------------------------------------------------
+// LF credentials
+// ---------------------------------------------------------------------------
+
+/** Insert or replace an LF credential row, fire-and-forget. */
+export function putLfCard(record: LfCardRecord): Promise<string> {
+  return db.lfCards.put(record);
+}
+
+export function deleteLfCard(id: string): Promise<void> {
+  return db.lfCards.delete(id);
+}
+
+export async function renameLfCard(id: string, name: string): Promise<void> {
+  await db.lfCards.update(id, { name, updatedAt: Date.now() });
+}
+
+export async function setLfCardMeta(
+  id: string,
+  meta: Partial<Pick<LfCardRecord, "favorite" | "notes" | "writable" | "chip" | "config">>,
+): Promise<void> {
+  await db.lfCards.update(id, { ...meta, updatedAt: Date.now() });
+}
+
+/**
+ * Merge a freshly parsed LF read into the store. Cards are de-duplicated by
+ * their identity (raw/format+FC+CN) so re-reading the same tag updates one row
+ * instead of piling up duplicates, mirroring how HF dumps upsert by UID.
+ */
+export async function upsertLfCard(
+  fields: Partial<LfCardRecord> & Pick<LfCardRecord, "tech">,
+  matchKey: string,
+): Promise<LfCardRecord> {
+  const now = Date.now();
+  const existing = matchKey
+    ? await db.lfCards.filter((row) => lfMatchKey(row) === matchKey).first()
+    : undefined;
+
+  const record: LfCardRecord = existing
+    ? { ...existing, ...fields, updatedAt: now }
+    : {
+        id: makeVaultId("lf"),
+        name: fields.name ?? "LF card",
+        uid: fields.uid ?? "",
+        tech: fields.tech,
+        format: fields.format,
+        facilityCode: fields.facilityCode,
+        cardNumber: fields.cardNumber,
+        raw: fields.raw,
+        fields: fields.fields,
+        chip: fields.chip,
+        config: fields.config,
+        writable: fields.writable,
+        cachedAt: now,
+        favorite: false,
+        notes: "",
+        updatedAt: now,
+      };
+
+  await db.lfCards.put(record);
+  return record;
+}
+
+/** Stable identity for de-duping an LF card across re-reads. */
+export function lfMatchKey(
+  card: Pick<LfCardRecord, "tech" | "format" | "facilityCode" | "cardNumber" | "raw" | "fields">,
+): string {
+  if (card.facilityCode != null && card.cardNumber != null) {
+    return `${card.tech}:${card.format ?? ""}:${card.facilityCode}:${card.cardNumber}:${JSON.stringify(card.fields ?? {})}`;
+  }
+  if (card.raw) return `${card.tech}:raw:${card.raw.toUpperCase()}`;
+  if (card.fields && Object.keys(card.fields).length) {
+    return `${card.tech}:fields:${JSON.stringify(card.fields)}`;
+  }
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Operation audit trail
+// ---------------------------------------------------------------------------
+
+export function putOperation(record: OperationRecord): Promise<string> {
+  return db.operations.put(record);
+}
+
+export function deleteOperation(id: string): Promise<void> {
+  return db.operations.delete(id);
+}
+
+export function clearOperations(): Promise<void> {
+  return db.operations.clear();
+}
+
+export function putBackup(record: BackupRecord): Promise<string> {
+  return db.backups.put(record);
+}
+
+export function deleteBackup(id: string): Promise<void> {
+  return db.backups.delete(id);
+}
+
+export function clearBackups(): Promise<void> {
+  return db.backups.clear();
 }

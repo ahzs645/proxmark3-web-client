@@ -3,7 +3,7 @@
  * Supports multiple backends: WebSerial (browser), native serial (Tauri), Bluetooth SPP (Tauri)
  */
 
-export type TransportType = 'webserial' | 'tauri-serial' | 'tauri-bluetooth';
+export type TransportType = "webserial" | "tauri-serial" | "tauri-bluetooth";
 
 export interface TransportDevice {
   /** Unique identifier for this device */
@@ -113,15 +113,15 @@ export interface TransportConfig {
   /** Stop bits (default: 1) */
   stopBits?: 1 | 2;
   /** Parity (default: none) */
-  parity?: 'none' | 'even' | 'odd';
+  parity?: "none" | "even" | "odd";
   /** Flow control (default: none) */
-  flowControl?: 'none' | 'hardware';
+  flowControl?: "none" | "hardware";
 }
 
 export const DEFAULT_TRANSPORT_CONFIG: TransportConfig = {
   baudRate: 115200,
   dataBits: 8,
   stopBits: 1,
-  parity: 'none',
-  flowControl: 'none',
+  parity: "none",
+  flowControl: "none",
 };

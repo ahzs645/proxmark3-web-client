@@ -40,6 +40,7 @@ export interface VaultStats {
   keys: number;
   dumps: number;
   files: number;
+  operations: number;
 }
 
 /** Headline counts across the whole vault, computed from the live arrays. */
@@ -48,11 +49,14 @@ export function vaultStats(
   assets: unknown[],
   keys: unknown[],
   cards: unknown[],
+  lfCards: unknown[] = [],
+  operations: unknown[] = [],
 ): VaultStats {
   return {
-    cards: cards.length,
+    cards: cards.length + lfCards.length,
     keys: keys.length,
     dumps: dumps.length,
     files: assets.length,
+    operations: operations.length,
   };
 }

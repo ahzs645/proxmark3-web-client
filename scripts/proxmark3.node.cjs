@@ -1,9 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
 
-const sourcePath = path.join(__dirname, '..', 'public', 'wasm', 'proxmark3.js');
-const source = fs.readFileSync(sourcePath, 'utf8');
+const sourcePath = path.join(__dirname, "..", "public", "wasm", "proxmark3.js");
+const source = fs.readFileSync(sourcePath, "utf8");
 
 // The generated Emscripten bundle expects CommonJS globals in Node and spawns
 // worker threads using __filename. Keeping these pointed at this wrapper makes

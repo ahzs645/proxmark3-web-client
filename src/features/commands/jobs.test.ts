@@ -10,6 +10,7 @@ import {
 } from "./jobs";
 import { isPromptLine, summarizeOutputLine } from "./prompt";
 import type { CommandJob } from "./types";
+import { untrackedIdleTimeoutMs } from "./useCommandCenter";
 
 function add(jobs: CommandJob[], command: string, now: number) {
   return appendJob(jobs, { id: command, command, origin: "test", now }).jobs;
@@ -119,5 +120,16 @@ describe("prompt detection", () => {
   it("condenses output lines for the activity bar", () => {
     expect(summarizeOutputLine("\u001b[32m[+]  Found   key\u001b[0m")).toBe("Found key");
     expect(summarizeOutputLine("   ")).toBe("");
+  });
+});
+
+describe("untracked command completion", () => {
+  it("gives crypto attacks a wider quiet window than ordinary commands", () => {
+    const ordinary = untrackedIdleTimeoutMs("hf search");
+
+    expect(untrackedIdleTimeoutMs("hf mf autopwn --4k")).toBeGreaterThan(ordinary);
+    expect(untrackedIdleTimeoutMs("hf mf hardnested --blk 0 -a")).toBeGreaterThan(ordinary);
+    expect(untrackedIdleTimeoutMs("hf mf nested --1k")).toBeGreaterThan(ordinary);
+    expect(untrackedIdleTimeoutMs("hf mf darkside")).toBeGreaterThan(ordinary);
   });
 });

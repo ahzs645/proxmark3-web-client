@@ -1,10 +1,4 @@
-import type { ReactNode } from "react";
-
-export function SectionLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
-  return (
-    <label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-      {icon}
-      {children}
-    </label>
-  );
-}
+// The LF/T55xx tools historically defined their own SectionLabel. It now lives
+// in the shared panel kit so every panel's section headings match; this re-export
+// keeps the existing `../shared` import path working.
+export { SectionLabel } from "@/components/panels/shared/SectionLabel";

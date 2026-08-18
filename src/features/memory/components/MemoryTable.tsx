@@ -4,18 +4,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { SectorGroup, SectorKeysRecord } from "@/features/memory/types";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Copy, Key, Lock, Play, RefreshCw, Upload } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Key,
+  Lock,
+  Play,
+  RefreshCw,
+  Upload,
+} from "lucide-react";
 import { hexToAscii } from "@/features/memory/lib/trailer";
+
+function SelectionCheckbox({
+  checked,
+  label,
+  onToggle,
+}: {
+  checked: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm border border-input bg-background text-primary shadow-sm"
+      onClick={onToggle}
+    >
+      {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+    </button>
+  );
+}
 
 interface MemoryTableProps {
   filteredSectors: SectorGroup[];
   sectorKeys: SectorKeysRecord;
   expandedSectors: Set<number>;
   selectedBlock: number | null;
+  selectedBlocks: Set<number>;
   showKeys: boolean;
   disabled: boolean;
+  selectionEnabled?: boolean;
   onToggleSector: (sector: number) => void;
   onSelectBlock: (blockIndex: number) => void;
+  onToggleBlockSelection: (blockIndex: number) => void;
+  onToggleSectorSelection: (blockIndexes: number[]) => void;
+  onToggleAllSelection: (blockIndexes: number[]) => void;
   onDataChange: (blockIndex: number, value: string) => void;
   onReadBlock: (blockIndex: number) => void;
   onWriteBlock: (blockIndex: number, data: string) => void;
@@ -28,10 +66,15 @@ export function MemoryTable({
   sectorKeys,
   expandedSectors,
   selectedBlock,
+  selectedBlocks,
   showKeys,
   disabled,
+  selectionEnabled = true,
   onToggleSector,
   onSelectBlock,
+  onToggleBlockSelection,
+  onToggleSectorSelection,
+  onToggleAllSelection,
   onDataChange,
   onReadBlock,
   onWriteBlock,
@@ -40,8 +83,33 @@ export function MemoryTable({
 }: MemoryTableProps) {
   return (
     <table className="w-full text-xs">
-      <thead className="sticky top-0 bg-secondary/50">
+      <thead
+        className={cn(
+          "sticky z-10 bg-secondary/95 backdrop-blur",
+          selectionEnabled ? "top-[49px]" : "top-0",
+        )}
+      >
         <tr className="border-b">
+          {selectionEnabled ? (
+            <th className="w-10 px-2 py-2 text-center font-medium">
+              <SelectionCheckbox
+                label="Select all visible blocks"
+                checked={
+                  filteredSectors.flatMap(([, sectorBlocks]) => sectorBlocks).length > 0 &&
+                  filteredSectors
+                    .flatMap(([, sectorBlocks]) => sectorBlocks)
+                    .every((block) => selectedBlocks.has(block.index))
+                }
+                onToggle={() =>
+                  onToggleAllSelection(
+                    filteredSectors.flatMap(([, sectorBlocks]) =>
+                      sectorBlocks.map((block) => block.index),
+                    ),
+                  )
+                }
+              />
+            </th>
+          ) : null}
           <th className="w-16 px-3 py-2 text-left font-medium">Sec</th>
           <th className="w-16 px-3 py-2 text-left font-medium">Blk</th>
           <th className="w-20 px-3 py-2 text-left font-medium">Type</th>
@@ -68,10 +136,22 @@ export function MemoryTable({
                   "cursor-pointer bg-secondary/30 transition-colors hover:bg-secondary/50",
                   !hasData && "opacity-60",
                 )}
-                onClick={() => onToggleSector(sectorNum)}
+                onClick={(event) => {
+                  if ((event.target as HTMLElement).closest('[role="checkbox"]')) return;
+                  onToggleSector(sectorNum);
+                }}
               >
-                <td colSpan={6} className="px-3 py-1.5">
+                <td colSpan={selectionEnabled ? 7 : 6} className="px-3 py-1.5">
                   <div className="flex items-center gap-2">
+                    {selectionEnabled ? (
+                      <SelectionCheckbox
+                        label={`Select sector ${sectorNum}`}
+                        checked={sectorBlocks.every((block) => selectedBlocks.has(block.index))}
+                        onToggle={() =>
+                          onToggleSectorSelection(sectorBlocks.map((block) => block.index))
+                        }
+                      />
+                    ) : null}
                     {expandedSectors.has(sectorNum) ? (
                       <ChevronDown className="h-3 w-3" />
                     ) : (
@@ -134,8 +214,20 @@ export function MemoryTable({
                           isTrailer && "bg-amber-500/5",
                           isEmpty && !isTrailer && "opacity-50",
                         )}
-                        onClick={() => onSelectBlock(block.index)}
+                        onClick={(event) => {
+                          if ((event.target as HTMLElement).closest('[role="checkbox"]')) return;
+                          onSelectBlock(block.index);
+                        }}
                       >
+                        {selectionEnabled ? (
+                          <td className="px-2 py-1.5 text-center">
+                            <SelectionCheckbox
+                              label={`Select block ${block.index}`}
+                              checked={selectedBlocks.has(block.index)}
+                              onToggle={() => onToggleBlockSelection(block.index)}
+                            />
+                          </td>
+                        ) : null}
                         <td className="px-3 py-1.5 font-mono text-muted-foreground">
                           {block.sector}
                         </td>

@@ -23,9 +23,10 @@ export function DumpDialog({ draft, onDraftChange, onSave, onClose }: DumpDialog
     <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Dump Notes</DialogTitle>
+          <DialogTitle>Rename dump &amp; notes</DialogTitle>
           <DialogDescription>
-            Add local annotations and favorites to cached dumps without leaving the browser.
+            Give this dump a memorable name and add local annotations or a favorite flag — all
+            stored in the browser.
           </DialogDescription>
         </DialogHeader>
 

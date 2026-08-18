@@ -11,14 +11,14 @@ The PM3 C client was not designed for WASM. Rather than forking and rewriting, t
 
 ### Files that have WASM-specific changes
 
-| File | What changed |
-|------|-------------|
-| `client/Makefile` | Emscripten linker flags, source file filtering, pthread config |
-| `client/src/cmdhfmfhard.h` | Removed inline stub that disabled hardnested |
-| `client/src/cmdhfmfhard.c` | Added lz4/bz2 API stubs under `__EMSCRIPTEN__` |
-| `client/src/util.c` | Capped `detect_num_CPUs()` to 4 for Emscripten |
-| `client/deps/hardnested/Makefile` | Forces `cpu_arch = wasm` to use NOSIMD path |
-| `client/src/uart/uart_web.c` | Custom UART layer using shared ring buffers (not a patch — this is a new file) |
+| File                              | What changed                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `client/Makefile`                 | Emscripten linker flags, source file filtering, pthread config                 |
+| `client/src/cmdhfmfhard.h`        | Removed inline stub that disabled hardnested                                   |
+| `client/src/cmdhfmfhard.c`        | Added lz4/bz2 API stubs under `__EMSCRIPTEN__`                                 |
+| `client/src/util.c`               | Capped `detect_num_CPUs()` to 4 for Emscripten                                 |
+| `client/deps/hardnested/Makefile` | Forces `cpu_arch = wasm` to use NOSIMD path                                    |
+| `client/src/uart/uart_web.c`      | Custom UART layer using shared ring buffers (not a patch — this is a new file) |
 
 ## Pattern: Stubbing unavailable libraries
 
@@ -168,6 +168,7 @@ node scripts/pm3-wasm-smoke.cjs \
 ```
 
 Key flags:
+
 - `--advance-idle-ms` — how long to wait for output before advancing to the next command. Increase for slow operations like hardnested.
 - `--timeout-ms` — hard timeout for the entire run.
 - `--timings` — print per-command durations.

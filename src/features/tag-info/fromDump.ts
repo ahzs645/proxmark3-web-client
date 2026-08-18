@@ -28,11 +28,24 @@ export function tagInfoFromDump(dump: PM3DumpJson): Partial<TagInfo> | null {
   const atqa = groupHex(dump.Card?.ATQA, " ");
 
   const blockCount = dump.blocks ? Object.keys(dump.blocks).length : 0;
+  const pageSized =
+    blockCount > 0 &&
+    Object.values(dump.blocks ?? {}).every(
+      (value) => value.replace(/[^0-9a-fA-F]/g, "").length === 8,
+    );
   let type = "MIFARE Classic";
-  if (sak === "18" || sak === "19") type = "MIFARE Classic 4K";
+  if (pageSized) type = "MIFARE Ultralight / NTAG Type 2";
+  else if (sak === "18" || sak === "19") type = "MIFARE Classic 4K";
   else if (sak === "08" || sak === "09") type = "MIFARE Classic 1K";
   else if (blockCount > 128) type = "MIFARE Classic 4K";
   else if (blockCount > 0) type = "MIFARE Classic 1K";
 
-  return { uid, type, sak: sak || undefined, atqa, protocol: "HF", subtype: "MIFARE" };
+  return {
+    uid,
+    type,
+    sak: sak || undefined,
+    atqa,
+    protocol: "HF",
+    subtype: pageSized ? "Type 2" : "MIFARE",
+  };
 }

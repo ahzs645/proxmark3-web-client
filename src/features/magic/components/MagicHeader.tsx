@@ -1,6 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { Wand2, RefreshCw } from "lucide-react";
 
 interface MagicHeaderProps {
@@ -10,15 +9,11 @@ interface MagicHeaderProps {
 
 export function MagicHeader({ disabled = false, onDetect }: MagicHeaderProps) {
   return (
-    <CardHeader className="border-b pb-2">
-      <div className="flex items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Wand2 className="h-4 w-4 text-primary" />
-          Magic Card Operations
-          <Badge variant="outline" className="ml-1">
-            UID Writable
-          </Badge>
-        </CardTitle>
+    <PanelHeader
+      icon={Wand2}
+      title="Magic Card Operations"
+      tag="UID Writable"
+      actions={
         <Button
           size="sm"
           variant="outline"
@@ -29,7 +24,7 @@ export function MagicHeader({ disabled = false, onDetect }: MagicHeaderProps) {
           <RefreshCw className="h-3 w-3" />
           Detect
         </Button>
-      </div>
-    </CardHeader>
+      }
+    />
   );
 }

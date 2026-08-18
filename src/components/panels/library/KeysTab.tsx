@@ -1,13 +1,28 @@
+import {
+  Clock,
+  Copy,
+  Download,
+  Edit3,
+  FolderOpen,
+  Globe,
+  KeyRound,
+  Layers,
+  Plus,
+  Search,
+  Shield,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Clock, Copy, Download, Edit3, KeyRound, Plus, Search, Shield, Trash2 } from "lucide-react";
-import type { GroupedKeys, KeyDraft, StoredKey, StoredKeyKind } from "./types";
+import type { KeyDraft, KeyGroup, StoredKey } from "./types";
 import { copyText, relativeTime } from "./utils";
 
 interface KeysTabProps {
   keySearch: string;
-  groupedKeys: GroupedKeys;
+  keyGroups: KeyGroup[];
+  totalKeys: number;
   canImportActiveDumpKeys: boolean;
   onKeySearchChange: (value: string) => void;
   onOpenKeyEditor: (key?: StoredKey | KeyDraft | null) => void;
@@ -15,11 +30,31 @@ interface KeysTabProps {
   onImportDefaultKeys: () => void;
   onImportActiveDumpKeys: () => void;
   onExportKeys: () => void;
+  /** Load a group's source dump as the active card. */
+  onOpenDump: (dumpId: string) => void;
+  /** Clone/write a card using this group's keys (opens the write panel). */
+  onWriteCard: (group: KeyGroup) => void;
+}
+
+const KIND_BADGE: Record<
+  KeyGroup["kind"],
+  { label: string; variant: "success" | "secondary" | "outline" }
+> = {
+  session: { label: "Autopwn session", variant: "success" },
+  card: { label: "Card", variant: "secondary" },
+  common: { label: "Global", variant: "outline" },
+};
+
+function keyKindBadge(kind: StoredKey["kind"]) {
+  if (kind === "public") return <Badge variant="default">public</Badge>;
+  if (kind === "private") return <Badge variant="secondary">private</Badge>;
+  return <Badge variant="warning">recovered</Badge>;
 }
 
 export function KeysTab({
   keySearch,
-  groupedKeys,
+  keyGroups,
+  totalKeys,
   canImportActiveDumpKeys,
   onKeySearchChange,
   onOpenKeyEditor,
@@ -27,9 +62,9 @@ export function KeysTab({
   onImportDefaultKeys,
   onImportActiveDumpKeys,
   onExportKeys,
+  onOpenDump,
+  onWriteCard,
 }: KeysTabProps) {
-  const totalKeys = Object.values(groupedKeys).reduce((sum, entries) => sum + entries.length, 0);
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -65,90 +100,120 @@ export function KeysTab({
         </Button>
       </div>
 
-      {(["public", "private", "history"] as StoredKeyKind[]).map((kind) => {
-        const entries = groupedKeys[kind];
-        const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+      {keyGroups.length === 0 ? (
+        <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+          No keys yet. Run an autopwn/dump to recover keys automatically, import the common
+          dictionary, or add one by hand.
+        </div>
+      ) : (
+        keyGroups.map((group) => {
+          const kind = KIND_BADGE[group.kind];
+          const GroupIcon = group.kind === "common" ? Globe : KeyRound;
 
-        return (
-          <div key={kind} className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold">{label}</h3>
-              <Badge variant="outline">{entries.length}</Badge>
-            </div>
+          return (
+            <section key={group.id} className="rounded-xl border bg-card/40">
+              <header className="flex flex-wrap items-center gap-2 border-b border-border/60 p-3">
+                <GroupIcon className="h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="truncate text-sm font-semibold">{group.title}</h3>
+                    <Badge variant={kind.variant}>{kind.label}</Badge>
+                    <Badge variant="outline">
+                      {group.keys.length} key{group.keys.length === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+                  {group.subtitle ? (
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                      {group.subtitle}
+                    </p>
+                  ) : null}
+                </div>
 
-            {entries.length === 0 ? (
-              <div className="rounded-xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
-                No {kind} keys yet.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {entries.map((key) => (
-                  <div key={key.id} className="rounded-xl border bg-card/40 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-sm font-semibold">{key.label}</h4>
-                          <Badge
-                            variant={
-                              key.kind === "public"
-                                ? "default"
-                                : key.kind === "private"
-                                  ? "secondary"
-                                  : "warning"
-                            }
-                          >
-                            {label}
-                          </Badge>
-                        </div>
-                        <div className="mt-2 text-sm font-mono text-foreground">{key.value}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          {key.uidFilter ? (
-                            <span>UID {key.uidFilter}</span>
-                          ) : (
-                            <span>All cards</span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {relativeTime(key.updatedAt)}
-                          </span>
-                        </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {group.sourceDumpId ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1"
+                      onClick={() => onOpenDump(group.sourceDumpId as string)}
+                      title="Load this session's dump as the active card"
+                    >
+                      <FolderOpen className="h-3 w-3" />
+                      Open dump
+                    </Button>
+                  ) : null}
+                  {group.uid ? (
+                    <Button
+                      size="sm"
+                      className="h-7 gap-1"
+                      onClick={() => onWriteCard(group)}
+                      title="Clone / write this card using these keys"
+                    >
+                      <Upload className="h-3 w-3" />
+                      Write card
+                    </Button>
+                  ) : null}
+                </div>
+              </header>
+
+              <ul className="divide-y divide-border/50">
+                {group.keys.map((key) => (
+                  <li key={key.id} className="flex items-center gap-3 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="font-mono text-sm text-foreground">{key.value}</code>
+                        {keyKindBadge(key.kind)}
                       </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => copyText(key.value)}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => onOpenKeyEditor(key)}
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
-                          onClick={() => onDeleteKey(key.id)}
-                          aria-label="Delete key"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                        <span className="truncate">{key.label || "Key"}</span>
+                        {group.kind === "common" && key.uidFilter ? (
+                          <span className="flex items-center gap-1">
+                            <Layers className="h-3 w-3" />
+                            {key.uidFilter}
+                          </span>
+                        ) : null}
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {relativeTime(key.updatedAt)}
+                        </span>
                       </div>
                     </div>
-                  </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => copyText(key.value)}
+                        title="Copy key"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => onOpenKeyEditor(key)}
+                        title="Edit key"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
+                        onClick={() => onDeleteKey(key.id)}
+                        aria-label="Delete key"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </li>
                 ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+              </ul>
+            </section>
+          );
+        })
+      )}
     </div>
   );
 }

@@ -1,4 +1,24 @@
 export type CommandJobStatus = "queued" | "running" | "done" | "stopped";
+export type CommandResultKind = "unknown" | "success" | "warning" | "failure";
+
+export interface CommandProgress {
+  phase?: string;
+  percent?: number;
+  current?: number;
+  total?: number;
+  unitLabel?: string;
+  elapsedSeconds?: number;
+  recoveredKeys?: string[];
+  artifactPath?: string;
+  detail?: string;
+}
+
+export interface CommandRecovery {
+  code: string;
+  message: string;
+  action: string;
+  retryable: boolean;
+}
 
 /**
  * One command the workbench dispatched to the pm3 client. Jobs make a running
@@ -20,6 +40,12 @@ export interface CommandJob {
    * output going quiet. Surfaced so the UI can be honest about the difference.
    */
   completionObserved: boolean;
+  /** Bounded, ANSI-free output used by verification and the durable audit log. */
+  outputTail: string[];
+  progress?: CommandProgress;
+  resultKind: CommandResultKind;
+  resultSummary?: string;
+  recovery?: CommandRecovery;
 }
 
 export interface CommandCenter {
@@ -34,10 +60,16 @@ export interface CommandCenter {
   activeLine: string;
   /** Dispatch a command. Returns the job, or null if it was not sent. */
   run: (command: string, origin?: string) => CommandJob | null;
+  /** Dispatch and resolve when the exact job reaches a terminal state. */
+  runAndWait: (command: string, origin?: string, timeoutMs?: number) => Promise<CommandJob>;
+  /** Resolve an already-dispatched job when it reaches a terminal state. */
+  waitForJob: (id: string, timeoutMs?: number) => Promise<CommandJob>;
   /** Interrupt the active job (Ctrl+C) and drop anything queued behind it. */
   stopActive: () => void;
   /** Forget completed jobs (the running one is kept). */
   clearFinished: () => void;
+  /** Record raw pm3 output activity, including chunks without a newline. */
+  noteOutputActivity: () => void;
   /** Feed one line of pm3 output in; drives completion detection. */
   noteOutputLine: (line: string) => void;
 }

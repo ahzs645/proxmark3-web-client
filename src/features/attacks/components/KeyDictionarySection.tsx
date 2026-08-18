@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { FileKey } from "lucide-react";
 import type { CachedAsset } from "@/components/panels/KeyCachePanel";
 
@@ -15,10 +16,7 @@ export function KeyDictionarySection({
 }: KeyDictionarySectionProps) {
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <FileKey className="h-3 w-3" />
-        Key Dictionary (Optional)
-      </label>
+      <SectionLabel icon={<FileKey className="h-3 w-3" />}>Key Dictionary (Optional)</SectionLabel>
       <div className="flex flex-wrap gap-1">
         <Button
           size="sm"

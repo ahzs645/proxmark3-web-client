@@ -11,6 +11,7 @@ import {
 } from "./jobs";
 import { isPromptLine, summarizeOutputLine } from "./prompt";
 import type { CommandCenter, CommandJob } from "./types";
+import { applyCommandOutput } from "./progress";
 
 interface UseCommandCenterArgs {
   /**
@@ -34,11 +35,21 @@ const TICK_MS = 250;
 /**
  * How long an *untracked* command may produce no output before it is treated as
  * finished. Only reached on the stdin path (WebSerial), where the client offers
- * no completion callback and this build prints its prompt once at startup. Long
- * attacks such as autopwn and hardnested report progress well inside this
- * window; the terminal remains the source of truth either way.
+ * no completion callback and some builds do not re-print their prompt.
  */
 const UNTRACKED_IDLE_MS = 8000;
+
+/**
+ * Crypto attacks can legitimately spend a long time computing between complete
+ * output lines. Raw chunk activity keeps these live in the common case, while
+ * this wider fallback prevents the UI from declaring them done mid-attack.
+ */
+const LONG_RUNNING_IDLE_MS = 5 * 60 * 1000;
+const LONG_RUNNING_COMMAND = /\b(?:autopwn|hardnested|nested|darkside)\b/i;
+
+export function untrackedIdleTimeoutMs(command: string): number {
+  return LONG_RUNNING_COMMAND.test(command) ? LONG_RUNNING_IDLE_MS : UNTRACKED_IDLE_MS;
+}
 
 /**
  * Turns fire-and-forget command writes into observable jobs.
@@ -90,11 +101,16 @@ export function useCommandCenter({
       const running = findRunning(jobsRef.current);
       if (!running || running.completionObserved || !running.startedAt) return;
       const quietSince = Math.max(running.startedAt, lastOutputAtRef.current);
-      if (Date.now() - quietSince < UNTRACKED_IDLE_MS) return;
+      const idleLimit = untrackedIdleTimeoutMs(running.command);
+      if (Date.now() - quietSince < idleLimit) return;
       updateJobs((prev) => finishJob(prev, running.id, Date.now(), "done"));
     }, TICK_MS);
     return () => clearInterval(timer);
   }, [updateJobs]);
+
+  const noteOutputActivity = useCallback(() => {
+    if (findRunning(jobsRef.current)) lastOutputAtRef.current = Date.now();
+  }, []);
 
   const noteOutputLine = useCallback(
     (line: string) => {
@@ -113,6 +129,9 @@ export function useCommandCenter({
 
       const summary = summarizeOutputLine(line);
       if (summary) pendingLineRef.current = summary;
+      updateJobs((prev) =>
+        prev.map((job) => (job.id === running.id ? applyCommandOutput(job, line) : job)),
+      );
     },
     [updateJobs],
   );
@@ -152,14 +171,50 @@ export function useCommandCenter({
           );
           return;
         }
-        updateJobs((prev) =>
-          finishJob(prev, id, Date.now(), result === "failed" ? "stopped" : "done"),
-        );
+        updateJobs((prev) => {
+          const withResult = prev.map((job) =>
+            job.id === id && result === "failed"
+              ? {
+                  ...job,
+                  resultKind: "failure" as const,
+                  resultSummary: job.resultSummary ?? "Command dispatch failed",
+                }
+              : job,
+          );
+          return finishJob(withResult, id, Date.now(), result === "failed" ? "stopped" : "done");
+        });
       });
 
       return created;
     },
     [updateJobs],
+  );
+
+  const waitForJob = useCallback((id: string, timeoutMs = 120_000): Promise<CommandJob> => {
+    const startedAt = Date.now();
+    return new Promise((resolve, reject) => {
+      const timer = window.setInterval(() => {
+        const job = jobsRef.current.find((candidate) => candidate.id === id);
+        if (job && (job.status === "done" || job.status === "stopped")) {
+          window.clearInterval(timer);
+          resolve(job);
+          return;
+        }
+        if (Date.now() - startedAt >= timeoutMs) {
+          window.clearInterval(timer);
+          reject(new Error(`Timed out waiting for command: ${job?.command ?? id}`));
+        }
+      }, 50);
+    });
+  }, []);
+
+  const runAndWait = useCallback(
+    async (command: string, origin = "workflow", timeoutMs = 120_000): Promise<CommandJob> => {
+      const job = run(command, origin);
+      if (!job) throw new Error("The PM3 client is not ready to run this command.");
+      return waitForJob(job.id, timeoutMs);
+    },
+    [run, waitForJob],
   );
 
   const stopActive = useCallback(() => {
@@ -184,10 +239,25 @@ export function useCommandCenter({
       isBusy: activeJob !== null,
       activeLine,
       run,
+      runAndWait,
+      waitForJob,
       stopActive,
       clearFinished,
+      noteOutputActivity,
       noteOutputLine,
     }),
-    [jobs, activeJob, queuedJobs, activeLine, run, stopActive, clearFinished, noteOutputLine],
+    [
+      jobs,
+      activeJob,
+      queuedJobs,
+      activeLine,
+      run,
+      runAndWait,
+      waitForJob,
+      stopActive,
+      clearFinished,
+      noteOutputActivity,
+      noteOutputLine,
+    ],
   );
 }

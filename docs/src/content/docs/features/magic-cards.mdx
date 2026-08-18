@@ -8,21 +8,25 @@ The **Magic Card Panel** provides specialized operations for Chinese magic Mifar
 ## Supported Card Types
 
 ### Gen1a
+
 - Uses backdoor commands to bypass authentication
 - UID, ATQA, SAK can be freely written
 - Detectable by readers that check for backdoor response
 
 ### Gen2 (CUID)
+
 - Direct write to block 0 without backdoor commands
 - Less detectable than Gen1a
 - Some variants have write protection
 
 ### Gen3 (APDU)
+
 - Uses APDU commands for UID changes
 - Block 0 is locked after write on some variants
 - More compatible with modern readers
 
 ### Gen4 (GTU)
+
 - Password-protected operations (default: `00000000`)
 - Most flexible — supports UID, ATQA, SAK, ATS changes
 - Can emulate multiple card types

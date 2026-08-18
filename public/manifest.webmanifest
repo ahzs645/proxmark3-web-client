@@ -1,0 +1,28 @@
+{
+  "id": "./",
+  "name": "Proxmark3 Web Client",
+  "short_name": "Proxmark3",
+  "description": "Browser-based Proxmark3 RFID research and hardware tool",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#020817",
+  "theme_color": "#020817",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/pwa-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

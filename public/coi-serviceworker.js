@@ -1,146 +1,150 @@
-/*! coi-serviceworker v0.1.7 - Guido Zuidhof and contributors, licensed under MIT */
-let coepCredentialless = false;
-if (typeof window === 'undefined') {
-    self.addEventListener("install", () => self.skipWaiting());
-    self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+/*
+ * Proxmark3 PWA service worker.
+ *
+ * This worker intentionally owns both offline caching and cross-origin
+ * isolation. Registering separate workers at the app root would cause one to
+ * replace the other and either break offline mode or threaded WASM support.
+ */
 
-    self.addEventListener("message", (ev) => {
-        if (!ev.data) {
-            return;
-        } else if (ev.data.type === "deregister") {
-            self.registration
-                .unregister()
-                .then(() => {
-                    return self.clients.matchAll();
-                })
-                .then(clients => {
-                    clients.forEach((client) => client.navigate(client.url));
-                });
-        } else if (ev.data.type === "coepCredentialless") {
-            coepCredentialless = ev.data.value;
-        }
-    });
+const CACHE_PREFIX = "proxmark3-web-client";
+const CACHE_VERSION = "v2";
+const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
+const APP_SHELL = [
+  "./",
+  "./manifest.webmanifest",
+  "./icons/pwa-256.png",
+  "./icons/pwa-512.png",
+  "./wasm/proxmark3.js",
+  "./wasm/proxmark3.wasm",
+];
+const CACHEABLE_DESTINATIONS = new Set([
+  "audio",
+  "font",
+  "image",
+  "script",
+  "style",
+  "video",
+  "worker",
+]);
 
-    self.addEventListener("fetch", function (event) {
-        const r = event.request;
-        if (r.cache === "only-if-cached" && r.mode !== "same-origin") {
-            return;
-        }
-
-        const request = (coepCredentialless && r.mode === "no-cors")
-            ? new Request(r, {
-                credentials: "omit",
-            })
-            : r;
-        event.respondWith(
-            fetch(request)
-                .then((response) => {
-                    if (response.status === 0) {
-                        return response;
-                    }
-
-                    const newHeaders = new Headers(response.headers);
-                    newHeaders.set("Cross-Origin-Embedder-Policy",
-                        coepCredentialless ? "credentialless" : "require-corp"
-                    );
-                    if (!coepCredentialless) {
-                        newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
-                    }
-                    newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
-
-                    return new Response(response.body, {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers: newHeaders,
-                    });
-                })
-                .catch((e) => console.error(e))
-        );
-    });
-
-} else {
-    (() => {
-        const reloadedBySelf = window.sessionStorage.getItem("coiReloadedBySelf");
-        window.sessionStorage.removeItem("coiReloadedBySelf");
-        const coepDegrading = (reloadedBySelf == "coepdegrade");
-
-        // You can customize the behavior of this script through a global `coi` variable.
-        const coi = {
-            shouldRegister: () => !reloadedBySelf,
-            shouldDeregister: () => false,
-            coepCredentialless: () => true,
-            coepDegrade: () => true,
-            doReload: () => window.location.reload(),
-            quiet: false,
-            ...window.coi
-        };
-
-        const n = navigator;
-        const controlling = n.serviceWorker && n.serviceWorker.controller;
-
-        // Record the failure if the page is served by serviceWorker.
-        if (controlling && !window.crossOriginIsolated) {
-            window.sessionStorage.setItem("coiCoepHasFailed", "true");
-        }
-        const coepHasFailed = window.sessionStorage.getItem("coiCoepHasFailed");
-
-        if (controlling) {
-            // Reload only on the first failure.
-            const reloadToDegrade = coi.coepDegrade() && !(
-                coepDegrading || window.crossOriginIsolated
-            );
-            n.serviceWorker.controller.postMessage({
-                type: "coepCredentialless",
-                value: (reloadToDegrade || coepHasFailed && coi.coepDegrade())
-                    ? false
-                    : coi.coepCredentialless(),
-            });
-            if (reloadToDegrade) {
-                !coi.quiet && console.log("Reloading page to degrade COEP.");
-                window.sessionStorage.setItem("coiReloadedBySelf", "coepdegrade");
-                coi.doReload("coepdegrade");
-            }
-
-            if (coi.shouldDeregister()) {
-                n.serviceWorker.controller.postMessage({ type: "deregister" });
-            }
-        }
-
-        // If we're already coi: do nothing. Perhaps it's due to this script doing its job, or COOP/COEP are
-        // already set from the origin server. Also if the browser has no notion of crossOriginIsolated, just give up here.
-        if (window.crossOriginIsolated !== false || !coi.shouldRegister()) return;
-
-        if (!window.isSecureContext) {
-            !coi.quiet && console.log("COOP/COEP Service Worker not registered, a secure context is required.");
-            return;
-        }
-
-        // In some environments (e.g. Firefox private mode) this won't be available
-        if (!n.serviceWorker) {
-            !coi.quiet && console.error("COOP/COEP Service Worker not registered, perhaps due to private mode.");
-            return;
-        }
-
-        n.serviceWorker.register(window.document.currentScript.src).then(
-            (registration) => {
-                !coi.quiet && console.log("COOP/COEP Service Worker registered", registration.scope);
-
-                registration.addEventListener("updatefound", () => {
-                    !coi.quiet && console.log("Reloading page to make use of updated COOP/COEP Service Worker.");
-                    window.sessionStorage.setItem("coiReloadedBySelf", "updatefound");
-                    coi.doReload();
-                });
-
-                // If the registration is active, but it's not controlling the page
-                if (registration.active && !n.serviceWorker.controller) {
-                    !coi.quiet && console.log("Reloading page to make use of COOP/COEP Service Worker.");
-                    window.sessionStorage.setItem("coiReloadedBySelf", "notcontrolling");
-                    coi.doReload();
-                }
-            },
-            (err) => {
-                !coi.quiet && console.error("COOP/COEP Service Worker failed to register:", err);
-            }
-        );
-    })();
+function scopedUrl(path) {
+  return new URL(path, self.registration.scope).href;
 }
+
+function withIsolationHeaders(response) {
+  if (!response || response.status === 0) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function fetchWithoutCredentials(request) {
+  if (request.mode !== "no-cors") return fetch(request);
+  return fetch(new Request(request, { credentials: "omit" }));
+}
+
+function canCache(response) {
+  return response.ok || response.type === "opaque";
+}
+
+async function cacheResponse(cache, request, response) {
+  if (canCache(response)) await cache.put(request, response.clone());
+  return response;
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const response = await fetchWithoutCredentials(request);
+    await cacheResponse(cache, request, response);
+    return withIsolationHeaders(response);
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return withIsolationHeaders(cached);
+
+    const appShell = await cache.match(scopedUrl("./"));
+    if (appShell) return withIsolationHeaders(appShell);
+
+    return new Response("Proxmark3 Web Client is unavailable offline.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+}
+
+function cacheKeyWithoutSearch(request) {
+  const url = new URL(request.url);
+  url.search = "";
+  return url.href;
+}
+
+async function cacheFirst(request, ignoreSearch = false) {
+  const cache = await caches.open(CACHE_NAME);
+  const cacheKey = ignoreSearch ? cacheKeyWithoutSearch(request) : request;
+  const cached = await cache.match(cacheKey);
+  if (cached) return withIsolationHeaders(cached);
+
+  const response = await fetchWithoutCredentials(request);
+  await cacheResponse(cache, cacheKey, response);
+  return withIsolationHeaders(response);
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL.map(scopedUrl)))
+      .then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    Promise.all([
+      caches
+        .keys()
+        .then((names) =>
+          Promise.all(
+            names
+              .filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+              .map((name) => caches.delete(name)),
+          ),
+        ),
+      self.clients.claim(),
+    ]),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET" || !request.url.startsWith("http")) return;
+  if (request.cache === "only-if-cached" && request.mode !== "same-origin") return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  const url = new URL(request.url);
+  const isWasmAsset =
+    url.origin === self.location.origin && /\/wasm\/.*\.(?:data|js|wasm)$/.test(url.pathname);
+  if (CACHEABLE_DESTINATIONS.has(request.destination) || isWasmAsset) {
+    event.respondWith(cacheFirst(request, isWasmAsset));
+    return;
+  }
+
+  event.respondWith(fetchWithoutCredentials(request).then(withIsolationHeaders));
+});

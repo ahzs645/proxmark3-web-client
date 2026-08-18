@@ -1,6 +1,6 @@
-import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SelectOption {
   value: string;
@@ -21,21 +21,21 @@ export function Select({
   value,
   onValueChange,
   options,
-  placeholder = 'Select...',
+  placeholder = "Select...",
   className,
   disabled = false,
 }: SelectProps) {
   return (
-    <div className={cn('relative inline-block', className)}>
+    <div className={cn("relative inline-block", className)}>
       <select
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
         disabled={disabled}
         className={cn(
-          'h-8 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'cursor-pointer'
+          "h-8 w-full appearance-none rounded-md border border-input bg-background px-3 pr-8 text-sm",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "cursor-pointer",
         )}
       >
         {placeholder && !value && (

@@ -18,16 +18,17 @@ These are served from `public/wasm/` and loaded by the `useProxmarkWasm` hook.
 
 The WASM module exposes these functions to JavaScript:
 
-| Function | Purpose |
-|----------|---------|
-| `pm3_console` | Main command processor |
-| `pm3_web_exec` | Execute a command string |
-| `pm3_web_exec_opts` | Execute with structured options (newer, preferred API) |
-| `pm3_uart_rx_*` / `pm3_uart_tx_*` | Ring buffer pointers for serial I/O |
-| `pm3_uart_stdin_*` | Ring buffer pointers for keyboard input |
-| `pm3_uart_rb_capacity` | Ring buffer size |
+| Function                          | Purpose                                                |
+| --------------------------------- | ------------------------------------------------------ |
+| `pm3_console`                     | Main command processor                                 |
+| `pm3_web_exec`                    | Execute a command string                               |
+| `pm3_web_exec_opts`               | Execute with structured options (newer, preferred API) |
+| `pm3_uart_rx_*` / `pm3_uart_tx_*` | Ring buffer pointers for serial I/O                    |
+| `pm3_uart_stdin_*`                | Ring buffer pointers for keyboard input                |
+| `pm3_uart_rb_capacity`            | Ring buffer size                                       |
 
 The `useProxmarkWasm` hook manages the WASM lifecycle:
+
 - Loading and initializing the module
 - Command queuing and execution
 - Output capture (character-by-character from stdout/stderr) and routing
@@ -45,10 +46,10 @@ PM3LDFLAGS += -sPTHREAD_POOL_SIZE=8
 PM3LDFLAGS += -sDEFAULT_PTHREAD_STACK_SIZE=1048576
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `USE_PTHREADS=1` | Enables Emscripten pthread support |
-| `PROXY_TO_PTHREAD=1` | Runs `main()` on a worker thread so the browser event loop stays free |
+| Flag                  | Purpose                                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `USE_PTHREADS=1`      | Enables Emscripten pthread support                                                                                                  |
+| `PROXY_TO_PTHREAD=1`  | Runs `main()` on a worker thread so the browser event loop stays free                                                               |
 | `PTHREAD_POOL_SIZE=8` | Pre-allocates 8 Web Workers. Without this, `pthread_create()` must create workers on-the-fly which can deadlock in synchronous code |
 
 ### Browser requirements
@@ -123,10 +124,10 @@ The build command runs: `emmake make -C proxmark3wasm/client EMSCRIPTEN=1 SKIPRE
 
 ### Build-time dependencies excluded for WASM
 
-| Library | Why excluded | Impact |
-|---------|-------------|--------|
-| `lz4` | Not available in Emscripten, would need porting | Compressed hardnested tables (`.lz4`) can't be loaded; attack still works using collected nonces |
-| `bz2` | Not available in Emscripten | Same as lz4 — `.bz2` compressed tables unavailable |
-| `readline` | No terminal line editing in browser context | Handled by xterm.js on the JS side instead |
-| `Qt` | No GUI framework in WASM | Replaced by the React UI |
-| `bluez` | Linux Bluetooth stack, not relevant | Bluetooth handled by Tauri transport layer |
+| Library    | Why excluded                                    | Impact                                                                                           |
+| ---------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `lz4`      | Not available in Emscripten, would need porting | Compressed hardnested tables (`.lz4`) can't be loaded; attack still works using collected nonces |
+| `bz2`      | Not available in Emscripten                     | Same as lz4 — `.bz2` compressed tables unavailable                                               |
+| `readline` | No terminal line editing in browser context     | Handled by xterm.js on the JS side instead                                                       |
+| `Qt`       | No GUI framework in WASM                        | Replaced by the React UI                                                                         |
+| `bluez`    | Linux Bluetooth stack, not relevant             | Bluetooth handled by Tauri transport layer                                                       |

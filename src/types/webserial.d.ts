@@ -12,9 +12,9 @@ interface SerialOptions {
   baudRate: number;
   dataBits?: 7 | 8;
   stopBits?: 1 | 2;
-  parity?: 'none' | 'even' | 'odd';
+  parity?: "none" | "even" | "odd";
   bufferSize?: number;
-  flowControl?: 'none' | 'hardware';
+  flowControl?: "none" | "hardware";
 }
 
 interface SerialPortInfo {
@@ -28,15 +28,20 @@ interface SerialPort extends EventTarget {
   open(options: SerialOptions): Promise<void>;
   close(): Promise<void>;
   getInfo(): SerialPortInfo;
-  addEventListener(type: 'connect' | 'disconnect', listener: EventListener): void;
-  removeEventListener(type: 'connect' | 'disconnect', listener: EventListener): void;
+  setSignals?(signals: {
+    dataTerminalReady?: boolean;
+    requestToSend?: boolean;
+    break?: boolean;
+  }): Promise<void>;
+  addEventListener(type: "connect" | "disconnect", listener: EventListener): void;
+  removeEventListener(type: "connect" | "disconnect", listener: EventListener): void;
 }
 
 interface Serial extends EventTarget {
   getPorts(): Promise<SerialPort[]>;
   requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
-  addEventListener(type: 'connect' | 'disconnect', listener: EventListener): void;
-  removeEventListener(type: 'connect' | 'disconnect', listener: EventListener): void;
+  addEventListener(type: "connect" | "disconnect", listener: EventListener): void;
+  removeEventListener(type: "connect" | "disconnect", listener: EventListener): void;
 }
 
 interface Navigator {

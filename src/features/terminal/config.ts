@@ -1,7 +1,5 @@
 export const TERMINAL_CLASS_NAME = "terminal-container bg-[#0a0a0f] rounded-lg overflow-hidden";
 
-export const TERMINAL_MIN_HEIGHT = 300;
-
 export const TERMINAL_THEME = {
   background: "#0a0a0f",
   foreground: "#e4e4e7",

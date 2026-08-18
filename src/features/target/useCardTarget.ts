@@ -7,7 +7,13 @@ import type { TagInfo } from "@/features/tag-info/types";
 import { assetsForUid, dumpsForUid, keysForUid } from "@/features/vault/vault";
 import { sanitizeHex } from "@/lib/rfidUtils";
 import { classifyCard } from "./classify";
-import type { CardSource, CardTarget, CardTargetContextValue } from "./types";
+import type {
+  CardSource,
+  CardTarget,
+  CardTargetContextValue,
+  LfIdentifyState,
+  MagicIdentifyState,
+} from "./types";
 
 interface UseCardTargetArgs {
   /** Active dump from the dump store, bridged in as the target's memory. */
@@ -35,6 +41,8 @@ export function useCardTarget({
 }: UseCardTargetArgs): CardTargetContextValue {
   const [identity, setIdentityState] = useState<TagInfo | null>(null);
   const [source, setSource] = useState<CardSource>(null);
+  const [lf, setLf] = useState<LfIdentifyState | null>(null);
+  const [magic, setMagic] = useState<MagicIdentifyState | null>(null);
   const [updatedAt, setUpdatedAt] = useState(() => Date.now());
 
   const mergeIdentity = useCallback(
@@ -49,12 +57,29 @@ export function useCardTarget({
   const setIdentity = useCallback((next: TagInfo | null, nextSource: CardSource = "scan") => {
     setIdentityState(next);
     setSource(next ? nextSource : null);
+    // A replacement identity represents a newly selected/scanned card. Carrier
+    // and magic capability checks belong to the previous physical card until
+    // they are explicitly run again.
+    setLf(null);
+    setMagic(null);
+    setUpdatedAt(Date.now());
+  }, []);
+
+  const noteLfIdentify = useCallback((info: LfIdentifyState) => {
+    setLf(info);
+    setUpdatedAt(Date.now());
+  }, []);
+
+  const noteMagicIdentify = useCallback((info: MagicIdentifyState) => {
+    setMagic(info);
     setUpdatedAt(Date.now());
   }, []);
 
   const clearTarget = useCallback(() => {
     setIdentityState(null);
     setSource(null);
+    setLf(null);
+    setMagic(null);
     setUpdatedAt(Date.now());
   }, []);
 
@@ -87,6 +112,8 @@ export function useCardTarget({
       relatedDumps,
       relatedAssets,
       hasCard,
+      lf,
+      magic,
       updatedAt,
     };
   }, [
@@ -98,11 +125,13 @@ export function useCardTarget({
     savedKeyCount,
     relatedDumps,
     relatedAssets,
+    lf,
+    magic,
     updatedAt,
   ]);
 
   return useMemo(
-    () => ({ target, mergeIdentity, setIdentity, clearTarget }),
-    [target, mergeIdentity, setIdentity, clearTarget],
+    () => ({ target, mergeIdentity, setIdentity, noteLfIdentify, noteMagicIdentify, clearTarget }),
+    [target, mergeIdentity, setIdentity, noteLfIdentify, noteMagicIdentify, clearTarget],
   );
 }

@@ -1,6 +1,7 @@
 import type { CachedDump } from "@/components/panels/CardMemoryMap";
 import type { StoredKey } from "@/components/panels/library/types";
 import type { CachedAsset } from "@/features/key-cache/types";
+import type { MagicCardType } from "@/features/magic/types";
 import type { TagInfo } from "@/features/tag-info/types";
 
 export type CardSize = "1k" | "4k" | "mini" | "unknown";
@@ -47,7 +48,33 @@ export interface CardTarget {
   relatedAssets: CachedAsset[];
   /** True once we know anything about a card (identity and/or a dump). */
   hasCard: boolean;
+  /** Latest LF carrier detect result (writable T5577 check), if any. */
+  lf: LfIdentifyState | null;
+  /** Latest HF magic-card detect result, if any. */
+  magic: MagicIdentifyState | null;
   updatedAt: number;
+}
+
+/**
+ * The result of an LF carrier check (`lf t55xx detect`). A writable T5577/T5555
+ * is LF's equivalent of a "magic" card — it is what clones get written to.
+ */
+export interface LfIdentifyState {
+  chip?: string;
+  config?: string;
+  passwordSet?: boolean;
+  writable: boolean;
+  /** Human-readable reason a carrier check could not identify a card. */
+  error?: string;
+  at: number;
+}
+
+/** The result of an HF magic-card check (`hf mf info`). */
+export interface MagicIdentifyState {
+  isMagic: boolean;
+  gen: MagicCardType;
+  label: string;
+  at: number;
 }
 
 export interface CardTargetContextValue {
@@ -56,6 +83,10 @@ export interface CardTargetContextValue {
   mergeIdentity: (identity: Partial<TagInfo>, source?: CardSource) => void;
   /** Replace identity wholesale, or clear it with `null`. */
   setIdentity: (identity: TagInfo | null, source?: CardSource) => void;
+  /** Record the outcome of an LF carrier detect, for the write/clone UI to gate on. */
+  noteLfIdentify: (info: LfIdentifyState) => void;
+  /** Record the outcome of an HF magic detect, for the Magic panel to gate on. */
+  noteMagicIdentify: (info: MagicIdentifyState) => void;
   /** Forget the current card identity (the dump store is cleared separately). */
   clearTarget: () => void;
 }

@@ -138,6 +138,14 @@ export const WORKSPACES: WorkspaceDefinition[] = [
     hint: "Reader connection, terminal and quick commands",
     strips: ["connect", "hf", "lf", "data", "tools", "shortcuts"],
   },
+  {
+    value: "guided",
+    label: "Guided Clone",
+    icon: "wand2",
+    group: "Session",
+    hint: "Step-by-step source scan, target validation, write and read-back verification",
+    strips: ["lf", "t55xx"],
+  },
 
   {
     value: "attacks",
@@ -154,6 +162,14 @@ export const WORKSPACES: WorkspaceDefinition[] = [
     group: "High Frequency",
     hint: "Write block 0 and clone onto magic / gen1a cards",
     strips: ["magic", "hf"],
+  },
+  {
+    value: "type2",
+    label: "Type 2 / NDEF",
+    icon: "fileCode2",
+    group: "High Frequency",
+    hint: "Read, compose, safely write and verify NFC Type 2 NDEF content",
+    strips: ["hf", "memory"],
   },
   {
     value: "traffic",
@@ -214,6 +230,14 @@ export const WORKSPACES: WorkspaceDefinition[] = [
     strips: ["utilities", "tools"],
   },
 
+  {
+    value: "device",
+    label: "Device",
+    icon: "cpu",
+    group: "System",
+    hint: "Observed hardware, firmware compatibility and command capabilities",
+    strips: ["connect", "settings"],
+  },
   {
     value: "settings",
     label: "Settings",
@@ -291,7 +315,7 @@ export const LF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
     { icon: "play", label: "Sim", command: "lf em 410x sim" },
   ],
   hid: [
-    { icon: "creditCard", label: "Read", command: "lf hid read" },
+    { icon: "creditCard", label: "Read", command: "lf hid reader" },
     { icon: "copy", label: "Clone", command: "lf hid clone" },
     { icon: "play", label: "Sim", command: "lf hid sim" },
     { icon: "zap", label: "Brute", command: "lf hid brute -w H10301 -f 101" },

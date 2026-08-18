@@ -153,6 +153,26 @@ code,
   padding: 8px;
 }
 
+/* Preserve a usable output area when the terminal is docked on short screens. */
+@media (max-height: 650px) {
+  .terminal-dock {
+    flex-basis: 60%;
+    min-height: 220px;
+  }
+
+  .terminal-pane-header {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .terminal-pane-header > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.5rem;
+  }
+
+  .terminal-shortcuts {
+    display: none;
+  }
+}
+
 /* Ribbon toolbar styles */
 .ribbon-tab-content {
   min-height: 80px;

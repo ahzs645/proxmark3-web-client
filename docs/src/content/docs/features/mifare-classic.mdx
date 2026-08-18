@@ -40,6 +40,7 @@ Advanced attack for cards with a hardened PRNG (EV1, etc.). Collects encrypted n
 ### Key Check (CHK / FCHK)
 
 Validates a list of known keys against all sectors. Two variants:
+
 - `hf mf chk` — standard check, tries keys one at a time
 - `hf mf fchk` — fast check, tests all keys in a single command to the PM3
 
@@ -55,24 +56,24 @@ Tests whether the card is vulnerable to the MIFARE NACK bug.
 
 These commands have been verified against real hardware (MIFARE Classic 4K, hard PRNG) through the WASM client:
 
-| Command | Status | Notes |
-|---------|--------|-------|
-| `hf 14a info` | ✅ | UID, ATQA, SAK, card type detection |
-| `hf search` | ✅ | Scans all HF protocols |
-| `hf mf info` | ✅ | Sector 0 keys, block 0, PRNG detection |
-| `hf mf chk --4k` | ✅ | Full dictionary check |
-| `hf mf fchk --4k` | ✅ | Fast dictionary check (~54s) |
-| `hf mf rdbl` | ✅ | Read individual blocks with known key |
-| `hf mf rdsc` | ✅ | Read full sector with known key |
-| `hf mf darkside` | ✅ | Reports vulnerable/not vulnerable |
-| `hf mf nested` | ✅ | Reports vulnerable/not vulnerable |
-| `hf mf nack` | ✅ | NACK bug detection |
-| `hf mf isen` | ✅ | Static encrypted nonce info |
-| `hf mf hardnested` | ✅ | Full attack — nonce collection + brute force |
-| `hf mf autopwn` | ✅ | Full automated recovery pipeline |
-| `hw version` | ✅ | Hardware and firmware info |
-| `hw status` | ✅ | Memory, FPGA, transfer speed |
-| `hw ping` | ✅ | Connectivity test |
+| Command            | Status | Notes                                        |
+| ------------------ | ------ | -------------------------------------------- |
+| `hf 14a info`      | ✅     | UID, ATQA, SAK, card type detection          |
+| `hf search`        | ✅     | Scans all HF protocols                       |
+| `hf mf info`       | ✅     | Sector 0 keys, block 0, PRNG detection       |
+| `hf mf chk --4k`   | ✅     | Full dictionary check                        |
+| `hf mf fchk --4k`  | ✅     | Fast dictionary check (~54s)                 |
+| `hf mf rdbl`       | ✅     | Read individual blocks with known key        |
+| `hf mf rdsc`       | ✅     | Read full sector with known key              |
+| `hf mf darkside`   | ✅     | Reports vulnerable/not vulnerable            |
+| `hf mf nested`     | ✅     | Reports vulnerable/not vulnerable            |
+| `hf mf nack`       | ✅     | NACK bug detection                           |
+| `hf mf isen`       | ✅     | Static encrypted nonce info                  |
+| `hf mf hardnested` | ✅     | Full attack — nonce collection + brute force |
+| `hf mf autopwn`    | ✅     | Full automated recovery pipeline             |
+| `hw version`       | ✅     | Hardware and firmware info                   |
+| `hw status`        | ✅     | Memory, FPGA, transfer speed                 |
+| `hw ping`          | ✅     | Connectivity test                            |
 
 ## Usage
 
@@ -98,13 +99,13 @@ The upstream PM3 codebase disabled hardnested for WASM because it depends on:
 
 Each was addressed:
 
-| Dependency | Solution |
-|-----------|----------|
-| Pthreads | Already supported via `-sUSE_PTHREADS=1`. Added `-sPTHREAD_POOL_SIZE=8` and capped threads at 4. |
-| SIMD | Forced `NOSIMD_BUILD` path by setting `cpu_arch = wasm` in the hardnested Makefile. Uses 64-bit integer operations instead. |
-| lz4/bz2 | Provided inline API stubs so the code compiles. Compressed table paths fail gracefully at runtime. |
-| Memory | Increased `MAXIMUM_MEMORY` from 512 MB to 2 GB. |
-| SAFE_HEAP | Removed — incompatible with SharedArrayBuffer used by pthreads. |
+| Dependency | Solution                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Pthreads   | Already supported via `-sUSE_PTHREADS=1`. Added `-sPTHREAD_POOL_SIZE=8` and capped threads at 4.                            |
+| SIMD       | Forced `NOSIMD_BUILD` path by setting `cpu_arch = wasm` in the hardnested Makefile. Uses 64-bit integer operations instead. |
+| lz4/bz2    | Provided inline API stubs so the code compiles. Compressed table paths fail gracefully at runtime.                          |
+| Memory     | Increased `MAXIMUM_MEMORY` from 512 MB to 2 GB.                                                                             |
+| SAFE_HEAP  | Removed — incompatible with SharedArrayBuffer used by pthreads.                                                             |
 
 ### What to expect
 
@@ -130,11 +131,11 @@ The state count drops from ~2^47 (14 days of brute force) down toward a tractabl
 
 ### Performance comparison
 
-| Metric | Native | WASM (NOSIMD, 4 threads) |
-|--------|--------|--------------------------|
-| Brute force rate | ~500M-2B keys/s (with SIMD) | ~120M keys/s |
-| Typical attack time | 30s - 5min | 5min - 30min+ |
-| Memory usage | ~200-500 MB | ~500 MB - 1.5 GB |
+| Metric              | Native                      | WASM (NOSIMD, 4 threads) |
+| ------------------- | --------------------------- | ------------------------ |
+| Brute force rate    | ~500M-2B keys/s (with SIMD) | ~120M keys/s             |
+| Typical attack time | 30s - 5min                  | 5min - 30min+            |
+| Memory usage        | ~200-500 MB                 | ~500 MB - 1.5 GB         |
 
 The WASM version is roughly 4-8x slower due to no SIMD and WASM overhead, but it **works** — which is the important thing for a browser-based tool.
 

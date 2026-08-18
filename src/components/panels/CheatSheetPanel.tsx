@@ -35,8 +35,14 @@ const cheatData: CheatSection[] = [
     badge: "success",
     entries: [
       { command: "hf mf autopwn --1k", summary: "Full MIFARE Classic attack, keys + dump" },
-      { command: "hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w", summary: "Hardnested key recovery using collected nonces" },
-      { command: "hf iclass loclass -f iclass_mac_attack.bin", summary: "LOCLASS attack to extract custom iCLASS keys" },
+      {
+        command: "hf mf hardnested --blk 0 -a -k FFFFFFFFFFFF --tblk 4 --ta -w",
+        summary: "Hardnested key recovery using collected nonces",
+      },
+      {
+        command: "hf iclass loclass -f iclass_mac_attack.bin",
+        summary: "LOCLASS attack to extract custom iCLASS keys",
+      },
     ],
   },
   {
@@ -52,7 +58,7 @@ const cheatData: CheatSection[] = [
     title: "LF / HID + Indala",
     badge: "warning",
     entries: [
-      { command: "lf hid read", summary: "Read/demodulate HID Prox credential" },
+      { command: "lf hid reader", summary: "Read/demodulate HID Prox credential" },
       { command: "lf hid clone -w H10301 --fc 10 --cn 1337", summary: "Clone HID Prox to T5577" },
       { command: "lf indala read", summary: "Read/identify Indala card" },
     ],

@@ -7,10 +7,10 @@ import { CreditCard, FileJson, FolderOpen, HardDrive, Sparkles } from "lucide-re
 interface MemoryWelcomeProps {
   cachedDumps: CachedDump[];
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
-  onJsonUpload: (files: FileList | null) => void;
+  onDumpUpload: (files: FileList | null) => void;
 }
 
-export function MemoryWelcome({ cachedDumps, onDumpLoad, onJsonUpload }: MemoryWelcomeProps) {
+export function MemoryWelcome({ cachedDumps, onDumpLoad, onDumpUpload }: MemoryWelcomeProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-8">
       <div className="max-w-md space-y-6 text-center">
@@ -58,7 +58,7 @@ export function MemoryWelcome({ cachedDumps, onDumpLoad, onJsonUpload }: MemoryW
             <input
               type="file"
               accept=".json"
-              onChange={(e) => onJsonUpload(e.target.files)}
+              onChange={(e) => onDumpUpload(e.target.files)}
               className="hidden"
             />
           </label>
@@ -85,7 +85,7 @@ export function MemoryWelcome({ cachedDumps, onDumpLoad, onJsonUpload }: MemoryW
                 if (files) {
                   for (const file of Array.from(files)) {
                     if (file.name.endsWith(".json") && file.name.includes("dump")) {
-                      onJsonUpload(files);
+                      onDumpUpload(files);
                       break;
                     }
                   }
@@ -111,7 +111,7 @@ export function MemoryWelcome({ cachedDumps, onDumpLoad, onJsonUpload }: MemoryW
             <input
               type="file"
               accept=".bin,.dump,.eml"
-              onChange={(e) => onJsonUpload(e.target.files)}
+              onChange={(e) => onDumpUpload(e.target.files)}
               className="hidden"
             />
           </label>

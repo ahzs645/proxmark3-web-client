@@ -48,6 +48,8 @@ export function appendJob(
     startedAt: busy ? null : job.now,
     endedAt: null,
     completionObserved: true,
+    outputTail: [],
+    resultKind: "unknown",
   };
   return { jobs: trim([next, ...jobs]), job: next };
 }
@@ -108,7 +110,13 @@ export function stopAll(jobs: CommandJob[], now: number): CommandJob[] {
   return trim(
     jobs.map((job) =>
       job.status === "running" || job.status === "queued"
-        ? { ...job, status: "stopped" as const, endedAt: now }
+        ? {
+            ...job,
+            status: "stopped" as const,
+            endedAt: now,
+            resultKind: "failure" as const,
+            resultSummary: job.resultSummary ?? "Interrupted by user",
+          }
         : job,
     ),
   );

@@ -3,9 +3,9 @@
  * Shows available transports (WebSerial, Native Serial, Bluetooth) when in Tauri
  */
 
-import { Select } from '@/components/ui/select';
-import { Usb, Bluetooth, Cable } from 'lucide-react';
-import type { TransportType, TransportInfo } from '@/lib/transports';
+import { Select } from "@/components/ui/select";
+import { Usb, Bluetooth, Cable } from "lucide-react";
+import type { TransportType, TransportInfo } from "@/lib/transports";
 
 interface TransportSelectorProps {
   availableTransports: TransportInfo[];
@@ -20,11 +20,11 @@ interface TransportSelectorProps {
  */
 function getTransportIcon(type: TransportType) {
   switch (type) {
-    case 'webserial':
+    case "webserial":
       return <Usb className="h-3 w-3" />;
-    case 'tauri-serial':
+    case "tauri-serial":
       return <Cable className="h-3 w-3" />;
-    case 'tauri-bluetooth':
+    case "tauri-bluetooth":
       return <Bluetooth className="h-3 w-3" />;
     default:
       return <Usb className="h-3 w-3" />;
@@ -36,12 +36,12 @@ function getTransportIcon(type: TransportType) {
  */
 function getTransportLabel(type: TransportType): string {
   switch (type) {
-    case 'webserial':
-      return 'WebSerial';
-    case 'tauri-serial':
-      return 'Native USB';
-    case 'tauri-bluetooth':
-      return 'Bluetooth';
+    case "webserial":
+      return "WebSerial";
+    case "tauri-serial":
+      return "Native USB";
+    case "tauri-bluetooth":
+      return "Bluetooth";
     default:
       return type;
   }
@@ -59,7 +59,7 @@ export function TransportSelector({
     return null;
   }
 
-  const options = availableTransports.map(transport => ({
+  const options = availableTransports.map((transport) => ({
     value: transport.type,
     label: getTransportLabel(transport.type),
   }));
@@ -72,7 +72,7 @@ export function TransportSelector({
       <div className="flex items-center gap-1">
         {selectedTransport && getTransportIcon(selectedTransport)}
         <Select
-          value={selectedTransport || ''}
+          value={selectedTransport || ""}
           onValueChange={(value) => onTransportChange(value as TransportType)}
           options={options}
           disabled={disabled || isConnected}
@@ -80,9 +80,7 @@ export function TransportSelector({
         />
       </div>
       {isConnected && (
-        <div className="text-[9px] text-muted-foreground px-1">
-          Disconnect to change
-        </div>
+        <div className="text-[9px] text-muted-foreground px-1">Disconnect to change</div>
       )}
     </div>
   );

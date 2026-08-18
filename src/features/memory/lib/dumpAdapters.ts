@@ -8,15 +8,32 @@ export function dumpToBlocks(dump: PM3DumpJson): Block[] {
     .sort((a, b) => a - b);
 
   return blockNumbers.map((index) => {
-    const sector = Math.floor(index / 4);
-    const blockInSector = index % 4;
+    const pageSized = Object.values(dump.blocks ?? {}).every(
+      (value) => value.replace(/\s/g, "").length === 8,
+    );
+    const sector = pageSized
+      ? 0
+      : index < 128
+        ? Math.floor(index / 4)
+        : 32 + Math.floor((index - 128) / 16);
+    const blockInSector = pageSized ? index : index < 128 ? index % 4 : (index - 128) % 16;
     const data = dump.blocks?.[index.toString()] || "00000000000000000000000000000000";
+
+    if (pageSized) {
+      return {
+        index,
+        sector,
+        data,
+        kind: index < 2 ? "manufacturer" : index === 2 ? "trailer" : "page",
+        label: index < 2 ? "UID/BCC" : index === 2 ? "Lock/OTP" : "Page",
+      };
+    }
 
     if (index === 0) {
       return { index, sector, data, kind: "manufacturer", label: "Manufacturer" };
     }
 
-    if (blockInSector === 3) {
+    if ((index < 128 && blockInSector === 3) || (index >= 128 && blockInSector === 15)) {
       return { index, sector, data, kind: "trailer", label: "Sector Trailer" };
     }
 

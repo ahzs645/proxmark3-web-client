@@ -14,6 +14,7 @@ dist-ssr
 
 # Raw hardware capture logs (working artifacts; bundled demo data lives in src/)
 captures/
+card-dumps/
 
 # Editor directories and files
 .vscode/*

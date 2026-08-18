@@ -17,6 +17,8 @@ export interface PM3DumpJson {
     ATQA?: string;
     SAK?: string;
   };
+  /** 56-byte PM3 MFU binary header when the dump originated from an MFU file. */
+  MfuHeader?: string;
   blocks?: Record<string, string>;
   SectorKeys?: Record<
     string,

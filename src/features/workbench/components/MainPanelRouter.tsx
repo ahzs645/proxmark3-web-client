@@ -1,13 +1,13 @@
 import { lazy, Suspense } from "react";
-import { ChevronUp, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Theme } from "@/hooks/useTheme";
 import type { CachedDump, PM3DumpJson } from "@/components/panels/CardMemoryMap";
-import { useCommands } from "@/features/commands/context";
 import { WorkbenchHome } from "./WorkbenchHome";
 import type { CachedAssetWithData } from "../types";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
 import type { RefObject } from "react";
+import type { TransportType } from "@/lib/transports";
 
 const CardMemoryMap = lazy(() =>
   import("@/components/panels/CardMemoryMap").then((m) => ({ default: m.CardMemoryMap })),
@@ -44,6 +44,19 @@ const LibraryPanel = lazy(() =>
 );
 const UtilitiesPanel = lazy(() =>
   import("@/components/panels/UtilitiesPanel").then((m) => ({ default: m.UtilitiesPanel })),
+);
+const Type2NdefPanel = lazy(() =>
+  import("@/components/panels/Type2NdefPanel").then((m) => ({ default: m.Type2NdefPanel })),
+);
+const DeviceProfilePanel = lazy(() =>
+  import("@/components/panels/DeviceProfilePanel").then((m) => ({
+    default: m.DeviceProfilePanel,
+  })),
+);
+const GuidedClonePanel = lazy(() =>
+  import("@/components/panels/GuidedClonePanel").then((m) => ({
+    default: m.GuidedClonePanel,
+  })),
 );
 
 function PanelLoading() {
@@ -89,6 +102,10 @@ interface MainPanelRouterProps {
   onDumpRename: (id: string, newName: string) => void;
   onDumpDelete: (id: string) => void;
   onClearCache: () => void;
+  activeTransportType: TransportType | null;
+  onDisconnectApplication: () => Promise<void>;
+  onReconnectApplication: () => Promise<boolean>;
+  onFirmwareLog?: (message: string) => void;
 }
 
 export function MainPanelRouter({
@@ -125,11 +142,26 @@ export function MainPanelRouter({
   onDumpRename,
   onDumpDelete,
   onClearCache,
+  activeTransportType,
+  onDisconnectApplication,
+  onReconnectApplication,
+  onFirmwareLog,
 }: MainPanelRouterProps) {
-  const { isBusy } = useCommands();
   let panel = null;
 
-  if (activeWorkspace === "memory") {
+  if (activeWorkspace === "guided") {
+    panel = (
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="mx-auto h-full max-w-5xl">
+          <GuidedClonePanel
+            onCommand={onCommand}
+            onOpenTab={onOpenTab}
+            disabled={!canRunCommands}
+          />
+        </div>
+      </div>
+    );
+  } else if (activeWorkspace === "memory") {
     panel = (
       <div className="flex-1 flex flex-col overflow-hidden p-4">
         <CardMemoryMap
@@ -173,6 +205,18 @@ export function MainPanelRouter({
         </div>
       </div>
     );
+  } else if (activeWorkspace === "type2") {
+    panel = (
+      <div className="flex-1 p-4 overflow-hidden">
+        <div className="h-full max-w-6xl mx-auto">
+          <Type2NdefPanel
+            activeDump={activeDump}
+            onDumpLoad={onDumpLoad}
+            disabled={!canRunCommands}
+          />
+        </div>
+      </div>
+    );
   } else if (activeWorkspace === "lfops") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
@@ -206,6 +250,7 @@ export function MainPanelRouter({
             onDumpLoad={onDumpLoad}
             onDumpRename={onDumpRename}
             onDumpDelete={onDumpDelete}
+            onOpenTab={onOpenTab}
           />
         </div>
       </div>
@@ -218,6 +263,14 @@ export function MainPanelRouter({
         </div>
       </div>
     );
+  } else if (activeWorkspace === "device") {
+    panel = (
+      <div className="flex-1 overflow-hidden p-4">
+        <div className="mx-auto h-full max-w-4xl">
+          <DeviceProfilePanel />
+        </div>
+      </div>
+    );
   } else if (activeWorkspace === "settings") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
@@ -227,6 +280,11 @@ export function MainPanelRouter({
             onThemeChange={onThemeChange}
             cacheCount={cachedAssets.length}
             onClearCache={onClearCache}
+            isDeviceConnected={isDeviceConnected}
+            activeTransportType={activeTransportType}
+            onDisconnectApplication={onDisconnectApplication}
+            onReconnectApplication={onReconnectApplication}
+            onFirmwareLog={onFirmwareLog}
           />
         </div>
       </div>
@@ -250,7 +308,7 @@ export function MainPanelRouter({
         className={cn(
           "flex min-h-0 flex-col",
           !panel && "flex-1",
-          panel && terminalDockOpen && "shrink-0 basis-[45%] border-t border-border",
+          panel && terminalDockOpen && "terminal-dock shrink-0 basis-[45%] border-t border-border",
           panel && !terminalDockOpen && "hidden",
         )}
       >
@@ -281,22 +339,6 @@ export function MainPanelRouter({
           onRefreshTag={onRefreshTag}
         />
       </div>
-
-      {/* When the dock is hidden under a panel, offer a slim reopen affordance
-          that also says whether anything is still running down there. */}
-      {panel && !terminalDockOpen ? (
-        <button
-          type="button"
-          onClick={onTerminalDockToggle}
-          className={cn(
-            "flex shrink-0 items-center justify-center gap-1.5 border-t border-border bg-card/60 py-1.5 text-[11px] font-medium transition-colors hover:bg-accent hover:text-foreground",
-            isBusy ? "text-primary" : "text-muted-foreground",
-          )}
-        >
-          <ChevronUp className="h-3 w-3" />
-          {isBusy ? "Show terminal — command running" : "Show terminal"}
-        </button>
-      ) : null}
     </div>
   );
 }

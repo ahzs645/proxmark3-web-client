@@ -57,6 +57,18 @@ export function useSettingsState() {
     (value: boolean) => updateSetting("showAdvancedOptions", value),
     [updateSetting],
   );
+  const setOperationProfile = useCallback(
+    (value: SettingsState["operationProfile"]) => updateSetting("operationProfile", value),
+    [updateSetting],
+  );
+  const setNativePm3BinaryPath = useCallback(
+    (value: string) => updateSetting("nativePm3BinaryPath", value),
+    [updateSetting],
+  );
+  const setNativePm3Port = useCallback(
+    (value: string) => updateSetting("nativePm3Port", value),
+    [updateSetting],
+  );
 
   const exportSettings = useCallback(() => {
     exportSettingsToFile(settings);
@@ -101,6 +113,9 @@ export function useSettingsState() {
     setConfirmDestructiveOps,
     setTerminalFontSize,
     setShowAdvancedOptions,
+    setOperationProfile,
+    setNativePm3BinaryPath,
+    setNativePm3Port,
     exportSettings,
     importSettings,
     resetSettings,

@@ -1,6 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { Cpu } from "lucide-react";
 import { HexToolsSection } from "@/components/panels/utilities/HexToolsSection";
 import { UidToolsSection } from "@/components/panels/utilities/UidToolsSection";
@@ -10,13 +10,7 @@ import { Pn532ToolsSection } from "@/components/panels/utilities/Pn532ToolsSecti
 export function UtilitiesPanel() {
   return (
     <Card className="flex h-full flex-col overflow-hidden">
-      <CardHeader className="border-b pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Cpu className="h-4 w-4 text-primary" />
-          Browser Utilities
-          <Badge variant="outline">Offline</Badge>
-        </CardTitle>
-      </CardHeader>
+      <PanelHeader icon={Cpu} title="Browser Utilities" tag="Offline" />
 
       <CardContent className="flex-1 overflow-auto p-4">
         <Tabs defaultValue="hex" className="space-y-4">

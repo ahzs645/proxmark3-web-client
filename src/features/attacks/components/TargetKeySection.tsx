@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { Input } from "@/components/ui/input";
 import { Target } from "lucide-react";
 import type { KeyType } from "../types";
@@ -18,10 +19,7 @@ export function TargetKeySection({
 }: TargetKeySectionProps) {
   return (
     <div className="space-y-3">
-      <label className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-        <Target className="h-3 w-3" />
-        Target Key
-      </label>
+      <SectionLabel icon={<Target className="h-3 w-3" />}>Target Key</SectionLabel>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">Block</label>

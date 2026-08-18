@@ -15,14 +15,14 @@ declare global {
  * Check if running in Tauri desktop environment
  */
 export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
+  return typeof window !== "undefined" && "__TAURI__" in window;
 }
 
 /**
  * Check if running in a web browser (not Tauri)
  */
 export function isBrowser(): boolean {
-  return typeof window !== 'undefined' && !isTauri();
+  return typeof window !== "undefined" && !isTauri();
 }
 
 /**
@@ -31,7 +31,7 @@ export function isBrowser(): boolean {
  */
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    throw new Error('Tauri APIs not available - not running in Tauri environment');
+    throw new Error("Tauri APIs not available - not running in Tauri environment");
   }
 
   // Use the global __TAURI__ object directly instead of dynamic import
@@ -40,7 +40,7 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
     return window.__TAURI__.invoke<T>(cmd, args);
   }
 
-  throw new Error('Tauri invoke not available');
+  throw new Error("Tauri invoke not available");
 }
 
 /**
@@ -52,7 +52,7 @@ export async function getPlatform(): Promise<string | null> {
 
   try {
     // Platform detection via Tauri command (will be implemented in Phase 2)
-    return await invoke<string>('get_platform');
+    return await invoke<string>("get_platform");
   } catch {
     return null;
   }

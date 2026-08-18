@@ -1,7 +1,7 @@
 import type { CachedDump, PM3DumpJson } from "../CardMemoryMap";
 import { sanitizeHex } from "@/lib/rfidUtils";
 import { exportDumpJson } from "@/features/memory/lib/export";
-import type { CardDraft, KeyDraft, StoredCard, StoredKey } from "./types";
+import type { CardDraft, KeyDraft, KeyGroup, StoredCard, StoredKey } from "./types";
 
 function makeId(prefix: string): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -131,6 +131,92 @@ function matchesKeyDraft(
 
 export function getDumpUid(dump: CachedDump) {
   return sanitizeHex(dump.data.Card?.UID || "", 20);
+}
+
+/**
+ * A readable label for a dump. User-given names are kept as-is; the default pm3
+ * export filename (`hf-mf-<uid>-dump.json`) is prettified into something that
+ * reads like a card rather than a path.
+ */
+export function dumpDisplayName(dump: CachedDump): string {
+  const raw = dump.name || "";
+  const mifare = raw.match(/^hf-mf-([0-9A-Fa-f]+)-dump(?:-\d+)?\.(?:json|bin|eml)$/i);
+  if (mifare) return `MIFARE ${mifare[1].toUpperCase()}`;
+  const iclass = raw.match(/^hf-iclass-([0-9A-Fa-f]+)-dump(?:-\d+)?\.(?:json|bin|eml)$/i);
+  if (iclass) return `iCLASS ${iclass[1].toUpperCase()}`;
+  return raw.replace(/\.(json|bin|eml)$/i, "") || "Untitled dump";
+}
+
+/** Count the distinct, recovered (non-`?`) keys a dump yielded. */
+export function dumpKeyCount(dump: CachedDump): number {
+  return extractDumpKeysFromData(dump.data, dump.id).length;
+}
+
+/**
+ * Organize keys by their origin so a whole autopwn/dump session reads as one
+ * unit. Keys sharing a source dump group under that session; keys only tagged to
+ * a UID group under that card; untagged/common keys fall into a single group.
+ */
+export function groupKeysBySource(
+  keys: StoredKey[],
+  dumpMap: Map<string, CachedDump>,
+  cards: StoredCard[],
+): KeyGroup[] {
+  const cardByUid = new Map(cards.map((card) => [card.uid, card] as const));
+  const groups = new Map<string, KeyGroup>();
+  const commonKeys: StoredKey[] = [];
+
+  for (const key of keys) {
+    const uid = sanitizeHex(key.uidFilter || "", 20);
+    const dump = key.sourceDumpId ? (dumpMap.get(key.sourceDumpId) ?? null) : null;
+
+    // Untagged, non-session keys (common dictionary / manual global keys).
+    if (!uid && !dump) {
+      commonKeys.push(key);
+      continue;
+    }
+
+    const groupId = dump ? `dump:${dump.id}` : `uid:${uid}`;
+    let group = groups.get(groupId);
+    if (!group) {
+      const card = uid ? cardByUid.get(uid) : undefined;
+      const title = card?.name || (dump ? dumpDisplayName(dump) : uid ? `Card ${uid}` : "Keys");
+      const subtitleParts: string[] = [];
+      if (uid) subtitleParts.push(uid);
+      if (dump) subtitleParts.push(`from ${dump.name}`);
+      group = {
+        id: groupId,
+        title,
+        subtitle: subtitleParts.join(" · "),
+        uid,
+        sourceDumpId: dump?.id ?? null,
+        kind: dump ? "session" : "card",
+        keys: [],
+      };
+      groups.set(groupId, group);
+    }
+    group.keys.push(key);
+  }
+
+  const ordered = [...groups.values()].sort((a, b) => {
+    const aLatest = Math.max(...a.keys.map((k) => k.updatedAt));
+    const bLatest = Math.max(...b.keys.map((k) => k.updatedAt));
+    return bLatest - aLatest;
+  });
+
+  if (commonKeys.length) {
+    ordered.push({
+      id: "common",
+      title: "Common & global keys",
+      subtitle: "Applied to every card — seeds autopwn / check-keys",
+      uid: "",
+      sourceDumpId: null,
+      kind: "common",
+      keys: commonKeys,
+    });
+  }
+
+  return ordered;
 }
 
 export function extractDumpKeysFromData(

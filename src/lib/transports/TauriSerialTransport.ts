@@ -3,9 +3,9 @@
  * Uses Tauri commands to communicate with the serialport Rust crate
  */
 
-import { uartShared } from '../pm3WebUSB';
-import { isTauri, invoke } from '../tauri';
-import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from './types';
+import { uartShared } from "../pm3WebUSB";
+import { isTauri, invoke } from "../tauri";
+import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from "./types";
 
 interface PortInfo {
   name: string;
@@ -18,7 +18,7 @@ interface PortInfo {
 }
 
 export class TauriSerialTransport implements Transport {
-  readonly type: TransportType = 'tauri-serial';
+  readonly type: TransportType = "tauri-serial";
 
   private _isConnected: boolean = false;
   private readLoopRunning: boolean = false;
@@ -37,15 +37,15 @@ export class TauriSerialTransport implements Transport {
     if (!this.isAvailable()) return [];
 
     try {
-      const ports = await invoke<PortInfo[]>('serial_list_ports');
-      return ports.map(port => ({
+      const ports = await invoke<PortInfo[]>("serial_list_ports");
+      return ports.map((port) => ({
         id: port.name,
         name: this.formatPortName(port),
         type: this.type,
         address: port.name,
       }));
     } catch (error) {
-      console.error('Failed to list serial ports:', error);
+      console.error("Failed to list serial ports:", error);
       return [];
     }
   }
@@ -57,12 +57,12 @@ export class TauriSerialTransport implements Transport {
     } else if (port.manufacturer) {
       parts.push(`(${port.manufacturer})`);
     }
-    return parts.join(' ');
+    return parts.join(" ");
   }
 
   async connect(device?: TransportDevice): Promise<boolean> {
     if (!this.isAvailable()) {
-      console.error('Tauri serial not available');
+      console.error("Tauri serial not available");
       return false;
     }
 
@@ -74,9 +74,8 @@ export class TauriSerialTransport implements Transport {
       } else {
         // Auto-detect: try to find a Proxmark3 device
         const devices = await this.listDevices();
-        const pm3Device = devices.find(d =>
-          d.name.toLowerCase().includes('proxmark') ||
-          d.name.toLowerCase().includes('pm3')
+        const pm3Device = devices.find(
+          (d) => d.name.toLowerCase().includes("proxmark") || d.name.toLowerCase().includes("pm3"),
         );
 
         if (pm3Device) {
@@ -85,11 +84,11 @@ export class TauriSerialTransport implements Transport {
           // Fall back to first available device
           portName = devices[0].address || devices[0].id;
         } else {
-          throw new Error('No serial ports available');
+          throw new Error("No serial ports available");
         }
       }
 
-      const success = await invoke<boolean>('serial_connect', {
+      const success = await invoke<boolean>("serial_connect", {
         portName,
         baudRate: 115200,
       });
@@ -108,7 +107,7 @@ export class TauriSerialTransport implements Transport {
 
       return success;
     } catch (error) {
-      console.error('Tauri serial connection failed:', error);
+      console.error("Tauri serial connection failed:", error);
       this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
       return false;
     }
@@ -119,9 +118,9 @@ export class TauriSerialTransport implements Transport {
     this.stopTxLoop();
 
     try {
-      await invoke('serial_disconnect');
+      await invoke("serial_disconnect");
     } catch (error) {
-      console.error('Error disconnecting:', error);
+      console.error("Error disconnecting:", error);
     }
 
     this._isConnected = false;
@@ -132,7 +131,7 @@ export class TauriSerialTransport implements Transport {
   startReadLoop(): void {
     if (this.readLoopRunning) return;
     this.readLoopRunning = true;
-    this.runReadLoop();
+    void this.runReadLoop();
   }
 
   stopReadLoop(): void {
@@ -142,16 +141,16 @@ export class TauriSerialTransport implements Transport {
   private async runReadLoop(): Promise<void> {
     while (this.readLoopRunning && this._isConnected) {
       try {
-        const data = await invoke<number[]>('serial_read', { maxBytes: 4096 });
+        const data = await invoke<number[]>("serial_read", { maxBytes: 4096 });
         if (data && data.length > 0) {
           const uint8Data = new Uint8Array(data);
           uartShared.pushRx(uint8Data);
           this.eventHandlers.onData?.(uint8Data);
         }
-      } catch (error) {
+      } catch {
         // Check if still connected
         try {
-          const connected = await invoke<boolean>('serial_is_connected');
+          const connected = await invoke<boolean>("serial_is_connected");
           if (!connected) {
             this._isConnected = false;
             this.readLoopRunning = false;
@@ -164,14 +163,14 @@ export class TauriSerialTransport implements Transport {
       }
 
       // Small delay to prevent busy-looping
-      await new Promise(resolve => setTimeout(resolve, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
     }
   }
 
   startTxLoop(): void {
     if (this.txLoopRunning) return;
     this.txLoopRunning = true;
-    this.runTxLoop();
+    void this.runTxLoop();
   }
 
   stopTxLoop(): void {
@@ -186,13 +185,13 @@ export class TauriSerialTransport implements Transport {
         const n = uartShared.popTx(tmp.length, tmp);
         if (n > 0) {
           const dataToSend = Array.from(tmp.subarray(0, n));
-          await invoke('serial_write', { data: dataToSend });
+          await invoke("serial_write", { data: dataToSend });
         } else {
           // Sleep a bit to avoid busy-looping
-          await new Promise(resolve => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 5));
         }
       } catch (error) {
-        console.error('Tauri serial TX error:', error);
+        console.error("Tauri serial TX error:", error);
         this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     }
@@ -203,11 +202,11 @@ export class TauriSerialTransport implements Transport {
   }
 
   getName(): string {
-    return 'Native Serial (USB)';
+    return "Native Serial (USB)";
   }
 
   getDescription(): string {
-    return 'Connect via USB using native serial port (Tauri)';
+    return "Connect via USB using native serial port (Tauri)";
   }
 }
 

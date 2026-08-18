@@ -1,0 +1,32 @@
+---
+title: NFC Type 2 and NDEF
+description: Read, compose, safely write, clear, and verify NDEF data on supported NFC Type 2 tags.
+---
+
+The **Type 2 / NDEF** workspace is a browser-native editor and controlled write workflow for NFC Forum Type 2 tags. It currently has explicit writable profiles for NXP NTAG213, NTAG215, and NTAG216. Unknown or generic layouts remain read-only.
+
+## Read and inspect
+
+**Read tag** captures a complete PM3 MFU binary image in the WebAssembly filesystem, parses the capability container and protection bytes, and decodes supported NDEF Text and URI records. Imported PM3 MFU dumps can be inspected without hardware.
+
+## Safety checks
+
+Before a destructive operation the workspace checks the detected memory profile, static lock bytes, dynamic lock bytes, and `AUTH0`. Recommended and Thorough profiles also retain a before-image in IndexedDB and confirm that the same UID remains present before writing.
+
+Writes are bounded to the detected user-memory range. Recommended writes invalidate the first NDEF page, write the body, then commit the header. Thorough mode also reads the staged body before commit. Final verification compares the complete target area byte for byte and confirms that protected pages did not change.
+
+## Clear versus zero
+
+**Clear NDEF content** changes the length of existing NDEF TLVs to zero while keeping other TLVs and their offsets intact. **Zero user memory** writes zeroes across the complete supported user-memory range and therefore requires a known tag profile.
+
+## Browser storage
+
+Before-images and structured operation reports are stored locally in IndexedDB. Open **Library → Audit & backups** to export or remove them. Nothing is uploaded to a server.
+
+## Operation profiles
+
+- **Fast** keeps required profile and protection checks but skips backup and readback.
+- **Recommended** saves a browser backup, confirms target stability, performs a two-phase NDEF write, and verifies the final bytes.
+- **Thorough** adds pre-commit body verification and all available compatibility checks.
+
+Choose the default under **Settings → Behavior**.

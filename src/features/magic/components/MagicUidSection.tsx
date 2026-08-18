@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Key, Shuffle, Copy, Zap } from "lucide-react";
@@ -52,10 +53,7 @@ export function MagicUidSection({
 
   return (
     <div className="space-y-3 p-3">
-      <label className="flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-        <Key className="h-3 w-3" />
-        Set UID
-      </label>
+      <SectionLabel icon={<Key className="h-3 w-3" />}>Set UID</SectionLabel>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="space-y-2">
