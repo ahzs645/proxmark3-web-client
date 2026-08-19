@@ -49,7 +49,8 @@ export interface OperationRecord {
     | "mifare-verified-restore"
     | "lf-verified-write"
     | "magic-uid-write"
-    | "magic-block0-write";
+    | "magic-block0-write"
+    | "magic-dump-restore";
   profile?: string;
   method?: string;
   checks?: OperationCheckRecord[];
@@ -147,6 +148,72 @@ export interface AssetRecord {
   updatedAt: number;
 }
 
+// ---------------------------------------------------------------------------
+// Virtual cards
+// ---------------------------------------------------------------------------
+
+/**
+ * What the physical thing actually is. A UID says nothing about whether you are
+ * holding a badge, a keyfob or a sticker, so the user states it once here and
+ * every list can show it.
+ */
+export type VirtualCardForm =
+  | "card"
+  | "fob"
+  | "tag"
+  | "sticker"
+  | "wristband"
+  | "implant"
+  | "ring"
+  | "phone"
+  | "other";
+
+/** Why this item is in the library — the issued thing, or something we wrote. */
+export type VirtualCardRole = "original" | "clone" | "blank" | "test";
+
+/**
+ * A "virtual card": one real-world credential, assembled from the rows that are
+ * scattered across the technology-shaped tables. A dual-frequency badge is a
+ * single virtual card whose members are an HF card row, an LF credential row,
+ * and the dumps/keys recovered from either side — the other tables stay flat and
+ * protocol-specific, while this row is the thing the user actually recognizes.
+ */
+export interface VirtualCardRecord {
+  id: string;
+  /** Nickname, e.g. "Office badge". */
+  name: string;
+  form: VirtualCardForm;
+  role: VirtualCardRole;
+  /** Who issued it / where it is used, e.g. "UNBC", "Gym". */
+  issuer?: string;
+  /** Palette key for the colour dot shown in lists (see virtualCards.ts). */
+  color?: string;
+  /** Free-form labels for grouping, e.g. ["work", "door access"]. */
+  tags: string[];
+  favorite: boolean;
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** The vault tables a virtual card can draw members from. */
+export type VirtualCardMemberKind = "card" | "lfCard" | "dump" | "key" | "asset";
+
+/**
+ * A membership edge between a virtual card and one row in another table. Kept
+ * as its own table rather than a column on each record so linking never has to
+ * rewrite — or migrate — the protocol-specific rows, and so one dump or key can
+ * belong to more than one virtual card (an original and its clone).
+ */
+export interface VirtualCardMemberRecord {
+  /** Deterministic `<virtualCardId>:<kind>:<refId>` so re-linking is a no-op. */
+  id: string;
+  virtualCardId: string;
+  kind: VirtualCardMemberKind;
+  refId: string;
+  addedAt: number;
+}
+
 /**
  * The single IndexedDB database behind the whole vault. Replaces the five
  * independent localStorage stores (dumps, dump-meta, keys, cards, file cache)
@@ -160,6 +227,8 @@ export class VaultDatabase extends Dexie {
   lfCards!: Table<LfCardRecord, string>;
   operations!: Table<OperationRecord, string>;
   backups!: Table<BackupRecord, string>;
+  virtualCards!: Table<VirtualCardRecord, string>;
+  virtualCardMembers!: Table<VirtualCardMemberRecord, string>;
 
   constructor() {
     super("pm3-vault");
@@ -196,6 +265,19 @@ export class VaultDatabase extends Dexie {
       lfCards: "id, uid, updatedAt",
       operations: "id, kind, status, startedAt, endedAt, targetUid, updatedAt",
       backups: "id, kind, uid, operationId, createdAt",
+    });
+    // v5 adds the virtual-card layer: user-named real-world credentials that
+    // group the HF/LF rows, dumps and keys belonging to one physical card.
+    this.version(5).stores({
+      dumps: "id, uid, cachedAt",
+      keys: "id, uidFilter, kind",
+      cards: "id, uid",
+      assets: "id, kind, updatedAt",
+      lfCards: "id, uid, updatedAt",
+      operations: "id, kind, status, startedAt, endedAt, targetUid, updatedAt",
+      backups: "id, kind, uid, operationId, createdAt",
+      virtualCards: "id, name, form, updatedAt",
+      virtualCardMembers: "id, virtualCardId, kind, refId, [virtualCardId+kind], [kind+refId]",
     });
   }
 }

@@ -13,7 +13,9 @@ import {
   Search,
   Star,
   Trash2,
+  Upload,
 } from "lucide-react";
+import { MemberOfBadges } from "./MemberOfBadges";
 import { NotesPreview } from "./NotesPreview";
 import type { CardDraft, StoredCard } from "./types";
 import { copyText, relativeTime } from "./utils";
@@ -29,6 +31,7 @@ interface CardsTabProps {
   onDumpLoad?: (dump: PM3DumpJson, name: string) => void;
   onOpenCardEditor: (card?: StoredCard | CardDraft | null) => void;
   onToggleFavorite: (cardId: string) => void;
+  onWriteCard: (card: StoredCard) => void;
 }
 
 export function CardsTab({
@@ -42,6 +45,7 @@ export function CardsTab({
   onDumpLoad,
   onOpenCardEditor,
   onToggleFavorite,
+  onWriteCard,
 }: CardsTabProps) {
   return (
     <div className="space-y-4">
@@ -101,6 +105,7 @@ export function CardsTab({
                         <h3 className="text-sm font-semibold">{card.name}</h3>
                         {card.favorite ? <Badge variant="warning">Favorite</Badge> : null}
                         <Badge variant="outline">{card.type || "Unknown"}</Badge>
+                        <MemberOfBadges kind="card" refId={card.id} />
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="font-mono text-foreground">{card.uid}</span>
@@ -115,6 +120,15 @@ export function CardsTab({
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        className="h-8 gap-1 px-2"
+                        onClick={() => onWriteCard(card)}
+                        title="Choose how to write this saved card to a physical card"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Write
+                      </Button>
                       <Button
                         size="sm"
                         variant={card.favorite ? "default" : "ghost"}

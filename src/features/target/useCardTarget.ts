@@ -96,6 +96,10 @@ export function useCardTarget({
     const dictionary = buildKeyDictionary(savedKeys, uid);
     return dictionary ? dictionary.split("\n").filter(Boolean).length : 0;
   }, [savedKeys, uid]);
+  const libraryKeyCount = useMemo(() => {
+    const dictionary = buildKeyDictionary(allKeys);
+    return dictionary ? dictionary.split("\n").filter(Boolean).length : 0;
+  }, [allKeys]);
   const relatedDumps = useMemo(() => dumpsForUid(uid, cachedDumps), [uid, cachedDumps]);
   const relatedAssets = useMemo(() => assetsForUid(uid, cachedAssets), [uid, cachedAssets]);
 
@@ -109,6 +113,8 @@ export function useCardTarget({
       uid,
       savedKeys,
       savedKeyCount,
+      libraryKeys: allKeys,
+      libraryKeyCount,
       relatedDumps,
       relatedAssets,
       hasCard,
@@ -123,6 +129,8 @@ export function useCardTarget({
     uid,
     savedKeys,
     savedKeyCount,
+    allKeys,
+    libraryKeyCount,
     relatedDumps,
     relatedAssets,
     lf,

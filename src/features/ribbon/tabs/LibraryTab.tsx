@@ -1,13 +1,23 @@
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Select } from "@/components/ui/select";
 import { Copy, Download, KeyRound, Layers } from "lucide-react";
 import { useTarget } from "@/features/target/context";
 import { buildKeyDictionary, exportStoredKeys } from "@/components/panels/library/utils";
-import { MiniButton, CompactGroup } from "../primitives";
+import { libraryKeyModeOptions, type LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
+import {
+  RibbonStrip,
+  RibbonDivider,
+  RibbonGroup,
+  RibbonButton,
+  RibbonNote,
+  RIBBON_CONTROL,
+} from "../primitives";
 
 interface LibraryTabProps {
   onCommand: (cmd: string) => void;
   commandsEnabled: boolean;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
 }
 
 /**
@@ -15,43 +25,59 @@ interface LibraryTabProps {
  * already held for the active card. (This strip used to be a single button that
  * navigated to the Memory workspace — unrelated to the library in front of you.)
  */
-export function LibraryTab({ onCommand, commandsEnabled }: LibraryTabProps) {
+export function LibraryTab({
+  onCommand,
+  commandsEnabled,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
+}: LibraryTabProps) {
   const { target } = useTarget();
   const hasSavedKeys = target.savedKeyCount > 0;
   const cardType = target.classification.size === "4k" ? "4k" : "1k";
 
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="Active card">
-        <MiniButton
-          icon={<KeyRound className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="Active card">
+        <RibbonButton
+          icon={<KeyRound />}
           label="Check keys"
           onClick={() => onCommand(`hf mf chk --${cardType} -a`)}
           disabled={!commandsEnabled || !target.hasCard}
           variant="default"
         />
-        <MiniButton
-          icon={<Layers className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Layers />}
           label="Dump"
           onClick={() => onCommand(`hf mf dump --${cardType}`)}
           disabled={!commandsEnabled || !target.hasCard}
         />
-        <Badge variant={hasSavedKeys ? "secondary" : "outline"} className="h-7 px-2 text-xs">
-          {target.savedKeyCount} saved key{target.savedKeyCount === 1 ? "" : "s"}
+        <Select
+          value={libraryKeyMode}
+          onValueChange={(value) => onLibraryKeyModeChange(value as LibraryKeyMode)}
+          options={libraryKeyModeOptions(target.savedKeyCount, target.libraryKeyCount)}
+          size="sm"
+          className="w-40 shrink-0"
+          aria-label="Library key source"
+        />
+        <Badge
+          variant={target.libraryKeyCount ? "secondary" : "outline"}
+          className={RIBBON_CONTROL}
+        >
+          {target.libraryKeyCount} total · {target.savedKeyCount} matching
         </Badge>
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup title="Export">
-        <MiniButton
-          icon={<Download className="h-3 w-3" />}
-          label="Keys (.dic)"
+      <RibbonGroup title="Export">
+        <RibbonButton
+          icon={<Download />}
+          label="Keys (JSON)"
           onClick={() => exportStoredKeys(target.savedKeys)}
           disabled={!hasSavedKeys}
         />
-        <MiniButton
-          icon={<Copy className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Copy />}
           label="Copy keys"
           onClick={() => {
             const dictionary = buildKeyDictionary(target.savedKeys, target.uid);
@@ -59,14 +85,14 @@ export function LibraryTab({ onCommand, commandsEnabled }: LibraryTabProps) {
           }}
           disabled={!hasSavedKeys}
         />
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <div className="text-xs text-muted-foreground">
+      <RibbonNote>
         Cards, keys and dumps live in a local browser vault — nothing leaves this machine.
-      </div>
-    </div>
+      </RibbonNote>
+    </RibbonStrip>
   );
 }
 

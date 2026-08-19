@@ -16,12 +16,15 @@ import { KeyDictionarySection } from "@/features/attacks/components/KeyDictionar
 import { AdvancedOptionsSection } from "@/features/attacks/components/AdvancedOptionsSection";
 import { AttackWarnings } from "@/features/attacks/components/AttackWarnings";
 import { useMifareAttacksState } from "@/features/attacks/useMifareAttacksState";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 interface MifareAttacksPanelProps {
   onCommand: (cmd: string) => void;
   disabled?: boolean;
   cachedAssets?: CachedAsset[];
   cachePathPrefix?: string;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
 }
 
 export function MifareAttacksPanel({
@@ -29,6 +32,8 @@ export function MifareAttacksPanel({
   disabled = false,
   cachedAssets = [],
   cachePathPrefix = "/pm3-cache",
+  libraryKeyMode,
+  onLibraryKeyModeChange,
 }: MifareAttacksPanelProps) {
   const { target } = useTarget();
   const detectedCardType = target.classification.isClassic
@@ -109,6 +114,10 @@ export function MifareAttacksPanel({
               keyFiles={attacks.keyFiles}
               selectedKeyFile={attacks.selectedKeyFile}
               onSelectedKeyFileChange={attacks.setSelectedKeyFile}
+              libraryKeyMode={libraryKeyMode}
+              matchingKeyCount={target.savedKeyCount}
+              libraryKeyCount={target.libraryKeyCount}
+              onLibraryKeyModeChange={onLibraryKeyModeChange}
             />
           ) : null}
 

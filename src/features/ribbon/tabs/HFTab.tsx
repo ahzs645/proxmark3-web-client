@@ -1,8 +1,7 @@
-import { Separator } from "@/components/ui/separator";
 import { Select } from "@/components/ui/select";
 import { Eye, Search } from "lucide-react";
 import { HF_CARD_OPERATIONS, HF_CARD_TYPES, getIcon } from "../config";
-import { CompactGroup, MiniButton } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface HFTabProps {
   commandsEnabled: boolean;
@@ -18,52 +17,50 @@ export function HFTab({
   onCommand,
 }: HFTabProps) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="Search">
-        <MiniButton
-          icon={<Search className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="Search">
+        <RibbonButton
+          icon={<Search />}
           label="Search"
           onClick={() => onCommand("hf search")}
           disabled={!commandsEnabled}
           variant="default"
         />
-        <MiniButton
-          icon={<Search className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Search />}
           label="14A Info"
           onClick={() => onCommand("hf 14a info")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Eye className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Eye />}
           label="Sniff"
           onClick={() => onCommand("hf sniff")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <div className="flex shrink-0 flex-col gap-1">
-        <div className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Card Type
-        </div>
+      <RibbonGroup title="Card Type">
         <Select
           value={selectedHFCardType}
           onValueChange={onSelectedHFCardTypeChange}
           options={HF_CARD_TYPES}
           className="w-40"
+          size="sm"
         />
-      </div>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup
+      <RibbonGroup
         title={
           HF_CARD_TYPES.find((card) => card.value === selectedHFCardType)?.label || "Operations"
         }
       >
         {(HF_CARD_OPERATIONS[selectedHFCardType] || []).map((op) => (
-          <MiniButton
+          <RibbonButton
             key={op.label}
             icon={getIcon(op.icon)}
             label={op.label}
@@ -72,8 +69,8 @@ export function HFTab({
             variant={op.variant || "outline"}
           />
         ))}
-      </CompactGroup>
-    </div>
+      </RibbonGroup>
+    </RibbonStrip>
   );
 }
 

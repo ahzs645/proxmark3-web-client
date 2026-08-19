@@ -2,6 +2,7 @@ import type { ConnectionState } from "@/features/connection/model";
 import type { Theme } from "@/hooks/useTheme";
 import type { TransportInfo, TransportType } from "@/lib/transports";
 import type { RibbonStripId } from "./config";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -11,6 +12,8 @@ export interface RibbonToolbarProps {
   onConnect: () => void;
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
   onStopOperation?: () => void;
   onHardReset?: () => void;
   theme: Theme;

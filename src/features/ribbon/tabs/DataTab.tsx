@@ -1,6 +1,5 @@
-import { Separator } from "@/components/ui/separator";
 import { Download, Search, Square, Upload, Zap } from "lucide-react";
-import { RibbonButton, RibbonGroup } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface DataTabProps {
   commandsEnabled: boolean;
@@ -9,7 +8,7 @@ interface DataTabProps {
 
 export function DataTab({ commandsEnabled, onCommand }: DataTabProps) {
   return (
-    <div className="flex items-start gap-2 overflow-x-auto scrollbar-hide">
+    <RibbonStrip>
       <RibbonGroup title="Capture">
         <RibbonButton
           icon={<Search />}
@@ -37,7 +36,7 @@ export function DataTab({ commandsEnabled, onCommand }: DataTabProps) {
         />
       </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-16 shrink-0" />
+      <RibbonDivider />
 
       <RibbonGroup title="Analysis">
         <RibbonButton
@@ -54,7 +53,7 @@ export function DataTab({ commandsEnabled, onCommand }: DataTabProps) {
         />
       </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-16 shrink-0" />
+      <RibbonDivider />
 
       <RibbonGroup title="Convert">
         <RibbonButton
@@ -70,7 +69,7 @@ export function DataTab({ commandsEnabled, onCommand }: DataTabProps) {
           disabled={!commandsEnabled}
         />
       </RibbonGroup>
-    </div>
+    </RibbonStrip>
   );
 }
 

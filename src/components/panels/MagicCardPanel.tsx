@@ -26,6 +26,7 @@ import { makeOperationId } from "@/features/operations/report";
 import { putOperation } from "@/features/vault/operations";
 import { cn } from "@/lib/utils";
 import { buildReadBlockCommand } from "@/features/memory/lib/batch";
+import { MagicRestorePipeline } from "@/features/memory/components/MagicRestorePipeline";
 
 export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelProps) {
   // Pull the card to clone from the shared target rather than props, so a scan
@@ -292,6 +293,7 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
             </div>
           </div>
         )}
+        {target.dump ? <MagicRestorePipeline activeDump={target.dump} disabled={disabled} /> : null}
         <MagicCardTypeSection
           cardType={cardType}
           onCardTypeChange={setCardType}

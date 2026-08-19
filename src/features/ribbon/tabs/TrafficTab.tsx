@@ -1,6 +1,5 @@
-import { Separator } from "@/components/ui/separator";
 import { Radio, Shield, Square } from "lucide-react";
-import { CompactGroup, MiniButton } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface TrafficTabProps {
   commandsEnabled: boolean;
@@ -9,52 +8,52 @@ interface TrafficTabProps {
 
 export function TrafficTab({ commandsEnabled, onCommand }: TrafficTabProps) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="HF Sniff">
-        <MiniButton
-          icon={<Radio className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="HF Sniff">
+        <RibbonButton
+          icon={<Radio />}
           label="14A Sniff"
           onClick={() => onCommand("hf 14a sniff -c -r")}
           disabled={!commandsEnabled}
           variant="default"
         />
-        <MiniButton
-          icon={<Shield className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Shield />}
           label="iCLASS"
           onClick={() => onCommand("hf iclass sniff")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Radio className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Radio />}
           label="15693"
           onClick={() => onCommand("hf 15 sniff")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
-      <Separator orientation="vertical" className="h-14 shrink-0" />
-      <CompactGroup title="Trace">
-        <MiniButton
-          icon={<Square className="h-3 w-3" />}
+      </RibbonGroup>
+      <RibbonDivider />
+      <RibbonGroup title="Trace">
+        <RibbonButton
+          icon={<Square />}
           label="List 14A"
           onClick={() => onCommand("trace list -t 14a -1")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Square className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Square />}
           label="List iClass"
           onClick={() => onCommand("trace list -t iclass -1")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Square className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Square />}
           label="Clear"
           onClick={() => onCommand("trace clear")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      </RibbonGroup>
+      <RibbonDivider />
       <div className="text-xs text-muted-foreground">Use the panel below for capture analysis</div>
-    </div>
+    </RibbonStrip>
   );
 }
 

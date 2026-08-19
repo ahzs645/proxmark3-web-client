@@ -343,7 +343,7 @@ export const HF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
     { icon: "creditCard", label: "Info", command: "hf mf info" },
     { icon: "key", label: "Autopwn", command: "hf mf autopwn", variant: "default" },
     { icon: "download", label: "Dump", command: "hf mf dump" },
-    { icon: "upload", label: "Restore", command: "hf mf restore" },
+    { icon: "upload", label: "Restore CLI", command: "hf mf restore" },
     { icon: "play", label: "Sim", command: "hf mf sim" },
   ],
   mfultralight: [

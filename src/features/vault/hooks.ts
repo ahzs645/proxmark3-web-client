@@ -8,6 +8,8 @@ import {
   type KeyRecord,
   type LfCardRecord,
   type OperationRecord,
+  type VirtualCardMemberRecord,
+  type VirtualCardRecord,
 } from "./db";
 
 // Shared empty arrays keep referential identity stable while a live query is
@@ -19,6 +21,8 @@ const EMPTY_ASSETS: AssetRecord[] = [];
 const EMPTY_LF_CARDS: LfCardRecord[] = [];
 const EMPTY_OPERATIONS: OperationRecord[] = [];
 const EMPTY_BACKUPS: BackupRecord[] = [];
+const EMPTY_VIRTUAL_CARDS: VirtualCardRecord[] = [];
+const EMPTY_VIRTUAL_CARD_MEMBERS: VirtualCardMemberRecord[] = [];
 
 /** Live list of cached dumps, newest first. */
 export function useVaultDumps(): DumpRecord[] {
@@ -55,4 +59,14 @@ export function useVaultOperations(): OperationRecord[] {
 
 export function useVaultBackups(): BackupRecord[] {
   return useLiveQuery(() => db.backups.orderBy("createdAt").reverse().toArray()) ?? EMPTY_BACKUPS;
+}
+
+/** Live list of virtual cards (the user-named physical credentials). */
+export function useVirtualCards(): VirtualCardRecord[] {
+  return useLiveQuery(() => db.virtualCards.toArray()) ?? EMPTY_VIRTUAL_CARDS;
+}
+
+/** Live list of every virtual-card membership edge. */
+export function useVirtualCardMembers(): VirtualCardMemberRecord[] {
+  return useLiveQuery(() => db.virtualCardMembers.toArray()) ?? EMPTY_VIRTUAL_CARD_MEMBERS;
 }

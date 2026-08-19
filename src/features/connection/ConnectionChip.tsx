@@ -43,7 +43,8 @@ export function ConnectionChip({ connection, compact = false, className }: Conne
         <TooltipTrigger asChild>
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/60 px-2 py-0.5 text-[11px] font-medium",
+              "inline-flex items-center rounded-full border border-border/70 bg-background/60 py-0.5 text-[11px] font-medium",
+              compact ? "h-5 w-5 justify-center" : "gap-1.5 px-2",
               TONE_TEXT[connection.tone],
               className,
             )}
@@ -55,14 +56,14 @@ export function ConnectionChip({ connection, compact = false, className }: Conne
             <span className={compact ? "sr-only" : undefined}>{connection.label}</span>
           </span>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-xs space-y-2">
-          <p className="text-xs">{connection.detail}</p>
-          <ul className="space-y-1">
+        <TooltipContent side="bottom" className="max-w-xs space-y-2 p-3">
+          <p className="text-xs leading-snug">{connection.detail}</p>
+          <ul className="space-y-1.5 border-t border-border pt-2">
             {connection.stages.map((stage, index) => (
               <li key={stage.key} className="flex items-center gap-2 text-[11px]">
-                <span className="text-muted-foreground/60">{index + 1}</span>
+                <span className="tabular-nums text-muted-foreground">{index + 1}</span>
                 <StageIcon state={stage.state} />
-                <span className="font-medium">{stage.label}</span>
+                <span className="font-medium text-foreground">{stage.label}</span>
                 <span className="text-muted-foreground">{stage.detail}</span>
               </li>
             ))}

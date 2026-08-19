@@ -1,8 +1,13 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Download, FileJson, FolderOpen, Play, RefreshCw, Upload } from "lucide-react";
-import { RibbonButton, CompactGroup } from "../primitives";
+import {
+  RibbonStrip,
+  RibbonDivider,
+  RibbonGroup,
+  RibbonButton,
+  RibbonUploadButton,
+  RIBBON_CONTROL,
+} from "../primitives";
 
 interface MemoryTabProps {
   commandsEnabled: boolean;
@@ -24,112 +29,79 @@ export function MemoryTab({
   onCacheSync,
 }: MemoryTabProps) {
   return (
-    <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="Import">
-        <Button
+    <RibbonStrip>
+      <RibbonGroup title="Import">
+        <RibbonUploadButton
+          icon={<FileJson />}
+          label="Card Dump"
+          accept=".json,.bin,.dump,.eml,.txt"
+          onFiles={(files) => onJsonUpload?.(files)}
           variant="default"
-          size="sm"
-          className="relative h-7 gap-1 overflow-hidden px-2 text-xs"
-        >
-          <FileJson className="h-3 w-3" />
-          Card Dump
-          <input
-            type="file"
-            accept=".json,.bin,.dump,.eml,.txt"
-            onChange={(e) => {
-              onJsonUpload?.(e.target.files);
-              e.target.value = "";
-            }}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="relative h-7 gap-1 overflow-hidden px-2 text-xs"
-        >
-          <FolderOpen className="h-3 w-3" />
-          Folder
-          <input
-            type="file"
-            // @ts-expect-error webkitdirectory is not standard
-            webkitdirectory=""
-            multiple
-            onChange={(e) => {
-              onCacheUpload(e.target.files);
-              e.target.value = "";
-            }}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="relative h-7 gap-1 overflow-hidden px-2 text-xs"
-        >
-          <Upload className="h-3 w-3" />
-          Files
-          <input
-            type="file"
-            accept=".bin,.dump,.eml,.dic,.json,.key"
-            multiple
-            onChange={(e) => {
-              onCacheUpload(e.target.files);
-              e.target.value = "";
-            }}
-            className="absolute inset-0 cursor-pointer opacity-0"
-          />
-        </Button>
-      </CompactGroup>
+        />
+        <RibbonUploadButton
+          icon={<FolderOpen />}
+          label="Folder"
+          directory
+          multiple
+          onFiles={onCacheUpload}
+        />
+        <RibbonUploadButton
+          icon={<Upload />}
+          label="Files"
+          accept=".bin,.dump,.eml,.dic,.json,.key"
+          multiple
+          onFiles={onCacheUpload}
+        />
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup title="Card Operations">
+      <RibbonGroup title="Card Operations">
         <RibbonButton
-          icon={<Upload className="h-3 w-3" />}
-          label="Restore"
+          icon={<Upload />}
+          label="Restore CLI"
           onClick={() => onCommand("hf mf restore")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup title="Emulator">
+      <RibbonGroup title="Emulator">
         <RibbonButton
-          icon={<Download className="h-3 w-3" />}
+          icon={<Download />}
           label="Load"
           onClick={() => onCommand("hf mf eload")}
           disabled={!commandsEnabled}
         />
         <RibbonButton
-          icon={<Upload className="h-3 w-3" />}
+          icon={<Upload />}
           label="Save"
           onClick={() => onCommand("hf mf esave")}
           disabled={!commandsEnabled}
         />
         <RibbonButton
-          icon={<Play className="h-3 w-3" />}
+          icon={<Play />}
           label="Simulate"
           onClick={() => onCommand("hf mf sim --1k")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup title="Cache">
+      <RibbonGroup title="Cache">
         <RibbonButton
-          icon={<RefreshCw className={cacheSyncing ? "h-3 w-3 animate-spin" : "h-3 w-3"} />}
+          icon={<RefreshCw className={cacheSyncing ? "animate-spin" : undefined} />}
           label="Sync"
           onClick={onCacheSync}
           disabled={!commandsEnabled || cacheSyncing}
         />
-        <Badge variant="secondary" className="h-7 px-2 text-xs">
+        <Badge variant="secondary" className={RIBBON_CONTROL}>
           {cacheItemsLength} files
         </Badge>
-      </CompactGroup>
-    </div>
+      </RibbonGroup>
+    </RibbonStrip>
   );
 }
 

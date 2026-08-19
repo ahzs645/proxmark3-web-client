@@ -66,4 +66,20 @@ describe("LF format capability registry", () => {
       expect(capability?.buildSimulation).toBeTypeOf("function");
     }
   });
+
+  test("does not parse the IO Prox success message as raw hex", () => {
+    expect(parseRegisteredLfCredential("[+] Valid IO Prox ID found!")).toBeNull();
+  });
+
+  test("rejects implausibly short IO Prox raw clone values", () => {
+    const capability = LF_FORMATS_BY_TECH.get("ioprox");
+    expect(capability?.buildClone({ tech: "ioprox", raw: "F", name: "IO Prox F" })).toBeNull();
+    expect(
+      capability?.buildClone({
+        tech: "ioprox",
+        raw: "007859603059CDAF",
+        name: "IO Prox raw",
+      }),
+    ).toBe("lf io clone --raw 007859603059CDAF");
+  });
 });

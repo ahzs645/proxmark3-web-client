@@ -63,7 +63,7 @@ export function MagicQuickOperationsSection({
           className="gap-1"
         >
           <Lock className="h-3 w-3" />
-          Load Dump
+          CLI cload
         </Button>
       </div>
       <Separator />

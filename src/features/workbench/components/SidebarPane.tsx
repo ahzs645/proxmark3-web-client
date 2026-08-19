@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCommands } from "@/features/commands/context";
 import type { CommandJob, CommandJobStatus } from "@/features/commands/types";
 import { useTarget } from "@/features/target/context";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 const JOB_STATUS_LABEL: Record<CommandJobStatus, string> = {
   running: "running",
@@ -38,6 +39,8 @@ interface SidebarPaneProps {
   onCopyUid: () => void;
   onOpenTab: (tab: string) => void;
   onRefreshTag: () => void;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
 }
 
 export function SidebarPane({
@@ -50,8 +53,11 @@ export function SidebarPane({
   onCopyUid,
   onOpenTab,
   onRefreshTag,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
 }: SidebarPaneProps) {
-  const tagInfo = useTarget().target.identity;
+  const { target } = useTarget();
+  const tagInfo = target.identity;
   const { jobs } = useCommands();
   return (
     <div className="order-1 flex min-h-0 flex-col gap-4 md:order-1">
@@ -61,6 +67,10 @@ export function SidebarPane({
         onCopyUid={onCopyUid}
         onCommand={onCommand}
         disabled={!canRunCommands}
+        libraryKeyMode={libraryKeyMode}
+        matchingKeyCount={target.savedKeyCount}
+        libraryKeyCount={target.libraryKeyCount}
+        onLibraryKeyModeChange={onLibraryKeyModeChange}
       />
 
       <Card className="overflow-hidden border-border/80 bg-card/80 backdrop-blur md:flex-1">

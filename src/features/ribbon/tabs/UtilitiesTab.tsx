@@ -1,6 +1,5 @@
-import { Separator } from "@/components/ui/separator";
 import { FileCode2, Layers } from "lucide-react";
-import { MiniButton, CompactGroup } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface UtilitiesTabProps {
   onWorkspaceChange: (value: string) => void;
@@ -12,26 +11,26 @@ interface UtilitiesTabProps {
  */
 export function UtilitiesTab({ onWorkspaceChange }: UtilitiesTabProps) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="Open">
-        <MiniButton
-          icon={<FileCode2 className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="Open">
+        <RibbonButton
+          icon={<FileCode2 />}
           label="Hex viewer"
           onClick={() => onWorkspaceChange("hex")}
           variant="outline"
         />
-        <MiniButton
-          icon={<Layers className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Layers />}
           label="Memory map"
           onClick={() => onWorkspaceChange("memory")}
           variant="outline"
         />
-      </CompactGroup>
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      </RibbonGroup>
+      <RibbonDivider />
       <div className="text-xs text-muted-foreground">
         APDU, PN532, UID and checksum helpers run locally with no external services.
       </div>
-    </div>
+    </RibbonStrip>
   );
 }
 

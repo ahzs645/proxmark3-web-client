@@ -1,8 +1,7 @@
-import { Separator } from "@/components/ui/separator";
 import { Select } from "@/components/ui/select";
 import { Eye, Radio, Search } from "lucide-react";
 import { LF_CARD_OPERATIONS, LF_CARD_TYPES, getIcon } from "../config";
-import { CompactGroup, MiniButton } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface LFTabProps {
   commandsEnabled: boolean;
@@ -18,52 +17,50 @@ export function LFTab({
   onCommand,
 }: LFTabProps) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="Search">
-        <MiniButton
-          icon={<Search className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="Search">
+        <RibbonButton
+          icon={<Search />}
           label="Search"
           onClick={() => onCommand("lf search")}
           disabled={!commandsEnabled}
           variant="default"
         />
-        <MiniButton
-          icon={<Radio className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Radio />}
           label="Read"
           onClick={() => onCommand("lf read")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Eye className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Eye />}
           label="Sniff"
           onClick={() => onCommand("lf sniff")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <div className="flex shrink-0 flex-col gap-1">
-        <div className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-          Card Type
-        </div>
+      <RibbonGroup title="Card Type">
         <Select
           value={selectedLFCardType}
           onValueChange={onSelectedLFCardTypeChange}
           options={LF_CARD_TYPES}
           className="w-32"
+          size="sm"
         />
-      </div>
+      </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      <RibbonDivider />
 
-      <CompactGroup
+      <RibbonGroup
         title={
           LF_CARD_TYPES.find((card) => card.value === selectedLFCardType)?.label || "Operations"
         }
       >
         {(LF_CARD_OPERATIONS[selectedLFCardType] || []).map((op) => (
-          <MiniButton
+          <RibbonButton
             key={op.label}
             icon={getIcon(op.icon)}
             label={op.label}
@@ -72,8 +69,8 @@ export function LFTab({
             variant={op.variant || "outline"}
           />
         ))}
-      </CompactGroup>
-    </div>
+      </RibbonGroup>
+    </RibbonStrip>
   );
 }
 

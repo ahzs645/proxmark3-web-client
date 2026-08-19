@@ -117,7 +117,10 @@ function parseIoProx(output: string): ParsedLfCredential | null {
   const versionNumber = decimal(xsf?.[1] ?? direct?.[1] ?? 0);
   const facilityCode = xsf ? Number.parseInt(xsf[2], 16) : decimal(direct?.[2]);
   const cardNumber = decimal(xsf?.[3] ?? direct?.[3]);
-  const raw = hex(output.match(/IO\s*Prox.*?(?:ID|Raw)[.:/\s]*([0-9A-F]+)/is)?.[1]);
+  // Require a labelled value and enough data to represent a credential.  The
+  // PM3 status line `Valid IO Prox ID found!` previously matched `ID f` here,
+  // because F is a valid hexadecimal digit, and created a bogus raw-F card.
+  const raw = hex(output.match(/IO\s*Prox.*?\b(?:ID|Raw)\b\s*[:=]\s*([0-9A-F]{8,})\b/is)?.[1]);
   if (facilityCode == null || cardNumber == null) {
     return raw ? { tech: "ioprox", raw, name: `IO Prox ${raw}` } : null;
   }
@@ -289,7 +292,8 @@ export const LF_FORMATS: readonly LfFormatCapability[] = [
     buildClone: (credential) => {
       const versionNumber = decimal(credential.fields?.versionNumber ?? 0);
       if (credential.facilityCode == null || credential.cardNumber == null) {
-        return credential.raw ? `lf io clone --raw ${credential.raw}` : null;
+        const raw = hex(credential.raw);
+        return raw && raw.length >= 8 ? `lf io clone --raw ${raw}` : null;
       }
       return `lf io clone --vn ${versionNumber ?? 0} --fc ${credential.facilityCode} --cn ${credential.cardNumber}`;
     },

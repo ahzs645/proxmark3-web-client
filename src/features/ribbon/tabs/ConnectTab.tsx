@@ -1,8 +1,7 @@
-import { Separator } from "@/components/ui/separator";
 import { Bluetooth, HelpCircle, RefreshCw, Settings, Usb, Zap } from "lucide-react";
 import { TransportSelector } from "@/components/ribbon/TransportSelector";
 import type { TransportInfo, TransportType } from "@/lib/transports";
-import { RibbonButton, RibbonGroup } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 import type { ConnectionStatus } from "../types";
 
 interface ConnectTabProps {
@@ -31,7 +30,7 @@ export function ConnectTab({
   const hasTransport = availableTransports.length > 0;
 
   return (
-    <div className="flex items-start gap-2 overflow-x-auto scrollbar-hide">
+    <RibbonStrip>
       <RibbonGroup title="Connection">
         <RibbonButton
           icon={
@@ -66,7 +65,7 @@ export function ConnectTab({
 
       {availableTransports.length > 1 && onTransportChange ? (
         <>
-          <Separator orientation="vertical" className="h-16 shrink-0" />
+          <RibbonDivider />
           <TransportSelector
             availableTransports={availableTransports}
             selectedTransport={selectedTransport}
@@ -77,7 +76,7 @@ export function ConnectTab({
         </>
       ) : null}
 
-      <Separator orientation="vertical" className="h-16 shrink-0" />
+      <RibbonDivider />
 
       <RibbonGroup title="Device">
         <RibbonButton
@@ -99,7 +98,7 @@ export function ConnectTab({
           disabled={!commandsEnabled}
         />
       </RibbonGroup>
-    </div>
+    </RibbonStrip>
   );
 }
 

@@ -4,8 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Terminal, type TerminalHandle } from "@/components/terminal/Terminal";
 import { useCommands } from "@/features/commands/context";
+import { useTarget } from "@/features/target/context";
+import { libraryKeyModeOptions, type LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 interface TerminalPaneProps {
   terminalRef: RefObject<TerminalHandle | null>;
@@ -17,12 +20,13 @@ interface TerminalPaneProps {
   onRunQuickCommand: () => void;
   onCommand: (cmd: string) => void;
   onInput: (char: string) => void;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
   /** When provided, shows a collapse button to hide the terminal dock. */
   onCollapse?: () => void;
 }
 
 const SHORTCUTS: Array<{ label: string; command: string }> = [
-  { label: "Autopwn", command: "hf mf autopwn --1k" },
   { label: "Tune", command: "hw tune" },
   { label: "iCLASS", command: "hf iclass dump --ki 0" },
   { label: "Trace", command: "trace list -t 14a -1" },
@@ -38,9 +42,13 @@ export function TerminalPane({
   onRunQuickCommand,
   onCommand,
   onInput,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
   onCollapse,
 }: TerminalPaneProps) {
   const { activeJob, queuedJobs, stopActive } = useCommands();
+  const { target } = useTarget();
+  const autopwnSize = target.classification.size === "4k" ? "4k" : "1k";
   // Docked = a main panel is open and the terminal sits below it. The activity
   // bar already reports connection + the running command from there, so the
   // dock header drops the big title/status band and keeps only the controls —
@@ -149,15 +157,33 @@ export function TerminalPane({
         </div>
 
         <div className="terminal-shortcuts flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {SHORTCUTS.map((shortcut, index) => (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 shrink-0"
+              onClick={() => onQuickCommandChange(`hf mf autopwn --${autopwnSize}`)}
+            >
+              <Sparkles className="mr-1 h-3 w-3" />
+              Autopwn {autopwnSize.toUpperCase()}
+            </Button>
+            <Select
+              value={libraryKeyMode}
+              onValueChange={(value) => onLibraryKeyModeChange(value as LibraryKeyMode)}
+              options={libraryKeyModeOptions(target.savedKeyCount, target.libraryKeyCount)}
+              size="sm"
+              className="w-40"
+              aria-label="Terminal key source"
+            />
+          </div>
+          {SHORTCUTS.map((shortcut) => (
             <Button
               key={shortcut.command}
               size="sm"
-              variant={index === 0 ? "secondary" : "ghost"}
+              variant="ghost"
               className="h-7 shrink-0"
               onClick={() => onQuickCommandChange(shortcut.command)}
             >
-              {index === 0 ? <Sparkles className="mr-1 h-3 w-3" /> : null}
               {shortcut.label}
             </Button>
           ))}

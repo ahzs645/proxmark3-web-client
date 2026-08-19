@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 export interface TagInfo {
   uid?: string;
@@ -18,6 +19,10 @@ export interface TagInfoPanelProps {
   onCopyUid?: () => void;
   onCommand?: (cmd: string) => void;
   disabled?: boolean;
+  libraryKeyMode?: LibraryKeyMode;
+  matchingKeyCount?: number;
+  libraryKeyCount?: number;
+  onLibraryKeyModeChange?: (mode: LibraryKeyMode) => void;
 }
 
 export interface SuggestedAction {

@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { libraryKeyModeOptions, type LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 import type { CachedDump, CardType } from "@/features/memory/types";
 import {
   Copy,
@@ -31,6 +33,10 @@ interface MemoryMapHeaderProps {
   onExportDump: (format: "json" | "bin" | "eml") => void;
   onDump: () => void;
   onAutopwn: () => void;
+  libraryKeyMode: LibraryKeyMode;
+  matchingKeyCount: number;
+  libraryKeyCount: number;
+  onLibraryKeyModeChange?: (mode: LibraryKeyMode) => void;
   /** Dump the card seeding autopwn with keys saved in the library. */
   onDumpWithSavedKeys?: () => void;
 }
@@ -56,6 +62,10 @@ export function MemoryMapHeader({
   onExportDump,
   onDump,
   onAutopwn,
+  libraryKeyMode,
+  matchingKeyCount,
+  libraryKeyCount,
+  onLibraryKeyModeChange,
   onDumpWithSavedKeys,
 }: MemoryMapHeaderProps) {
   return (
@@ -127,6 +137,16 @@ export function MemoryMapHeader({
             <Key className="mr-1 h-3 w-3" />
             Autopwn
           </Button>
+          {onLibraryKeyModeChange ? (
+            <Select
+              value={libraryKeyMode}
+              onValueChange={(value) => onLibraryKeyModeChange(value as LibraryKeyMode)}
+              options={libraryKeyModeOptions(matchingKeyCount, libraryKeyCount)}
+              size="sm"
+              className="w-40"
+              aria-label="Autopwn key source"
+            />
+          ) : null}
           {onDumpWithSavedKeys ? (
             <Button
               size="sm"

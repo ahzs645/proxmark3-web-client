@@ -3,6 +3,7 @@ import type { TerminalHandle } from "@/components/terminal/Terminal";
 import { SidebarPane } from "./SidebarPane";
 import { SessionDashboard } from "./SessionDashboard";
 import { TerminalPane } from "./TerminalPane";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 interface WorkbenchHomeProps {
   terminalRef: RefObject<TerminalHandle | null>;
@@ -31,6 +32,8 @@ interface WorkbenchHomeProps {
   onOpenTab: (tab: string) => void;
   onLoadSample: () => void;
   onRefreshTag: () => void;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
 }
 
 export function WorkbenchHome({
@@ -58,13 +61,18 @@ export function WorkbenchHome({
   onOpenTab,
   onLoadSample,
   onRefreshTag,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
 }: WorkbenchHomeProps) {
   return (
     <div
       className={
         panelOpen
           ? "flex flex-1 flex-col overflow-hidden p-2 pt-0"
-          : "flex flex-1 flex-col gap-4 overflow-hidden p-4"
+          : // Below md the dashboard, terminal and sidebar cannot all fit a
+            // viewport, so the page scrolls instead of clipping them onto
+            // each other.
+            "flex flex-1 flex-col gap-4 overflow-y-auto p-3 sm:p-4 md:overflow-hidden"
       }
     >
       {panelOpen ? null : (
@@ -96,14 +104,14 @@ export function WorkbenchHome({
         className={
           panelOpen
             ? "flex min-h-0 flex-1"
-            : "grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[320px_minmax(0,1fr)]"
+            : "grid grid-cols-1 gap-4 md:min-h-0 md:flex-1 md:grid-cols-[320px_minmax(0,1fr)]"
         }
       >
         <div
           className={
             panelOpen
               ? "flex min-h-0 min-w-0 flex-1 flex-col gap-3"
-              : "order-2 flex min-h-0 min-w-0 flex-col gap-3 md:order-2"
+              : "order-2 flex min-h-[22rem] min-w-0 flex-col gap-3 md:order-2 md:min-h-0"
           }
         >
           <TerminalPane
@@ -116,6 +124,8 @@ export function WorkbenchHome({
             onRunQuickCommand={onRunQuickCommand}
             onCommand={onCommand}
             onInput={onInput}
+            libraryKeyMode={libraryKeyMode}
+            onLibraryKeyModeChange={onLibraryKeyModeChange}
             onCollapse={panelOpen ? onCollapseTerminal : undefined}
           />
         </div>
@@ -131,6 +141,8 @@ export function WorkbenchHome({
             onCopyUid={onCopyUid}
             onOpenTab={onOpenTab}
             onRefreshTag={onRefreshTag}
+            libraryKeyMode={libraryKeyMode}
+            onLibraryKeyModeChange={onLibraryKeyModeChange}
           />
         )}
       </div>

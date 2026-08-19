@@ -16,6 +16,10 @@ export function TagInfoPanel({
   onCopyUid,
   onCommand,
   disabled = false,
+  libraryKeyMode = "default",
+  matchingKeyCount = 0,
+  libraryKeyCount = 0,
+  onLibraryKeyModeChange,
 }: TagInfoPanelProps) {
   const suggestedActions = useMemo(() => getSuggestedActions(tagInfo), [tagInfo]);
 
@@ -35,6 +39,10 @@ export function TagInfoPanel({
           suggestedActions={suggestedActions}
           onCommand={onCommand}
           disabled={disabled}
+          libraryKeyMode={libraryKeyMode}
+          matchingKeyCount={matchingKeyCount}
+          libraryKeyCount={libraryKeyCount}
+          onLibraryKeyModeChange={onLibraryKeyModeChange}
         />
       </CardContent>
     </Card>

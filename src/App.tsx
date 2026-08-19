@@ -12,6 +12,13 @@ import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type EmscriptenFSLike } from "@/features/workbench/types";
 import { buildKeyDictionary } from "@/components/panels/library/utils";
+import {
+  acceptsLibraryKeyDictionary,
+  appendKeyDictionary,
+  hasKeyDictionary,
+  libraryKeyDictionaryName,
+  type LibraryKeyMode,
+} from "@/features/keys/libraryKeyCommands";
 import { vaultStats } from "@/features/vault/vault";
 import {
   useVaultAssets,
@@ -48,6 +55,10 @@ import { importDumpFile } from "@/features/memory/lib/import";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
 import { CardTargetContext } from "@/features/target/context";
+import { useCaptureImport } from "@/features/import/useCaptureImport";
+import { CaptureImportContext } from "@/features/import/context";
+import { ImportDragOverlay } from "@/features/import/ImportOverlay";
+import { ImportReviewDialog } from "@/features/import/ImportReviewDialog";
 import { CommandCenterContext } from "@/features/commands/context";
 import { isPromptLine } from "@/features/commands/prompt";
 import type { CommandCenter } from "@/features/commands/types";
@@ -62,6 +73,8 @@ import type { DeviceProfile } from "@/features/device/types";
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TERMINAL_DOCK_STORAGE_KEY = "pm3-terminal-dock";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
+const LIBRARY_KEYS_STORAGE_KEY = "pm3-library-key-mode";
+const LEGACY_LIBRARY_KEYS_STORAGE_KEY = "pm3-use-library-keys";
 const CACHE_PATH_PREFIX = "/pm3-cache";
 const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
@@ -100,6 +113,12 @@ function App() {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem(TRANSPORT_STORAGE_KEY) as TransportType | null;
     return saved && TRANSPORT_TYPES.includes(saved) ? saved : null;
+  });
+  const [libraryKeyMode, setLibraryKeyMode] = useState<LibraryKeyMode>(() => {
+    if (typeof window === "undefined") return "default";
+    const saved = localStorage.getItem(LIBRARY_KEYS_STORAGE_KEY);
+    if (saved === "default" || saved === "matching" || saved === "all") return saved;
+    return localStorage.getItem(LEGACY_LIBRARY_KEYS_STORAGE_KEY) === "1" ? "all" : "default";
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [deviceProfile, setDeviceProfile] = useState<DeviceProfile>(emptyDeviceProfile);
@@ -616,22 +635,95 @@ function App() {
     [handleDumpLoad],
   );
 
+  // Materialize generated dictionaries inside the same in-memory filesystem
+  // PM3 commands use. This keeps structured Library keys independent from
+  // manually imported .dic assets while still presenting either as `-f`.
+  const writeCacheTextFile = useCallback((name: string, text: string): string | null => {
+    const win = window as unknown as Record<string, unknown>;
+    const FS = (win.FS || (win.Module as Record<string, unknown> | undefined)?.FS) as
+      | EmscriptenFSLike
+      | undefined;
+    if (!FS?.writeFile) return null;
+    try {
+      const info = FS.analyzePath ? FS.analyzePath(CACHE_PATH_PREFIX) : { exists: false };
+      if (!info?.exists) {
+        if (FS.mkdirTree) FS.mkdirTree(CACHE_PATH_PREFIX);
+        else if (FS.mkdir) FS.mkdir(CACHE_PATH_PREFIX);
+      }
+      const path = `${CACHE_PATH_PREFIX}/${name}`;
+      FS.writeFile(path, new TextEncoder().encode(text), { flags: "w+" });
+      return path;
+    } catch (error) {
+      console.error(`Failed to write cache file: ${name}`, error);
+      return null;
+    }
+  }, []);
+
+  const prepareLibraryKeyCommand = useCallback(
+    (command: string): string => {
+      if (
+        libraryKeyMode === "default" ||
+        !acceptsLibraryKeyDictionary(command) ||
+        hasKeyDictionary(command)
+      ) {
+        return command;
+      }
+
+      const uid = cardTarget.target.uid;
+      const matching = libraryKeyMode === "matching";
+      const dictionary = matching
+        ? buildKeyDictionary(cardTarget.target.savedKeys, uid)
+        : buildKeyDictionary(cardTarget.target.libraryKeys);
+      if (!dictionary) {
+        terminalRef.current?.writeln(
+          `\x1b[33mNo usable ${matching ? "matching card" : "Library"} keys are available; using PM3 defaults.\x1b[0m`,
+        );
+        return command;
+      }
+
+      const path = writeCacheTextFile(
+        libraryKeyDictionaryName(uid, libraryKeyMode),
+        `${dictionary}\n`,
+      );
+      if (!path) {
+        terminalRef.current?.writeln(
+          "\x1b[31mCould not materialize the Library key dictionary; using PM3 defaults.\x1b[0m",
+        );
+        return command;
+      }
+
+      const count = dictionary.split("\n").filter(Boolean).length;
+      terminalRef.current?.writeln(
+        `\x1b[36mUsing ${count} ${matching ? "matching card" : "entire Library"} key${count === 1 ? "" : "s"}${uid ? ` for target UID ${uid}` : ""} → ${path}\x1b[0m`,
+      );
+      return appendKeyDictionary(command, path);
+    },
+    [
+      cardTarget.target.libraryKeys,
+      cardTarget.target.savedKeys,
+      cardTarget.target.uid,
+      libraryKeyMode,
+      writeCacheTextFile,
+    ],
+  );
+
   // Handle command execution. Note what it deliberately no longer does: force
   // the terminal dock open. The activity bar reports the running command from
   // every workspace, so firing one never yanks the view you were using.
   const handleCommand = useCallback(
     (cmd: string) => {
-      pushCommand(cmd);
+      const prepared = prepareLibraryKeyCommand(cmd);
+      pushCommand(prepared);
 
       // `clear` is a client-side convenience, not a pm3 command.
-      if (cmd === "clear") {
+      if (prepared === "clear") {
         terminalRef.current?.clear();
         return null;
       }
 
-      return commandCenter.run(cmd);
+      return commandCenter.run(prepared);
     },
-    [commandCenter, pushCommand],
+    [commandCenter, prepareLibraryKeyCommand, pushCommand],
   );
 
   // Probe once per attached hardware session. Parsing remains evidence based,
@@ -663,29 +755,6 @@ function App() {
     });
   }, [commandCenter]);
 
-  // Write a small text file straight into the cache FS (no React-state round
-  // trip), used to drop a key dictionary in place right before a command.
-  const writeCacheTextFile = useCallback((name: string, text: string): string | null => {
-    const win = window as unknown as Record<string, unknown>;
-    const FS = (win.FS || (win.Module as Record<string, unknown> | undefined)?.FS) as
-      | EmscriptenFSLike
-      | undefined;
-    if (!FS?.writeFile) return null;
-    try {
-      const info = FS.analyzePath ? FS.analyzePath(CACHE_PATH_PREFIX) : { exists: false };
-      if (!info?.exists) {
-        if (FS.mkdirTree) FS.mkdirTree(CACHE_PATH_PREFIX);
-        else if (FS.mkdir) FS.mkdir(CACHE_PATH_PREFIX);
-      }
-      const path = `${CACHE_PATH_PREFIX}/${name}`;
-      FS.writeFile(path, new TextEncoder().encode(text), { flags: "w+" });
-      return path;
-    } catch (error) {
-      console.error(`Failed to write cache file: ${name}`, error);
-      return null;
-    }
-  }, []);
-
   // Dump a card using keys already saved in the browser library: export them as
   // a pm3 dictionary and seed autopwn with it (uses known keys first, recovers
   // any missing). The resulting dump flows through cacheGeneratedArtifact.
@@ -695,7 +764,7 @@ function App() {
         terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
         return;
       }
-      const dictionary = buildKeyDictionary(vaultKeys, uid);
+      const dictionary = buildKeyDictionary(vaultKeys);
       if (!dictionary) {
         terminalRef.current?.writeln(
           "\x1b[33mNo saved keys for this card yet — run Autopwn or Check Keys first.\x1b[0m",
@@ -744,6 +813,13 @@ function App() {
       localStorage.setItem(TERMINAL_DOCK_STORAGE_KEY, terminalDockOpen ? "1" : "0");
     }
   }, [terminalDockOpen]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LIBRARY_KEYS_STORAGE_KEY, libraryKeyMode);
+      localStorage.removeItem(LEGACY_LIBRARY_KEYS_STORAGE_KEY);
+    }
+  }, [libraryKeyMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -917,96 +993,115 @@ function App() {
   // to dock or undock.
   const isSessionWorkspace = getWorkspace(activeWorkspace).value === DEFAULT_WORKSPACE;
 
+  // Capture-folder import: window-wide drag target plus the Library's button.
+  const captureImport = useCaptureImport();
+
   return (
     <DeviceProfileContext.Provider value={deviceProfileContext}>
       <CardTargetContext.Provider value={cardTarget}>
         <CommandCenterContext.Provider value={commandCenter}>
-          <div className="h-dvh overflow-hidden flex flex-col bg-background">
-            {/* Ribbon Toolbar */}
-            <RibbonToolbar
-              connection={connection}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-              onCommand={handleCommand}
-              onStopOperation={commandCenter.stopActive}
-              onHardReset={wasmState.hardReset}
-              theme={theme}
-              onThemeChange={setTheme}
-              isBusy={commandCenter.isBusy}
-              cacheItems={cachedAssets}
-              cacheSyncing={isSyncingCache}
-              onCacheUpload={handleCacheUpload}
-              onCacheUse={handleCacheUse}
-              onCacheDelete={handleCacheDelete}
-              onCacheSync={syncCacheToFS}
-              cachePathPrefix={CACHE_PATH_PREFIX}
-              activeWorkspace={activeWorkspace}
-              onWorkspaceChange={openWorkspace}
-              activeStrip={activeStrip}
-              onStripChange={setActiveStrip}
-              availableTransports={wasmState.availableTransports}
-              selectedTransport={selectedTransport || wasmState.activeTransportType}
-              onTransportChange={setSelectedTransport}
-              onJsonUpload={handleJsonUpload}
-            />
-            <MainPanelRouter
-              activeWorkspace={activeWorkspace}
-              terminalDockOpen={terminalDockOpen}
-              onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
-              onDumpWithSavedKeys={handleDumpWithSavedKeys}
-              theme={theme}
-              onThemeChange={setTheme}
-              terminalRef={terminalRef}
-              activeDump={activeDump}
-              cachedDumps={cachedDumps}
-              cachedAssets={cachedAssets}
-              cachePathPrefix={CACHE_PATH_PREFIX}
-              canRunCommands={canRunCommands}
-              isLoading={wasmState.isLoading}
-              isConnecting={isConnecting}
-              isDeviceConnected={wasmState.isDeviceConnected}
-              hasHardwareTransport={hasHardwareTransport}
-              activeTransportLabel={activeTransportLabel}
-              commandHistory={commandHistory}
-              quickCommand={quickCommand}
-              onQuickCommandChange={setQuickCommand}
-              onRunQuickCommand={runQuickCommand}
-              onCommand={handleCommand}
-              onInput={handleTerminalInput}
-              onConnect={() => void handleConnect()}
-              onDisconnect={() => void handleDisconnect()}
-              onCopyUid={handleCopyUid}
-              onOpenTab={openWorkspace}
-              onLoadSample={() =>
-                handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
-              }
-              onRefreshTag={handleRefreshTag}
-              onDumpLoad={handleDumpLoad}
-              onDumpRename={handleDumpRename}
-              onDumpDelete={handleDumpDelete}
-              onClearCache={() => void clearAssets()}
-              activeTransportType={wasmState.activeTransportType}
-              onDisconnectApplication={wasmState.disconnectDevice}
-              onReconnectApplication={() => wasmState.connectDevice("webserial")}
-              onFirmwareLog={writeTerminalLine}
-            />
+          <CaptureImportContext.Provider value={captureImport}>
+            <div className="h-dvh overflow-hidden flex flex-col bg-background">
+              {/* Ribbon Toolbar */}
+              <RibbonToolbar
+                connection={connection}
+                onConnect={handleConnect}
+                onDisconnect={handleDisconnect}
+                onCommand={handleCommand}
+                onStopOperation={commandCenter.stopActive}
+                onHardReset={wasmState.hardReset}
+                theme={theme}
+                onThemeChange={setTheme}
+                isBusy={commandCenter.isBusy}
+                cacheItems={cachedAssets}
+                cacheSyncing={isSyncingCache}
+                onCacheUpload={handleCacheUpload}
+                onCacheUse={handleCacheUse}
+                onCacheDelete={handleCacheDelete}
+                onCacheSync={syncCacheToFS}
+                cachePathPrefix={CACHE_PATH_PREFIX}
+                activeWorkspace={activeWorkspace}
+                onWorkspaceChange={openWorkspace}
+                activeStrip={activeStrip}
+                onStripChange={setActiveStrip}
+                availableTransports={wasmState.availableTransports}
+                selectedTransport={selectedTransport || wasmState.activeTransportType}
+                onTransportChange={setSelectedTransport}
+                onJsonUpload={handleJsonUpload}
+                libraryKeyMode={libraryKeyMode}
+                onLibraryKeyModeChange={setLibraryKeyMode}
+              />
+              <MainPanelRouter
+                activeWorkspace={activeWorkspace}
+                terminalDockOpen={terminalDockOpen}
+                onTerminalDockToggle={() => setTerminalDockOpen((open) => !open)}
+                onDumpWithSavedKeys={handleDumpWithSavedKeys}
+                libraryKeyMode={libraryKeyMode}
+                onLibraryKeyModeChange={setLibraryKeyMode}
+                theme={theme}
+                onThemeChange={setTheme}
+                terminalRef={terminalRef}
+                activeDump={activeDump}
+                cachedDumps={cachedDumps}
+                cachedAssets={cachedAssets}
+                cachePathPrefix={CACHE_PATH_PREFIX}
+                canRunCommands={canRunCommands}
+                isLoading={wasmState.isLoading}
+                isConnecting={isConnecting}
+                isDeviceConnected={wasmState.isDeviceConnected}
+                hasHardwareTransport={hasHardwareTransport}
+                activeTransportLabel={activeTransportLabel}
+                commandHistory={commandHistory}
+                quickCommand={quickCommand}
+                onQuickCommandChange={setQuickCommand}
+                onRunQuickCommand={runQuickCommand}
+                onCommand={handleCommand}
+                onInput={handleTerminalInput}
+                onConnect={() => void handleConnect()}
+                onDisconnect={() => void handleDisconnect()}
+                onCopyUid={handleCopyUid}
+                onOpenTab={openWorkspace}
+                onLoadSample={() =>
+                  handleDumpLoad(PRIMARY_SAMPLE_DUMP.data, PRIMARY_SAMPLE_DUMP.name)
+                }
+                onRefreshTag={handleRefreshTag}
+                onDumpLoad={handleDumpLoad}
+                onDumpRename={handleDumpRename}
+                onDumpDelete={handleDumpDelete}
+                onClearCache={() => void clearAssets()}
+                activeTransportType={wasmState.activeTransportType}
+                onDisconnectApplication={wasmState.disconnectDevice}
+                onReconnectApplication={() => wasmState.connectDevice("webserial")}
+                onFirmwareLog={writeTerminalLine}
+              />
 
-            {/* Activity bar: connection, the running command and the terminal
+              {/* Activity bar: connection, the running command and the terminal
             toggle, present on every workspace. */}
-            <ActivityBar
-              connection={connection}
-              vault={vaultSummary}
-              terminalOpen={terminalDockOpen}
-              onToggleTerminal={
-                isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
-              }
-              onCommand={handleCommand}
-              onOpenTab={openWorkspace}
-              onRefresh={handleRefreshTag}
-              onCopyUid={handleCopyUid}
-              disabled={!canRunCommands}
-            />
-          </div>
+              <ActivityBar
+                connection={connection}
+                vault={vaultSummary}
+                terminalOpen={terminalDockOpen}
+                onToggleTerminal={
+                  isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
+                }
+                onCommand={handleCommand}
+                onOpenTab={openWorkspace}
+                onRefresh={handleRefreshTag}
+                onCopyUid={handleCopyUid}
+                disabled={!canRunCommands}
+              />
+
+              {captureImport.dragging ? <ImportDragOverlay /> : null}
+              <ImportReviewDialog
+                stage={captureImport.stage}
+                plan={captureImport.plan}
+                outcome={captureImport.outcome}
+                error={captureImport.error}
+                onConfirm={(name) => void captureImport.commit(name)}
+                onClose={captureImport.dismiss}
+              />
+            </div>
+          </CaptureImportContext.Provider>
         </CommandCenterContext.Provider>
       </CardTargetContext.Provider>
     </DeviceProfileContext.Provider>

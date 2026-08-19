@@ -1,4 +1,6 @@
 import { RibbonStripPicker, RibbonTabNav } from "@/features/ribbon/RibbonTabNav";
+import { ScrollRail } from "@/components/ui/scroll-rail";
+import { RIBBON_ROW_MIN_HEIGHT } from "@/features/ribbon/primitives";
 import { getWorkspace, type RibbonStripId } from "@/features/ribbon/config";
 import { useRibbonSelections } from "@/features/ribbon/hooks/useRibbonSelections";
 import type { RibbonToolbarProps } from "@/features/ribbon/types";
@@ -19,6 +21,8 @@ import { ToolsTab } from "@/features/ribbon/tabs/ToolsTab";
 import { TrafficTab } from "@/features/ribbon/tabs/TrafficTab";
 import { UtilitiesTab } from "@/features/ribbon/tabs/UtilitiesTab";
 import { toLegacyStatus } from "@/features/connection/model";
+import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 /**
  * Header of the workbench: the workspace switcher on top, and below it the
@@ -31,6 +35,8 @@ export function RibbonToolbar({
   onConnect,
   onDisconnect,
   onCommand,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
   onStopOperation,
   onHardReset,
   theme,
@@ -71,18 +77,20 @@ export function RibbonToolbar({
         isBusy={isBusy}
       />
 
-      <div className="ribbon-tab-content flex items-stretch gap-2 p-2">
+      <div className="flex items-stretch gap-2 border-t border-border/50 p-2">
         <RibbonStripPicker
           strips={workspace.strips}
           activeStrip={activeStrip}
           onStripChange={onStripChange}
         />
-        <div className="min-w-0 flex-1">
+        <StripSurface strip={activeStrip}>
           {renderStrip(activeStrip, {
             connectionStatus: toLegacyStatus(connection),
             onConnect,
             onDisconnect,
             onCommand,
+            libraryKeyMode,
+            onLibraryKeyModeChange,
             commandsEnabled,
             availableTransports,
             selectedTransport,
@@ -101,9 +109,28 @@ export function RibbonToolbar({
             selectedLFCardType,
             onSelectedLFCardTypeChange: setSelectedLFCardType,
           })}
-        </div>
+        </StripSurface>
       </div>
     </div>
+  );
+}
+
+/**
+ * Holds whatever the active strip renders.
+ *
+ * Nearly every strip is a single row of groups, so it gets the horizontal rail
+ * with its overflow affordances. "Shortcuts" is the exception — it is a stack
+ * of full panels — and is capped and scrolled vertically instead, so choosing
+ * it can no longer push the workspace off the bottom of the screen.
+ */
+function StripSurface({ strip, children }: { strip: RibbonStripId; children: ReactNode }) {
+  if (strip === "shortcuts") {
+    return <div className="max-h-[45vh] min-w-0 flex-1 overflow-y-auto pr-1">{children}</div>;
+  }
+  return (
+    <ScrollRail contentClassName={cn("items-stretch", RIBBON_ROW_MIN_HEIGHT)}>
+      {children}
+    </ScrollRail>
   );
 }
 
@@ -112,6 +139,8 @@ type StripContext = {
   onConnect: RibbonToolbarProps["onConnect"];
   onDisconnect: RibbonToolbarProps["onDisconnect"];
   onCommand: RibbonToolbarProps["onCommand"];
+  libraryKeyMode: RibbonToolbarProps["libraryKeyMode"];
+  onLibraryKeyModeChange: RibbonToolbarProps["onLibraryKeyModeChange"];
   commandsEnabled: boolean;
   availableTransports: NonNullable<RibbonToolbarProps["availableTransports"]>;
   selectedTransport: RibbonToolbarProps["selectedTransport"];
@@ -204,11 +233,25 @@ function renderStrip(strip: RibbonStripId, ctx: StripContext) {
         />
       );
     case "library":
-      return <LibraryTab onCommand={ctx.onCommand} commandsEnabled={ctx.commandsEnabled} />;
+      return (
+        <LibraryTab
+          onCommand={ctx.onCommand}
+          commandsEnabled={ctx.commandsEnabled}
+          libraryKeyMode={ctx.libraryKeyMode}
+          onLibraryKeyModeChange={ctx.onLibraryKeyModeChange}
+        />
+      );
     case "utilities":
       return <UtilitiesTab onWorkspaceChange={ctx.onWorkspaceChange} />;
     case "attacks":
-      return <AttacksTab commandsEnabled={ctx.commandsEnabled} onCommand={ctx.onCommand} />;
+      return (
+        <AttacksTab
+          commandsEnabled={ctx.commandsEnabled}
+          onCommand={ctx.onCommand}
+          libraryKeyMode={ctx.libraryKeyMode}
+          onLibraryKeyModeChange={ctx.onLibraryKeyModeChange}
+        />
+      );
     case "magic":
       return <MagicTab commandsEnabled={ctx.commandsEnabled} onCommand={ctx.onCommand} />;
     case "traffic":

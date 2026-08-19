@@ -131,9 +131,6 @@ body {
   font-feature-settings:
     "rlig" 1,
     "calt" 1;
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
 }
 
 code,
@@ -171,11 +168,6 @@ code,
   .terminal-shortcuts {
     display: none;
   }
-}
-
-/* Ribbon toolbar styles */
-.ribbon-tab-content {
-  min-height: 80px;
 }
 
 /* Table styles for memory map */
@@ -238,11 +230,18 @@ button:focus-visible {
   }
 }
 
-/* Smooth transitions for theme switching */
-* {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.15s;
-  transition-timing-function: ease-out;
+/* Theme switching is instant on purpose.
+   This used to be a `*` rule giving every element in the document a colour
+   transition, so flipping the theme started a fresh animation on every node at
+   once — 50-120ms of blocked main thread per toggle, and a visible two-stage
+   flip because `body` faded over 0.3s while its contents snapped over 0.15s.
+   `.theme-switching` is set for the single frame the class swap happens in, so
+   the per-component `transition-colors` used for hover states does not smear
+   across the change either. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
 }
 
 /* Custom scrollbar */

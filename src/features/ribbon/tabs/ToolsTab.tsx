@@ -1,6 +1,5 @@
-import { Separator } from "@/components/ui/separator";
 import { HelpCircle, Key, Play, Settings } from "lucide-react";
-import { RibbonButton, RibbonGroup } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface ToolsTabProps {
   commandsEnabled: boolean;
@@ -9,7 +8,7 @@ interface ToolsTabProps {
 
 export function ToolsTab({ commandsEnabled, onCommand }: ToolsTabProps) {
   return (
-    <div className="flex items-start gap-2 overflow-x-auto scrollbar-hide">
+    <RibbonStrip>
       <RibbonGroup title="Scripts">
         <RibbonButton
           icon={<Play />}
@@ -31,7 +30,7 @@ export function ToolsTab({ commandsEnabled, onCommand }: ToolsTabProps) {
         />
       </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-16 shrink-0" />
+      <RibbonDivider />
 
       <RibbonGroup title="Key Memory">
         <RibbonButton
@@ -54,7 +53,7 @@ export function ToolsTab({ commandsEnabled, onCommand }: ToolsTabProps) {
         />
       </RibbonGroup>
 
-      <Separator orientation="vertical" className="h-16 shrink-0" />
+      <RibbonDivider />
 
       <RibbonGroup title="Help">
         <RibbonButton
@@ -70,7 +69,7 @@ export function ToolsTab({ commandsEnabled, onCommand }: ToolsTabProps) {
           disabled={!commandsEnabled}
         />
       </RibbonGroup>
-    </div>
+    </RibbonStrip>
   );
 }
 

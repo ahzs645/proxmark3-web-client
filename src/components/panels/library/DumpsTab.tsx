@@ -14,7 +14,9 @@ import {
   Pencil,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
+import { MemberOfBadges } from "./MemberOfBadges";
 import { NotesPreview } from "./NotesPreview";
 import type { CardDraft, StoredDumpMeta } from "./types";
 import { dumpDisplayName, dumpKeyCount, exportDump, relativeTime } from "./utils";
@@ -30,6 +32,7 @@ interface DumpsTabProps {
   onOpenDumpEditor: (dump: CachedDump) => void;
   onCreateCardFromDump: (draft: CardDraft) => void;
   onCreateDumpCardDraft: (dump: CachedDump) => CardDraft;
+  onWriteDump: (dump: CachedDump) => void;
 }
 
 export function DumpsTab({
@@ -43,6 +46,7 @@ export function DumpsTab({
   onOpenDumpEditor,
   onCreateCardFromDump,
   onCreateDumpCardDraft,
+  onWriteDump,
 }: DumpsTabProps) {
   return (
     <div className="space-y-4">
@@ -95,6 +99,7 @@ export function DumpsTab({
                           {dump.data.Card.UID}
                         </Badge>
                       ) : null}
+                      <MemberOfBadges kind="dump" refId={dump.id} />
                     </div>
                     {showFilename ? (
                       <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
@@ -123,6 +128,15 @@ export function DumpsTab({
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1 px-2"
+                      onClick={() => onWriteDump(dump)}
+                      title="Choose how to write this Library dump to a physical card"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Write
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

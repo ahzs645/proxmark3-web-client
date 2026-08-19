@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { CheckSquare, Eye, RefreshCw, RotateCcw, ShieldCheck, Upload } from "lucide-react";
+import { CheckSquare, Eye, RefreshCw, RotateCcw, Upload } from "lucide-react";
 import { useTarget } from "@/features/target/context";
 import { useCommands } from "@/features/commands/context";
 import { DumpCacheBrowser } from "@/features/memory/components/DumpCacheBrowser";
 import { BlockInspector } from "@/features/memory/components/BlockInspector";
 import { MemoryMapHeader } from "@/features/memory/components/MemoryMapHeader";
+import { MagicRestorePipeline } from "@/features/memory/components/MagicRestorePipeline";
 import { MemoryTable } from "@/features/memory/components/MemoryTable";
 import { MemoryWelcome } from "@/features/memory/components/MemoryWelcome";
 import {
@@ -26,10 +27,10 @@ import {
   parseReadBlockData,
 } from "@/features/memory/lib/batch";
 import { validateAccessBits } from "@/lib/access-bits";
-import { bytesToBase64, makeOperationId } from "@/features/operations/report";
-import { dumpBytes } from "@/features/memory/lib/export";
-import { putBackup, putOperation } from "@/features/vault/operations";
+import { makeOperationId } from "@/features/operations/report";
+import { putOperation } from "@/features/vault/operations";
 import type { OperationCheckRecord, OperationRecord } from "@/features/vault/db";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 import type {
   Block,
   CachedDump,
@@ -44,6 +45,8 @@ export type { Block, CachedDump, CardType, PM3DumpJson } from "@/features/memory
 interface CardMemoryMapProps {
   onCommand: (cmd: string) => void;
   onDumpWithSavedKeys?: (uid: string, cardType: "1k" | "4k") => void;
+  libraryKeyMode?: LibraryKeyMode;
+  onLibraryKeyModeChange?: (mode: LibraryKeyMode) => void;
   disabled?: boolean;
   cardType?: CardType;
   initialData?: Block[];
@@ -57,6 +60,8 @@ interface CardMemoryMapProps {
 export function CardMemoryMap({
   onCommand,
   onDumpWithSavedKeys,
+  libraryKeyMode = "default",
+  onLibraryKeyModeChange,
   disabled = false,
   cardType: cardTypeProp,
   initialData,
@@ -99,6 +104,10 @@ export function CardMemoryMap({
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
   const [confirmBatchWrite, setConfirmBatchWrite] = useState(false);
+  const [pendingDirectBlockWrite, setPendingDirectBlockWrite] = useState<{
+    blockIndex: number;
+    data: string;
+  } | null>(null);
 
   useEffect(() => {
     if (activeDump?.data) {
@@ -198,6 +207,10 @@ export function CardMemoryMap({
     (blockIndex: number, data: string) => {
       const clean = data.replace(/\s/g, "");
       if (clean.length !== 32) return;
+      if (blockIndex === 0) {
+        setPendingDirectBlockWrite({ blockIndex, data: clean });
+        return;
+      }
       onCommand(`hf mf wrbl ${blockIndex} ${authKeyType.toLowerCase()} ${authKey} ${clean}`);
     },
     [authKey, authKeyType, onCommand],
@@ -277,16 +290,12 @@ export function CardMemoryMap({
       failures: number[],
       output: string[],
       checks: OperationCheckRecord[],
-      backupId?: string,
     ) => {
       const endedAt = Date.now();
       const record: OperationRecord = {
         id: makeOperationId(),
         kind: operation,
-        command:
-          operation === "write" && selectedBlocks.size === blocks.length
-            ? "mifare verified restore"
-            : `mifare batch ${operation}`,
+        command: `mifare batch ${operation}`,
         origin: "memory-map",
         status: failures.length ? "warning" : "succeeded",
         queuedAt: startedAt,
@@ -300,18 +309,14 @@ export function CardMemoryMap({
           : `${operation === "read" ? "Read" : "Write"} completed for ${selectedBlocks.size} selected blocks.`,
         outputTail: output.slice(-200),
         updatedAt: endedAt,
-        workflow:
-          operation === "write" && selectedBlocks.size === blocks.length
-            ? "mifare-verified-restore"
-            : "mifare-batch",
+        workflow: "mifare-batch",
         checks,
-        backupId,
         verified: operation === "read" ? true : failures.length === 0,
         affectedPages: [...selectedBlocks].sort((a, b) => a - b),
       };
       await putOperation(record);
     },
-    [activeDump?.data.Card?.UID, blocks.length, cardType, selectedBlocks],
+    [activeDump?.data.Card?.UID, cardType, selectedBlocks],
   );
 
   const handleReadSelected = useCallback(async () => {
@@ -362,6 +367,7 @@ export function CardMemoryMap({
     setConfirmBatchWrite(false);
     const chosen = blocks.filter((block) => selectedBlocks.has(block.index));
     if (!chosen.length) return;
+    const includesBlock0 = chosen.some((block) => block.index === 0);
     const invalidTrailers = chosen.filter(
       (block) =>
         block.kind === "trailer" &&
@@ -379,30 +385,18 @@ export function CardMemoryMap({
     const failures: number[] = [];
     const output: string[] = [];
     const checks: OperationCheckRecord[] = [];
-    let backupId: string | undefined;
+    if (includesBlock0) {
+      checks.push({
+        id: "direct-block0",
+        label: "Direct block 0 write",
+        state: "warning",
+        detail:
+          "The optional guarded magic-card workflow was bypassed; this batch used ordinary authenticated block commands without a complete target backup.",
+        blocking: false,
+      });
+    }
     setBatchBusy(true);
     try {
-      if (activeDump) {
-        const bytes = dumpBytes(activeDump.data);
-        backupId = makeOperationId("backup");
-        await putBackup({
-          id: backupId,
-          name: `mifare-before-batch-${activeDump.data.Card?.UID ?? "card"}-${startedAt}.bin`,
-          kind: "mifare",
-          uid: activeDump.data.Card?.UID,
-          mimeType: "application/octet-stream",
-          base64: bytesToBase64(bytes),
-          size: bytes.length,
-          createdAt: Date.now(),
-        });
-        checks.push({
-          id: "backup",
-          label: "Browser backup",
-          state: "ok",
-          detail: `Saved ${bytes.length} bytes before writing.`,
-          blocking: false,
-        });
-      }
       for (let index = 0; index < chosen.length; index++) {
         const block = chosen[index];
         const expected = block.data.replace(/\s/g, "").toUpperCase();
@@ -447,12 +441,11 @@ export function CardMemoryMap({
           ? `Write finished; ${failures.length} failed block(s) remain selected for retry.`
           : `Wrote ${chosen.length} selected blocks.`,
       );
-      await persistBatchReport("write", startedAt, failures, output, checks, backupId);
+      await persistBatchReport("write", startedAt, failures, output, checks);
     } finally {
       setBatchBusy(false);
     }
   }, [
-    activeDump,
     authKey,
     authKeyType,
     blocks,
@@ -482,6 +475,10 @@ export function CardMemoryMap({
             onExportDump={handleExportDump}
             onDump={handleDump}
             onAutopwn={handleAutopwn}
+            libraryKeyMode={libraryKeyMode}
+            matchingKeyCount={target.savedKeyCount}
+            libraryKeyCount={target.libraryKeyCount}
+            onLibraryKeyModeChange={onLibraryKeyModeChange}
             onDumpWithSavedKeys={onDumpWithSavedKeys ? handleDumpWithSavedKeys : undefined}
           />
 
@@ -510,6 +507,7 @@ export function CardMemoryMap({
           />
         ) : (
           <CardContent className="flex-1 overflow-auto p-0">
+            <MagicRestorePipeline activeDump={activeDump} disabled={disabled} />
             {cardType !== "ultralight" ? (
               <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-background/95 px-3 py-2 backdrop-blur">
                 <Badge variant="secondary">
@@ -532,19 +530,6 @@ export function CardMemoryMap({
                 >
                   <Upload className="mr-1 h-3 w-3" />
                   Write selected
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedBlocks(new Set(blocks.map((block) => block.index)));
-                    setConfirmBatchWrite(true);
-                  }}
-                  disabled={disabled || batchBusy || blocks.length === 0}
-                  title="Restore the active dump with backup and per-block read-back verification"
-                >
-                  <ShieldCheck className="mr-1 h-3 w-3" />
-                  Verified restore
                 </Button>
                 {failedBlocks.length ? (
                   <Button
@@ -594,22 +579,33 @@ export function CardMemoryMap({
       </Card>
       <ConfirmDialog
         open={confirmBatchWrite}
-        title={
-          selectedBlocks.size === blocks.length
-            ? `Restore all ${blocks.length} blocks?`
-            : `Write ${selectedBlocks.size} selected block${selectedBlocks.size === 1 ? "" : "s"}?`
-        }
+        title={`Write ${selectedBlocks.size} selected block${selectedBlocks.size === 1 ? "" : "s"}?`}
         description={
-          selectedBlocks.size === blocks.length
-            ? "This verified restore writes the active dump block by block. It saves a browser backup first, validates trailer access bits, and reads every ordinary block back byte for byte. Block 0 is included and can change the card UID."
-            : selectedBlocks.has(0)
-              ? "Block 0 is selected. Writing manufacturer data can change the UID or make a card unusable. A browser backup will be saved before writing, valid trailer access bits are required, and ordinary blocks will be read back."
-              : "A browser backup will be saved before writing, valid trailer access bits are required, and ordinary blocks will be read back byte for byte."
+          selectedBlocks.has(0)
+            ? "This direct batch includes block 0. It bypasses the optional guarded magic-card workflow and uses ordinary authenticated block writes, so it may fail on cards requiring generation-specific commands and does not create a complete target backup."
+            : "This writes the selected data/trailer blocks with the supplied or saved keys. It validates trailer access bits and reads ordinary blocks back, but it does not create a complete target-card backup."
         }
         confirmLabel="Write selected"
         destructive
         onConfirm={() => void handleWriteSelected()}
         onClose={() => setConfirmBatchWrite(false)}
+      />
+      <ConfirmDialog
+        open={pendingDirectBlockWrite !== null}
+        title="Write block 0 directly?"
+        description="This bypasses the optional guarded magic-card workflow and sends an ordinary authenticated block write. It may not work on a magic card that requires a generation-specific command, and no complete target backup will be created."
+        confirmLabel="Direct write"
+        destructive
+        onConfirm={() => {
+          if (pendingDirectBlockWrite) {
+            onCommand(
+              `hf mf wrbl ${pendingDirectBlockWrite.blockIndex} ${authKeyType.toLowerCase()} ${authKey} ${pendingDirectBlockWrite.data}`,
+            );
+            setBatchStatus("Sent a direct block 0 write without the optional guarded workflow.");
+          }
+          setPendingDirectBlockWrite(null);
+        }}
+        onClose={() => setPendingDirectBlockWrite(null)}
       />
 
       <Card className="flex w-full flex-col lg:w-80">

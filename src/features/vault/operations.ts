@@ -12,8 +12,17 @@ import {
   type DumpRecord,
   type LfCardRecord,
   type OperationRecord,
+  type VirtualCardForm,
+  type VirtualCardMemberKind,
+  type VirtualCardRecord,
+  type VirtualCardRole,
 } from "./db";
+import { lfMatchKey } from "./lfIdentity";
 import { normalizeUid } from "./uid";
+import { memberId } from "./virtualCards";
+
+// Re-exported so existing callers keep one import site for vault operations.
+export { lfMatchKey };
 
 export function makeVaultId(prefix = "v"): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -29,8 +38,9 @@ export function putDump(record: DumpRecord): Promise<string> {
   return db.dumps.put(record);
 }
 
-export function deleteDump(id: string): Promise<void> {
-  return db.dumps.delete(id);
+export async function deleteDump(id: string): Promise<void> {
+  await db.dumps.delete(id);
+  await pruneVirtualCardMembers("dump", id);
 }
 
 export async function renameDump(id: string, name: string): Promise<void> {
@@ -54,8 +64,9 @@ export async function saveKey(draft: KeyDraft, existing: StoredKey[]): Promise<v
   await db.keys.bulkPut(upsertKeyRecord(existing, draft));
 }
 
-export function deleteKey(id: string): Promise<void> {
-  return db.keys.delete(id);
+export async function deleteKey(id: string): Promise<void> {
+  await db.keys.delete(id);
+  await pruneVirtualCardMembers("key", id);
 }
 
 /** Bulk import key drafts (default keys, dump-extracted keys), de-duplicated. */
@@ -92,8 +103,9 @@ export async function saveCard(draft: CardDraft, existing: StoredCard[]): Promis
   await db.cards.bulkPut(upsertCardRecord(existing, draft));
 }
 
-export function deleteCard(id: string): Promise<void> {
-  return db.cards.delete(id);
+export async function deleteCard(id: string): Promise<void> {
+  await db.cards.delete(id);
+  await pruneVirtualCardMembers("card", id);
 }
 
 export async function setCardFavorite(id: string, favorite: boolean): Promise<void> {
@@ -113,12 +125,14 @@ export async function putAsset(asset: AssetRecord): Promise<void> {
   await db.assets.put({ ...asset, id: existing?.id ?? asset.id });
 }
 
-export function deleteAsset(id: string): Promise<void> {
-  return db.assets.delete(id);
+export async function deleteAsset(id: string): Promise<void> {
+  await db.assets.delete(id);
+  await pruneVirtualCardMembers("asset", id);
 }
 
-export function clearAssets(): Promise<void> {
-  return db.assets.clear();
+export async function clearAssets(): Promise<void> {
+  await db.assets.clear();
+  await db.virtualCardMembers.where("kind").equals("asset").delete();
 }
 
 export function normalizeDumpUid(dump: PM3DumpJson): string {
@@ -134,8 +148,9 @@ export function putLfCard(record: LfCardRecord): Promise<string> {
   return db.lfCards.put(record);
 }
 
-export function deleteLfCard(id: string): Promise<void> {
-  return db.lfCards.delete(id);
+export async function deleteLfCard(id: string): Promise<void> {
+  await db.lfCards.delete(id);
+  await pruneVirtualCardMembers("lfCard", id);
 }
 
 export async function renameLfCard(id: string, name: string): Promise<void> {
@@ -188,20 +203,6 @@ export async function upsertLfCard(
   return record;
 }
 
-/** Stable identity for de-duping an LF card across re-reads. */
-export function lfMatchKey(
-  card: Pick<LfCardRecord, "tech" | "format" | "facilityCode" | "cardNumber" | "raw" | "fields">,
-): string {
-  if (card.facilityCode != null && card.cardNumber != null) {
-    return `${card.tech}:${card.format ?? ""}:${card.facilityCode}:${card.cardNumber}:${JSON.stringify(card.fields ?? {})}`;
-  }
-  if (card.raw) return `${card.tech}:raw:${card.raw.toUpperCase()}`;
-  if (card.fields && Object.keys(card.fields).length) {
-    return `${card.tech}:fields:${JSON.stringify(card.fields)}`;
-  }
-  return "";
-}
-
 // ---------------------------------------------------------------------------
 // Operation audit trail
 // ---------------------------------------------------------------------------
@@ -228,4 +229,141 @@ export function deleteBackup(id: string): Promise<void> {
 
 export function clearBackups(): Promise<void> {
   return db.backups.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Virtual cards
+// ---------------------------------------------------------------------------
+
+export interface VirtualCardDraft {
+  id?: string;
+  name: string;
+  form: VirtualCardForm;
+  role: VirtualCardRole;
+  issuer: string;
+  color: string;
+  tags: string[];
+  notes: string;
+  favorite: boolean;
+}
+
+/** Create or update a virtual card, returning the row's id either way. */
+export async function saveVirtualCard(draft: VirtualCardDraft): Promise<string> {
+  const now = Date.now();
+  const existing = draft.id ? await db.virtualCards.get(draft.id) : undefined;
+
+  const record: VirtualCardRecord = {
+    id: existing?.id ?? draft.id ?? makeVaultId("vcard"),
+    name: draft.name.trim() || "Untitled card",
+    form: draft.form,
+    role: draft.role,
+    issuer: draft.issuer.trim() || undefined,
+    color: draft.color || undefined,
+    tags: draft.tags,
+    favorite: draft.favorite,
+    notes: draft.notes,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  await db.virtualCards.put(record);
+  return record.id;
+}
+
+/** Delete a virtual card and every membership edge pointing at it. */
+export async function deleteVirtualCard(id: string): Promise<void> {
+  await db.transaction("rw", db.virtualCards, db.virtualCardMembers, async () => {
+    await db.virtualCardMembers.where("virtualCardId").equals(id).delete();
+    await db.virtualCards.delete(id);
+  });
+}
+
+export async function setVirtualCardFavorite(id: string, favorite: boolean): Promise<void> {
+  await db.virtualCards.update(id, { favorite, updatedAt: Date.now() });
+}
+
+/** Attach rows to a virtual card. Re-linking an existing member is a no-op. */
+export async function linkVirtualCardMembers(
+  virtualCardId: string,
+  members: { kind: VirtualCardMemberKind; refId: string }[],
+): Promise<void> {
+  if (!members.length) return;
+  const now = Date.now();
+
+  await db.transaction("rw", db.virtualCards, db.virtualCardMembers, async () => {
+    await db.virtualCardMembers.bulkPut(
+      members.map((member) => ({
+        id: memberId(virtualCardId, member.kind, member.refId),
+        virtualCardId,
+        kind: member.kind,
+        refId: member.refId,
+        addedAt: now,
+      })),
+    );
+    await db.virtualCards.update(virtualCardId, { updatedAt: now });
+  });
+}
+
+/**
+ * Replace a virtual card's whole membership set (what the attach dialog saves).
+ * Diffed rather than cleared-and-rewritten so `addedAt` survives on rows that
+ * were already members.
+ */
+export async function setVirtualCardMembers(
+  virtualCardId: string,
+  members: { kind: VirtualCardMemberKind; refId: string }[],
+): Promise<void> {
+  const now = Date.now();
+  const wanted = new Map(
+    members.map((member) => [memberId(virtualCardId, member.kind, member.refId), member] as const),
+  );
+
+  await db.transaction("rw", db.virtualCards, db.virtualCardMembers, async () => {
+    const current = await db.virtualCardMembers
+      .where("virtualCardId")
+      .equals(virtualCardId)
+      .toArray();
+
+    const removed = current.filter((edge) => !wanted.has(edge.id)).map((edge) => edge.id);
+    const currentIds = new Set(current.map((edge) => edge.id));
+    const added = [...wanted.entries()]
+      .filter(([id]) => !currentIds.has(id))
+      .map(([id, member]) => ({
+        id,
+        virtualCardId,
+        kind: member.kind,
+        refId: member.refId,
+        addedAt: now,
+      }));
+
+    if (removed.length) await db.virtualCardMembers.bulkDelete(removed);
+    if (added.length) await db.virtualCardMembers.bulkPut(added);
+    if (removed.length || added.length) {
+      await db.virtualCards.update(virtualCardId, { updatedAt: now });
+    }
+  });
+}
+
+/** Detach one row from a virtual card. */
+export async function unlinkVirtualCardMember(
+  virtualCardId: string,
+  kind: VirtualCardMemberKind,
+  refId: string,
+): Promise<void> {
+  const now = Date.now();
+  await db.transaction("rw", db.virtualCards, db.virtualCardMembers, async () => {
+    await db.virtualCardMembers.delete(memberId(virtualCardId, kind, refId));
+    await db.virtualCards.update(virtualCardId, { updatedAt: now });
+  });
+}
+
+/**
+ * Drop membership edges whose target row is gone. Called after a dump or key is
+ * deleted so a virtual card never counts members that no longer exist.
+ */
+export async function pruneVirtualCardMembers(
+  kind: VirtualCardMemberKind,
+  refId: string,
+): Promise<void> {
+  await db.virtualCardMembers.where("[kind+refId]").equals([kind, refId]).delete();
 }

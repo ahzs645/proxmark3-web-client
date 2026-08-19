@@ -42,6 +42,10 @@ export interface CardTarget {
   savedKeys: StoredKey[];
   /** Number of unique, usable keys saved for this card's UID. */
   savedKeyCount: number;
+  /** Every structured key in the Library, regardless of UID metadata. */
+  libraryKeys: StoredKey[];
+  /** Number of unique, usable keys available across the entire Library. */
+  libraryKeyCount: number;
   /** Other cached dumps in the vault sharing this card's UID. */
   relatedDumps: CachedDump[];
   /** Cached files in the vault whose name references this card's UID. */

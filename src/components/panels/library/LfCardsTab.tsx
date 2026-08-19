@@ -8,6 +8,7 @@ import { deleteLfCard } from "@/features/vault/operations";
 import { buildRegisteredLfClone, describeLfCredential } from "@/features/lf-tools/formats";
 import { lfCardToForm } from "@/features/lf-tools/lfParse";
 import type { LfCardRecord } from "@/features/vault/db";
+import { MemberOfBadges } from "./MemberOfBadges";
 
 interface LfCardsTabProps {
   /** Send the clone command straight to the terminal, when a runner is available. */
@@ -67,6 +68,7 @@ export function LfCardsTab({ onCommand }: LfCardsTabProps) {
                         {card.tech}
                       </Badge>
                       {card.writable && <Badge variant="success">writable</Badge>}
+                      <MemberOfBadges kind="lfCard" refId={card.id} />
                     </div>
                     <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
                       {detailFor(card)}

@@ -8,6 +8,7 @@ import type { CachedAssetWithData } from "../types";
 import type { TerminalHandle } from "@/components/terminal/Terminal";
 import type { RefObject } from "react";
 import type { TransportType } from "@/lib/transports";
+import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
 
 const CardMemoryMap = lazy(() =>
   import("@/components/panels/CardMemoryMap").then((m) => ({ default: m.CardMemoryMap })),
@@ -73,6 +74,8 @@ interface MainPanelRouterProps {
   terminalDockOpen: boolean;
   onTerminalDockToggle: () => void;
   onDumpWithSavedKeys: (uid: string, cardType: "1k" | "4k") => void;
+  libraryKeyMode: LibraryKeyMode;
+  onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   terminalRef: RefObject<TerminalHandle | null>;
@@ -113,6 +116,8 @@ export function MainPanelRouter({
   terminalDockOpen,
   onTerminalDockToggle,
   onDumpWithSavedKeys,
+  libraryKeyMode,
+  onLibraryKeyModeChange,
   theme,
   onThemeChange,
   terminalRef,
@@ -167,6 +172,8 @@ export function MainPanelRouter({
         <CardMemoryMap
           onCommand={onCommand}
           onDumpWithSavedKeys={onDumpWithSavedKeys}
+          libraryKeyMode={libraryKeyMode}
+          onLibraryKeyModeChange={onLibraryKeyModeChange}
           disabled={!canRunCommands}
           cachedDumps={cachedDumps}
           onDumpLoad={onDumpLoad}
@@ -193,6 +200,8 @@ export function MainPanelRouter({
             disabled={!canRunCommands}
             cachedAssets={cachedAssets}
             cachePathPrefix={cachePathPrefix}
+            libraryKeyMode={libraryKeyMode}
+            onLibraryKeyModeChange={onLibraryKeyModeChange}
           />
         </div>
       </div>
@@ -337,6 +346,8 @@ export function MainPanelRouter({
           onOpenTab={onOpenTab}
           onLoadSample={onLoadSample}
           onRefreshTag={onRefreshTag}
+          libraryKeyMode={libraryKeyMode}
+          onLibraryKeyModeChange={onLibraryKeyModeChange}
         />
       </div>
     </div>

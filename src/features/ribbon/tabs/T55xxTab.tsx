@@ -1,6 +1,5 @@
-import { Separator } from "@/components/ui/separator";
 import { Copy, Download, Key, Radio, Search, Square } from "lucide-react";
-import { CompactGroup, MiniButton } from "../primitives";
+import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 
 interface T55xxTabProps {
   commandsEnabled: boolean;
@@ -9,54 +8,54 @@ interface T55xxTabProps {
 
 export function T55xxTab({ commandsEnabled, onCommand }: T55xxTabProps) {
   return (
-    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-      <CompactGroup title="T55xx">
-        <MiniButton
-          icon={<Search className="h-3 w-3" />}
+    <RibbonStrip>
+      <RibbonGroup title="T55xx">
+        <RibbonButton
+          icon={<Search />}
           label="Detect"
           onClick={() => onCommand("lf t55xx detect")}
           disabled={!commandsEnabled}
           variant="default"
         />
-        <MiniButton
-          icon={<Download className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Download />}
           label="Dump"
           onClick={() => onCommand("lf t55xx dump")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Square className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Square />}
           label="Wipe"
           onClick={() => onCommand("lf t55xx wipe")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Key className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Key />}
           label="Chk Pwd"
           onClick={() => onCommand("lf t55xx chk")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
-      <Separator orientation="vertical" className="h-14 shrink-0" />
-      <CompactGroup title="EM410x">
-        <MiniButton
-          icon={<Radio className="h-3 w-3" />}
+      </RibbonGroup>
+      <RibbonDivider />
+      <RibbonGroup title="EM410x">
+        <RibbonButton
+          icon={<Radio />}
           label="Read"
           onClick={() => onCommand("lf em 410x reader")}
           disabled={!commandsEnabled}
         />
-        <MiniButton
-          icon={<Copy className="h-3 w-3" />}
+        <RibbonButton
+          icon={<Copy />}
           label="Clone"
           onClick={() => onCommand("lf em 410x clone --id 0102030405")}
           disabled={!commandsEnabled}
         />
-      </CompactGroup>
-      <Separator orientation="vertical" className="h-14 shrink-0" />
+      </RibbonGroup>
+      <RibbonDivider />
       <div className="text-xs text-muted-foreground">
         Use the panel below for detailed operations
       </div>
-    </div>
+    </RibbonStrip>
   );
 }
 
