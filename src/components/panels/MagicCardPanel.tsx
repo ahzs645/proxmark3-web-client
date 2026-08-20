@@ -293,6 +293,32 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
             </div>
           </div>
         )}
+        <div className="px-3 pt-3">
+          <div className="rounded-md border border-border/70 bg-muted/20 p-3 text-xs">
+            <p className="font-medium text-foreground">What do you want to write?</p>
+            <ul className="mt-1.5 space-y-1 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Whole card</span> — copy every block
+                from a saved dump onto a magic card.{" "}
+                {target.dump ? (
+                  <span className="text-green-600 dark:text-green-400">
+                    Ready below (“{target.dump.name}” is loaded).
+                  </span>
+                ) : (
+                  <span>Load a dump from the Library first to enable it.</span>
+                )}
+              </li>
+              <li>
+                <span className="font-medium text-foreground">UID / identity only</span> — change
+                just the UID, SAK and ATQA. Data blocks are untouched.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">A single block</span> — hand-build and
+                write block 0 (advanced), or edit specific blocks in Memory.
+              </li>
+            </ul>
+          </div>
+        </div>
         {target.dump ? <MagicRestorePipeline activeDump={target.dump} disabled={disabled} /> : null}
         <MagicCardTypeSection
           cardType={cardType}

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTarget } from "@/features/target/context";
@@ -45,8 +44,6 @@ import {
   useVaultDumps,
   useVaultKeys,
   useVaultLfCards,
-  useVaultOperations,
-  useVaultBackups,
   useVirtualCards,
   useVirtualCardMembers,
 } from "@/features/vault/hooks";
@@ -99,8 +96,6 @@ export function LibraryPanel({
   const keys = useVaultKeys();
   const cachedDumps = useVaultDumps();
   const lfCards = useVaultLfCards();
-  const operations = useVaultOperations();
-  const backups = useVaultBackups();
   const assets = useVaultAssets();
   const virtualCards = useVirtualCards();
   const virtualCardEdges = useVirtualCardMembers();
@@ -442,25 +437,14 @@ export function LibraryPanel({
       <CardContent className="flex-1 overflow-auto p-4">
         <VirtualCardMembershipContext.Provider value={membership}>
           <Tabs defaultValue="virtual" className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <TabsList className="h-auto flex-wrap justify-start">
-                <TabsTrigger value="virtual">Virtual Cards</TabsTrigger>
-                <TabsTrigger value="cards">Cards</TabsTrigger>
-                <TabsTrigger value="keys">Keys</TabsTrigger>
-                <TabsTrigger value="dumps">Dumps</TabsTrigger>
-                <TabsTrigger value="lf">LF</TabsTrigger>
-                <TabsTrigger value="audit">Audit & backups</TabsTrigger>
-              </TabsList>
-              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary">{virtualCards.length} virtual</Badge>
-                <Badge variant="secondary">{cards.length} cards</Badge>
-                <Badge variant="secondary">{keys.length} keys</Badge>
-                <Badge variant="secondary">{cachedDumps.length} dumps</Badge>
-                <Badge variant="secondary">{lfCards.length} LF</Badge>
-                <Badge variant="secondary">{operations.length} reports</Badge>
-                <Badge variant="secondary">{backups.length} backups</Badge>
-              </div>
-            </div>
+            <TabsList className="h-auto flex-wrap justify-start">
+              <TabsTrigger value="virtual">Virtual Cards</TabsTrigger>
+              <TabsTrigger value="cards">Cards</TabsTrigger>
+              <TabsTrigger value="keys">Keys</TabsTrigger>
+              <TabsTrigger value="dumps">Dumps</TabsTrigger>
+              <TabsTrigger value="lf">LF</TabsTrigger>
+              <TabsTrigger value="audit">Audit & backups</TabsTrigger>
+            </TabsList>
 
             <TabsContent value="virtual" className="m-0">
               <VirtualCardsTab
@@ -485,6 +469,7 @@ export function LibraryPanel({
                 onOpenDump={openDumpById}
                 onWriteDump={(dump) => setWriteSource(writeSourceFromDump(dump))}
                 onWriteCard={(card) => setWriteSource(writeSourceFromCard(card))}
+                onWriteLf={() => onOpenTab?.("guided")}
               />
             </TabsContent>
 
@@ -550,7 +535,7 @@ export function LibraryPanel({
             </TabsContent>
 
             <TabsContent value="lf" className="m-0">
-              <LfCardsTab />
+              <LfCardsTab onGuidedWrite={() => onOpenTab?.("guided")} />
             </TabsContent>
 
             <TabsContent value="audit" className="m-0">

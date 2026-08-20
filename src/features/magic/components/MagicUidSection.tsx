@@ -53,7 +53,7 @@ export function MagicUidSection({
 
   return (
     <div className="space-y-3 p-3">
-      <SectionLabel icon={<Key className="h-3 w-3" />}>Set UID</SectionLabel>
+      <SectionLabel icon={<Key className="h-3 w-3" />}>Write UID / identity only</SectionLabel>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="space-y-2">

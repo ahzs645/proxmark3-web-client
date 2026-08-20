@@ -93,7 +93,14 @@ export function ActivityBar({
   const { activeJob, queuedJobs, activeLine, jobs, stopActive } = useCommands();
   const { target, clearTarget } = useTarget();
   const elapsed = useElapsed(activeJob?.startedAt);
-  const steps = useMemo(() => getNextSteps(target), [target]);
+  // Keep the footer a single, calm spine: it is a quick anchor, not a full
+  // action bar (every workspace already hosts the complete set). Cap the
+  // next-step buttons so a rich card can't wrap the footer into a wall.
+  const allSteps = useMemo(() => getNextSteps(target), [target]);
+  const steps = useMemo(
+    () => allSteps.slice(0, target.hasCard ? 2 : allSteps.length),
+    [allSteps, target.hasCard],
+  );
   const finishedCount = jobs.filter(
     (job) => job.status === "done" || job.status === "stopped",
   ).length;

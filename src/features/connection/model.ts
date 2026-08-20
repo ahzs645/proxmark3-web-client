@@ -17,7 +17,8 @@ export type ConnectionPhase =
   | "offline"
   | "opening"
   | "attaching"
-  | "online";
+  | "online"
+  | "simulated";
 
 export type ConnectionTone = "ok" | "warn" | "error" | "idle";
 
@@ -58,6 +59,8 @@ export interface ConnectionInputs {
   isAttaching: boolean;
   /** A connect attempt is running in the shell (browser picker, handshake). */
   isConnecting: boolean;
+  /** Simulated mode: commands run against a virtual card, no hardware/WASM. */
+  isSimulated?: boolean;
   availableTransports: TransportInfo[];
   activeTransportType: TransportType | null;
 }
@@ -70,39 +73,55 @@ export function deriveConnectionState(input: ConnectionInputs): ConnectionState 
     isClientAttached,
     isAttaching,
     isConnecting,
+    isSimulated,
     availableTransports,
     activeTransportType,
   } = input;
 
   const hasHardwareTransport = availableTransports.length > 0;
-  const transportLabel = getTransportLabel(
-    activeTransportType ?? availableTransports[0]?.type,
-    availableTransports,
-  );
+  const transportLabel = isSimulated
+    ? "Simulator"
+    : getTransportLabel(activeTransportType ?? availableTransports[0]?.type, availableTransports);
 
-  const runtimeState: StageState = isReady ? "ok" : error ? "error" : "pending";
-  const linkState: StageState = isDeviceConnected ? "ok" : isConnecting ? "active" : "pending";
-  const clientState: StageState = isClientAttached
+  const runtimeState: StageState = isSimulated
     ? "ok"
-    : isAttaching
-      ? "active"
-      : isDeviceConnected
-        ? "pending"
+    : isReady
+      ? "ok"
+      : error
+        ? "error"
         : "pending";
-
-  const phase: ConnectionPhase = !isReady
-    ? error
-      ? "runtime-error"
-      : "booting"
+  const linkState: StageState = isSimulated
+    ? "ok"
+    : isDeviceConnected
+      ? "ok"
+      : isConnecting
+        ? "active"
+        : "pending";
+  const clientState: StageState = isSimulated
+    ? "ok"
     : isClientAttached
-      ? "online"
+      ? "ok"
       : isAttaching
-        ? "attaching"
-        : isConnecting
-          ? "opening"
-          : isDeviceConnected
-            ? "attaching"
-            : "offline";
+        ? "active"
+        : isDeviceConnected
+          ? "pending"
+          : "pending";
+
+  const phase: ConnectionPhase = isSimulated
+    ? "simulated"
+    : !isReady
+      ? error
+        ? "runtime-error"
+        : "booting"
+      : isClientAttached
+        ? "online"
+        : isAttaching
+          ? "attaching"
+          : isConnecting
+            ? "opening"
+            : isDeviceConnected
+              ? "attaching"
+              : "offline";
 
   const copy: Record<ConnectionPhase, { label: string; detail: string; tone: ConnectionTone }> = {
     booting: {
@@ -137,6 +156,11 @@ export function deriveConnectionState(input: ConnectionInputs): ConnectionState 
       detail: `Client attached to the reader over ${transportLabel}.`,
       tone: "ok",
     },
+    simulated: {
+      label: "Simulated",
+      detail: "Commands run against a virtual card — no hardware or WASM in use.",
+      tone: "ok",
+    },
   };
 
   const { label, detail, tone } = copy[phase];
@@ -146,27 +170,45 @@ export function deriveConnectionState(input: ConnectionInputs): ConnectionState 
     tone,
     label,
     detail,
-    canRunCommands: isReady,
-    isLive: isClientAttached,
+    canRunCommands: Boolean(isSimulated) || isReady,
+    isLive: Boolean(isSimulated) || isClientAttached,
     transportLabel,
     hasHardwareTransport,
     stages: [
       {
         key: "runtime",
-        label: "WASM client",
-        detail: isReady ? "Running" : error ? "Failed to load" : "Loading…",
+        label: isSimulated ? "Simulator" : "WASM client",
+        detail: isSimulated
+          ? "Virtual"
+          : isReady
+            ? "Running"
+            : error
+              ? "Failed to load"
+              : "Loading…",
         state: runtimeState,
       },
       {
         key: "link",
         label: transportLabel,
-        detail: isDeviceConnected ? "Port open" : isConnecting ? "Opening…" : "Not connected",
+        detail: isSimulated
+          ? "Virtual card"
+          : isDeviceConnected
+            ? "Port open"
+            : isConnecting
+              ? "Opening…"
+              : "Not connected",
         state: linkState,
       },
       {
         key: "client",
-        label: "hw connect",
-        detail: isClientAttached ? "Attached" : isAttaching ? "Attaching…" : "Not attached",
+        label: isSimulated ? "session" : "hw connect",
+        detail: isSimulated
+          ? "Attached"
+          : isClientAttached
+            ? "Attached"
+            : isAttaching
+              ? "Attaching…"
+              : "Not attached",
         state: clientState,
       },
     ],
@@ -177,7 +219,7 @@ export function deriveConnectionState(input: ConnectionInputs): ConnectionState 
 export function toLegacyStatus(
   state: ConnectionState,
 ): "connected" | "connecting" | "disconnected" {
-  if (state.phase === "online") return "connected";
+  if (state.phase === "online" || state.phase === "simulated") return "connected";
   if (state.phase === "opening" || state.phase === "attaching") return "connecting";
   return "disconnected";
 }

@@ -13,14 +13,13 @@ import {
   Star,
   Trash2,
   Unlink,
-  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { VirtualCardMemberKind, VirtualCardMemberRecord } from "@/features/vault/db";
-import type { DumpRecord } from "@/features/vault/db";
+import type { DumpRecord, LfCardRecord } from "@/features/vault/db";
 import {
   MEMBER_KIND_TAGS,
   colorDotClass,
@@ -30,6 +29,7 @@ import {
   suggestedMembers,
   summarizeMembers,
   type ResolvedVirtualCard,
+  type VirtualCardMembers,
   type VirtualCardPools,
 } from "@/features/vault/virtualCards";
 import { ImportSourceButtons } from "@/features/import/ImportSourceButtons";
@@ -57,6 +57,8 @@ interface VirtualCardsTabProps {
   onOpenDump?: (dumpId: string) => void;
   onWriteDump?: (dump: DumpRecord) => void;
   onWriteCard?: (card: StoredCard) => void;
+  /** Open the guided LF write workflow for this card's LF credential. */
+  onWriteLf?: (lfCard: LfCardRecord) => void;
 }
 
 const MEMBER_ICONS: Record<VirtualCardMemberKind, typeof CreditCard> = {
@@ -71,6 +73,36 @@ function frequencyVariant(frequency: ResolvedVirtualCard["frequency"]) {
   if (frequency === "dual") return "default" as const;
   if (frequency === "empty") return "outline" as const;
   return "secondary" as const;
+}
+
+/** The HF side of a virtual card: prefer a stored card, fall back to a dump. */
+function hfSide(members: VirtualCardMembers): { tech: string; ident: string } | null {
+  const card = members.card[0];
+  if (card) return { tech: card.type || "HF card", ident: card.uid };
+  const dump = members.dump[0];
+  if (dump) {
+    const blocks = Object.keys(dump.data.blocks ?? {}).length;
+    const size = blocks >= 256 ? " 4K" : blocks >= 64 ? " 1K" : "";
+    return { tech: `MIFARE Classic${size}`, ident: dump.uid || dump.data.Card?.UID || "" };
+  }
+  return null;
+}
+
+/** The LF side: the decoded credential, shown as tech + facility/card or raw. */
+function lfSide(members: VirtualCardMembers): { tech: string; ident: string } | null {
+  const lf = members.lfCard[0];
+  if (!lf) return null;
+  const tech = lf.format ? `${lf.tech.toUpperCase()} ${lf.format}` : lf.tech.toUpperCase();
+  const ident =
+    lf.facilityCode != null || lf.cardNumber != null
+      ? [
+          lf.facilityCode != null ? `FC ${lf.facilityCode}` : null,
+          lf.cardNumber != null ? `CN ${lf.cardNumber}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : (lf.raw ?? "");
+  return { tech, ident };
 }
 
 /**
@@ -93,6 +125,7 @@ export function VirtualCardsTab({
   onOpenDump,
   onWriteDump,
   onWriteCard,
+  onWriteLf,
 }: VirtualCardsTabProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -159,21 +192,55 @@ export function VirtualCardsTab({
                           </Badge>
                         </div>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          {record.issuer ? <span>{record.issuer}</span> : null}
-                          {resolved.uids.map((uid) => (
-                            <span key={uid} className="font-mono text-foreground">
-                              {uid}
-                            </span>
-                          ))}
-                          <span>{relativeTime(record.updatedAt)}</span>
-                        </div>
-
-                        {resolved.technologies.length ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {resolved.technologies.join(" + ")}
-                          </p>
-                        ) : null}
+                        {(() => {
+                          const hf = hfSide(members);
+                          const lf = lfSide(members);
+                          return (
+                            <div className="mt-2 space-y-1 text-xs">
+                              {hf ? (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 px-1.5 py-0 text-[10px]"
+                                  >
+                                    HF
+                                  </Badge>
+                                  <span className="text-muted-foreground">{hf.tech}</span>
+                                  {hf.ident ? (
+                                    <span className="font-mono text-foreground">{hf.ident}</span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {lf ? (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 px-1.5 py-0 text-[10px]"
+                                  >
+                                    LF
+                                  </Badge>
+                                  <span className="text-muted-foreground">{lf.tech}</span>
+                                  {lf.ident ? (
+                                    <span className="font-mono text-foreground">{lf.ident}</span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {!hf && !lf && resolved.uids.length ? (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {resolved.uids.map((uid) => (
+                                    <span key={uid} className="font-mono text-foreground">
+                                      {uid}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                                {record.issuer ? <span>{record.issuer}</span> : null}
+                                <span>{relativeTime(record.updatedAt)}</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {record.tags.length ? (
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -223,28 +290,51 @@ export function VirtualCardsTab({
                       {members.dump.length || members.card.length ? (
                         <Button
                           size="sm"
+                          className="w-28 justify-center"
                           onClick={() => {
                             if (members.dump.length === 1) onWriteDump?.(members.dump[0]);
                             else if (members.dump.length > 1) toggleExpanded(record.id);
                             else if (members.card[0]) onWriteCard?.(members.card[0]);
                           }}
+                          title="Write this card's HF side (dump or UID) to a magic card"
                         >
-                          <Upload className="mr-1 h-3 w-3" />
-                          {members.dump.length > 1 ? "Choose HF source" : "Write HF"}
+                          <CreditCard className="mr-1 h-3 w-3" />
+                          {members.dump.length > 1 ? "HF source…" : "Write HF"}
+                        </Button>
+                      ) : null}
+                      {members.lfCard.length && onWriteLf ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-28 justify-center"
+                          onClick={() => {
+                            if (members.lfCard.length === 1) onWriteLf(members.lfCard[0]);
+                            else toggleExpanded(record.id);
+                          }}
+                          title="Write this card's LF credential to a blank T5577"
+                        >
+                          <Radio className="mr-1 h-3 w-3" />
+                          {members.lfCard.length > 1 ? "LF source…" : "Write LF"}
                         </Button>
                       ) : null}
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => toggleExpanded(record.id)}
-                        disabled={resolved.memberCount === 0}
+                        className="w-28 justify-center"
+                        onClick={() => onAttach(resolved)}
                       >
-                        {summarizeMembers(members)}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => onAttach(resolved)}>
-                        <Link2 className="h-3 w-3 mr-1" />
+                        <Link2 className="mr-1 h-3 w-3" />
                         Attach
                       </Button>
+                      {resolved.memberCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(record.id)}
+                          className="ml-auto text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        >
+                          {summarizeMembers(members)}
+                        </button>
+                      ) : null}
                     </div>
 
                     {suggestions.length ? (
@@ -318,6 +408,16 @@ export function VirtualCardsTab({
                                       variant="ghost"
                                       className="h-6 px-2"
                                       onClick={() => onWriteCard(row as StoredCard)}
+                                    >
+                                      Write
+                                    </Button>
+                                  ) : null}
+                                  {kind === "lfCard" && onWriteLf ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2"
+                                      onClick={() => onWriteLf(row as LfCardRecord)}
                                     >
                                       Write
                                     </Button>

@@ -57,6 +57,8 @@ export function RibbonToolbar({
   availableTransports = [],
   selectedTransport = null,
   onTransportChange,
+  simulatedMode = false,
+  onToggleSimulated,
 }: RibbonToolbarProps) {
   const commandsEnabled = connection.canRunCommands;
   const workspace = getWorkspace(activeWorkspace);
@@ -95,6 +97,8 @@ export function RibbonToolbar({
             availableTransports,
             selectedTransport,
             onTransportChange,
+            simulatedMode,
+            onToggleSimulated,
             cacheItems,
             cacheSyncing,
             onCacheUpload,
@@ -145,6 +149,8 @@ type StripContext = {
   availableTransports: NonNullable<RibbonToolbarProps["availableTransports"]>;
   selectedTransport: RibbonToolbarProps["selectedTransport"];
   onTransportChange: RibbonToolbarProps["onTransportChange"];
+  simulatedMode: boolean;
+  onToggleSimulated: RibbonToolbarProps["onToggleSimulated"];
   cacheItems: RibbonToolbarProps["cacheItems"];
   cacheSyncing: RibbonToolbarProps["cacheSyncing"];
   onCacheUpload: RibbonToolbarProps["onCacheUpload"];
@@ -173,6 +179,8 @@ function renderStrip(strip: RibbonStripId, ctx: StripContext) {
           availableTransports={ctx.availableTransports}
           selectedTransport={ctx.selectedTransport}
           onTransportChange={ctx.onTransportChange}
+          simulatedMode={ctx.simulatedMode}
+          onToggleSimulated={ctx.onToggleSimulated}
         />
       );
     case "hf":

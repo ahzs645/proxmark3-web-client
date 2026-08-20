@@ -337,7 +337,7 @@ export function MagicRestorePipeline({ activeDump, disabled = false }: MagicRest
         <div>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Optional guarded magic-card restore</h3>
+            <h3 className="text-sm font-semibold">Write the whole card (all blocks)</h3>
             <Badge variant={plan.state === "ready" ? "success" : "secondary"}>{planLabel}</Badge>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{plan.summary}</p>

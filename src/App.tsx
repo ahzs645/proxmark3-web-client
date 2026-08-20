@@ -51,6 +51,7 @@ import {
   type RibbonStripId,
 } from "@/features/ribbon/config";
 import { PRIMARY_SAMPLE_DUMP } from "@/features/memory/demo/sampleDumps";
+import { Pm3Simulator } from "@/features/simulator";
 import { importDumpFile } from "@/features/memory/lib/import";
 import { tagInfoFromDump } from "@/features/tag-info/fromDump";
 import { useCardTarget } from "@/features/target/useCardTarget";
@@ -73,6 +74,7 @@ import type { DeviceProfile } from "@/features/device/types";
 const TAB_STORAGE_KEY = "pm3-active-tab";
 const TERMINAL_DOCK_STORAGE_KEY = "pm3-terminal-dock";
 const TRANSPORT_STORAGE_KEY = "pm3-transport";
+const SIMULATED_MODE_STORAGE_KEY = "pm3-simulated-mode";
 const LIBRARY_KEYS_STORAGE_KEY = "pm3-library-key-mode";
 const LEGACY_LIBRARY_KEYS_STORAGE_KEY = "pm3-use-library-keys";
 const CACHE_PATH_PREFIX = "/pm3-cache";
@@ -121,6 +123,16 @@ function App() {
     return localStorage.getItem(LEGACY_LIBRARY_KEYS_STORAGE_KEY) === "1" ? "all" : "default";
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  // Simulated mode: every command is answered by an in-browser virtual card
+  // instead of the WASM client / hardware. Persisted like the transport choice.
+  const [simulatedMode, setSimulatedMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(SIMULATED_MODE_STORAGE_KEY) === "1";
+  });
+  const simulatorRef = useRef<Pm3Simulator | null>(null);
+  if (!simulatorRef.current) simulatorRef.current = new Pm3Simulator();
+  const simulatedModeRef = useRef(simulatedMode);
+  simulatedModeRef.current = simulatedMode;
   const [deviceProfile, setDeviceProfile] = useState<DeviceProfile>(emptyDeviceProfile);
   const { commandHistory, pushCommand } = useCommandHistory();
   const { theme, setTheme } = useTheme();
@@ -282,6 +294,14 @@ function App() {
 
   const readFsBytes = useCallback((filePath: string): Uint8Array | null => {
     if (typeof window === "undefined") return null;
+
+    // In simulated mode dumps/keys live in the simulator's in-memory FS, not
+    // the WASM client's, so the library ingest pipeline reads them from there.
+    if (simulatedModeRef.current) {
+      return (
+        simulatorRef.current?.readFile(stripAnsi(filePath).trim().replace(/^`|`$/g, "")) ?? null
+      );
+    }
 
     const globalWindow = window as typeof window & {
       FS?: EmscriptenFSLike;
@@ -458,6 +478,9 @@ function App() {
   // what is running, what is queued behind it, and how long it has been going.
   const commandCenter = useCommandCenter({
     dispatch: (command) => {
+      if (simulatedModeRef.current) {
+        return simulatorRef.current!.execute(command, handleWasmOutput);
+      }
       if (wasmState.isReady) return wasmState.sendCommand(command);
       terminalRef.current?.writeln(
         wasmState.isLoading
@@ -466,7 +489,10 @@ function App() {
       );
       return null;
     },
-    interrupt: wasmState.sendBreak,
+    interrupt: () => {
+      if (simulatedModeRef.current) simulatorRef.current?.interrupt();
+      else wasmState.sendBreak();
+    },
     flushOutput: wasmState.flushOutput,
   });
   commandCenterRef.current = commandCenter;
@@ -831,6 +857,11 @@ function App() {
   }, [selectedTransport]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SIMULATED_MODE_STORAGE_KEY, simulatedMode ? "1" : "0");
+  }, [simulatedMode]);
+
+  useEffect(() => {
     if (wasmState.isReady && cachedAssets.length) {
       syncCacheToFS();
     }
@@ -856,6 +887,12 @@ function App() {
 
   const handleConnect = useCallback(async () => {
     if (isConnecting) return;
+    if (simulatedModeRef.current) {
+      terminalRef.current?.writeln(
+        "\x1b[33mSimulated mode is on — turn it off to connect real hardware.\x1b[0m",
+      );
+      return;
+    }
     const transportType =
       selectedTransport || wasmState.availableTransports[0]?.type || "webserial";
     const transportName = getTransportLabel(transportType, wasmState.availableTransports);
@@ -892,6 +929,33 @@ function App() {
     setDeviceProfile(emptyDeviceProfile());
   }, [wasmState, clearTarget]);
 
+  const handleToggleSimulated = useCallback(() => {
+    setSimulatedMode((prev) => {
+      const next = !prev;
+      if (next) {
+        // Drop any live hardware link so the two backends never fight over the
+        // command channel, and reset the virtual card to a clean session.
+        if (wasmState.isDeviceConnected) void wasmState.disconnectDevice();
+        simulatorRef.current = new Pm3Simulator();
+        clearTarget();
+        setDeviceProfile(emptyDeviceProfile());
+        terminalRef.current?.writeln(
+          "\x1b[35m● Simulated mode ON — commands now run against a virtual card.\x1b[0m",
+        );
+        terminalRef.current?.writeln(
+          '\x1b[90mTry: hf search · hf mf autopwn · hf mf dump · lf search · type "help".\x1b[0m',
+        );
+      } else {
+        clearTarget();
+        setDeviceProfile(emptyDeviceProfile());
+        terminalRef.current?.writeln(
+          "\x1b[33m○ Simulated mode OFF — reconnect hardware to run real commands.\x1b[0m",
+        );
+      }
+      return next;
+    });
+  }, [wasmState, clearTarget]);
+
   const handleCopyUid = useCallback(() => {
     if (tagInfo?.uid) {
       void navigator.clipboard.writeText(tagInfo.uid);
@@ -914,8 +978,8 @@ function App() {
   );
 
   const canRunCommands = useMemo(() => {
-    return wasmState.isReady;
-  }, [wasmState.isReady]);
+    return simulatedMode || wasmState.isReady;
+  }, [simulatedMode, wasmState.isReady]);
 
   const runQuickCommand = useCallback(() => {
     if (!quickCommand.trim()) return;
@@ -940,11 +1004,13 @@ function App() {
         isClientAttached: wasmState.isClientAttached,
         isAttaching: wasmState.isAttaching,
         isConnecting,
+        isSimulated: simulatedMode,
         availableTransports: wasmState.availableTransports,
         activeTransportType: selectedTransport || wasmState.activeTransportType,
       }),
     [
       isConnecting,
+      simulatedMode,
       selectedTransport,
       wasmState.activeTransportType,
       wasmState.availableTransports,
@@ -1027,6 +1093,8 @@ function App() {
                 availableTransports={wasmState.availableTransports}
                 selectedTransport={selectedTransport || wasmState.activeTransportType}
                 onTransportChange={setSelectedTransport}
+                simulatedMode={simulatedMode}
+                onToggleSimulated={handleToggleSimulated}
                 onJsonUpload={handleJsonUpload}
                 libraryKeyMode={libraryKeyMode}
                 onLibraryKeyModeChange={setLibraryKeyMode}

@@ -1,4 +1,4 @@
-import { Bluetooth, HelpCircle, RefreshCw, Settings, Usb, Zap } from "lucide-react";
+import { Bluetooth, FlaskConical, HelpCircle, RefreshCw, Settings, Usb, Zap } from "lucide-react";
 import { TransportSelector } from "@/components/ribbon/TransportSelector";
 import type { TransportInfo, TransportType } from "@/lib/transports";
 import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
@@ -13,6 +13,8 @@ interface ConnectTabProps {
   availableTransports?: TransportInfo[];
   selectedTransport?: TransportType | null;
   onTransportChange?: (type: TransportType) => void;
+  simulatedMode?: boolean;
+  onToggleSimulated?: () => void;
 }
 
 export function ConnectTab({
@@ -24,6 +26,8 @@ export function ConnectTab({
   availableTransports = [],
   selectedTransport = null,
   onTransportChange,
+  simulatedMode = false,
+  onToggleSimulated,
 }: ConnectTabProps) {
   const isConnected = connectionStatus === "connected";
   const isConnecting = connectionStatus === "connecting";
@@ -42,7 +46,7 @@ export function ConnectTab({
           }
           label={isConnected ? "Disconnect" : isConnecting ? "Connecting…" : "Connect"}
           onClick={isConnected ? onDisconnect : onConnect}
-          disabled={isConnecting || (!isConnected && !hasTransport)}
+          disabled={simulatedMode || isConnecting || (!isConnected && !hasTransport)}
           variant={isConnected ? "secondary" : "default"}
         />
         <RibbonButton
@@ -52,11 +56,30 @@ export function ConnectTab({
             onDisconnect();
             setTimeout(onConnect, 500);
           }}
-          disabled={!commandsEnabled || isConnecting || !hasTransport}
+          disabled={simulatedMode || !commandsEnabled || isConnecting || !hasTransport}
         />
       </RibbonGroup>
 
-      {!hasTransport ? (
+      {onToggleSimulated ? (
+        <>
+          <RibbonDivider />
+          <RibbonGroup title="Simulation">
+            <RibbonButton
+              icon={<FlaskConical className={simulatedMode ? "text-amber-500" : ""} />}
+              label={simulatedMode ? "Simulating" : "Simulate"}
+              onClick={onToggleSimulated}
+              variant={simulatedMode ? "default" : "outline"}
+            />
+          </RibbonGroup>
+        </>
+      ) : null}
+
+      {simulatedMode ? (
+        <div className="flex h-16 max-w-xs shrink-0 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+          Simulated mode is on — every command runs against a virtual card. Turn it off to use real
+          hardware.
+        </div>
+      ) : !hasTransport ? (
         <div className="flex h-16 max-w-xs shrink-0 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
           No WebSerial in this browser — hardware connection requires Chrome/Edge on desktop.
           Offline tools still work.
