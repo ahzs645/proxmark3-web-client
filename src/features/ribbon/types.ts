@@ -40,4 +40,7 @@ export interface RibbonToolbarProps {
   availableTransports?: TransportInfo[];
   selectedTransport?: TransportType | null;
   onTransportChange?: (type: TransportType) => void;
+  /** Simulated mode: commands run against a virtual card, no hardware. */
+  simulatedMode?: boolean;
+  onToggleSimulated?: () => void;
 }
