@@ -29,6 +29,7 @@ function parseArgs(argv) {
     advanceIdleMs: Number(process.env.PM3_ADVANCE_IDLE_MS || 1500),
     commands: [],
     expect: [],
+    files: [],
     wasmDir: process.env.PM3_WASM_DIR || defaultWasmDir,
     autoQuit: true,
     quiet: false,
@@ -67,6 +68,13 @@ function parseArgs(argv) {
       case "--expect":
         options.expect.push(argv[++i] || fail("missing value for --expect"));
         break;
+      case "--file": {
+        const spec = argv[++i] || fail("missing value for --file");
+        const separator = spec.lastIndexOf(":");
+        if (separator <= 0) fail("--file expects <local-path>:<wasm-path>");
+        options.files.push({ local: spec.slice(0, separator), remote: spec.slice(separator + 1) });
+        break;
+      }
       case "--no-auto-quit":
         options.autoQuit = false;
         break;
@@ -135,6 +143,8 @@ Options:
   --baud <rate>              Serial baud rate. Default: 115200.
   --command <text>           PM3 command to send. Repeat for multiple commands.
   --expect <text>            Require substring in captured output. Repeatable.
+  --file <local>:<wasm>      Copy a local file into the WASM filesystem before running commands
+                             (e.g. a dump for "hf mf eload"). Repeatable.
   --timeout-ms <n>           Hard timeout for the run. Default: 30000.
   --startup-delay-ms <n>     Delay before sending commands. Default: 500.
   --settle-ms <n>            Extra wait before exit after commands. Default: 1500.
@@ -252,7 +262,8 @@ class WasmSmokeRunner {
   }
 
   isPromptLine(line) {
-    return stripAnsi(line).trimEnd().endsWith("pm3 -->");
+    // Proxmark3 prompts read "pm3 -->", a connected Proxmark5 prints "pm5 -->".
+    return /pm[35] -->$/.test(stripAnsi(line).trimEnd());
   }
 
   isQuitCommand(command) {
@@ -445,6 +456,24 @@ class WasmSmokeRunner {
 
     Atomics.store(heapU32, tailIdx, (tail + available) >>> 0);
     return out;
+  }
+
+  stageFiles() {
+    if (this.options.files.length === 0) return;
+    // The non-modularized Emscripten glue declares FS at script scope, which
+    // becomes a global when loaded via vm.runInThisContext.
+    const FS = globalThis.FS || globalThis.Module?.FS;
+    if (!FS?.writeFile) throw new Error("Emscripten FS is not available in this build");
+    for (const { local, remote } of this.options.files) {
+      const bytes = fs.readFileSync(local);
+      const dir = path.posix.dirname(remote);
+      if (dir && dir !== "/" && dir !== ".") {
+        if (FS.mkdirTree) FS.mkdirTree(dir);
+        else if (!FS.analyzePath?.(dir)?.exists) FS.mkdir(dir);
+      }
+      FS.writeFile(remote, new Uint8Array(bytes), { flags: "w+" });
+      this.printRunner(`[runner] staged ${local} -> ${remote} (${bytes.length} bytes)`);
+    }
   }
 
   startBridge() {
@@ -674,6 +703,12 @@ class WasmSmokeRunner {
     globalThis.Module = {
       locateFile: (wasmPath) => path.join(this.options.wasmDir, wasmPath),
       onRuntimeInitialized: () => {
+        try {
+          this.stageFiles();
+        } catch (error) {
+          this.finish(1, `failed to stage files: ${error.message}`);
+          return;
+        }
         this.startBridge()
           .then(() => {
             setTimeout(() => {

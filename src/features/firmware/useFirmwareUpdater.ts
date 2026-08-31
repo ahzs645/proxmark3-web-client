@@ -13,12 +13,13 @@ import {
   openFirmwareSerial,
   reconnectFirmwareSerial,
 } from "./serial";
-import type {
-  FirmwareEntry,
-  FirmwareManifest,
-  FirmwarePhase,
-  FirmwareProgress,
-  ReaderInspection,
+import {
+  isFlashablePlatform,
+  type FirmwareEntry,
+  type FirmwareManifest,
+  type FirmwarePhase,
+  type FirmwareProgress,
+  type ReaderInspection,
 } from "./types";
 import { getTransportManager } from "@/lib/transports";
 import { WebSerialTransport } from "@/lib/transports/WebSerialTransport";
@@ -104,7 +105,7 @@ export function useFirmwareUpdater({
   );
 
   const compatibleFirmware = useMemo(() => {
-    if (!manifest || !inspection || inspection.platform === "unknown") return [];
+    if (!manifest || !inspection || !isFlashablePlatform(inspection.platform)) return [];
     return manifest.firmwares.filter((entry) => entry.platform === inspection.platform);
   }, [inspection, manifest]);
 
@@ -233,6 +234,11 @@ export function useFirmwareUpdater({
       setInspection(current);
       if (current.platform === "unknown") {
         throw new Error("Hardware platform could not be verified; flashing is blocked for safety");
+      }
+      if (!isFlashablePlatform(current.platform)) {
+        throw new Error(
+          `${current.platform} uses a different flash layout; this updater only writes Proxmark3 boards`,
+        );
       }
       if (current.platform !== selectedFirmware.platform) {
         throw new Error(

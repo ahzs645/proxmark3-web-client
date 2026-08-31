@@ -1,6 +1,8 @@
 import { isTauri } from "../../tauri";
 import { TauriBluetoothTransport } from "../TauriBluetoothTransport";
 import { TauriSerialTransport } from "../TauriSerialTransport";
+import { TauriTcpTransport } from "../TauriTcpTransport";
+import { WebBluetoothTransport } from "../WebBluetoothTransport";
 import { WebSerialTransport } from "../WebSerialTransport";
 import type { Transport, TransportInfo, TransportType } from "../types";
 import type { TransportManagerState } from "./state";
@@ -10,6 +12,13 @@ export function registerDefaultTransports(state: TransportManagerState): void {
   const webSerial = new WebSerialTransport();
   if (webSerial.isAvailable()) {
     state.transports.set(webSerial.type, webSerial);
+  }
+
+  // Web Bluetooth reaches the Proxmark5 BWM from Chromium browsers; Tauri's
+  // WKWebView/WebKitGTK do not implement it, so this is effectively browser-only.
+  const webBluetooth = new WebBluetoothTransport();
+  if (webBluetooth.isAvailable()) {
+    state.transports.set(webBluetooth.type, webBluetooth);
   }
 
   if (!isTauri()) {
@@ -24,6 +33,11 @@ export function registerDefaultTransports(state: TransportManagerState): void {
   const tauriBluetooth = new TauriBluetoothTransport();
   if (tauriBluetooth.isAvailable()) {
     state.transports.set(tauriBluetooth.type, tauriBluetooth);
+  }
+
+  const tauriTcp = new TauriTcpTransport();
+  if (tauriTcp.isAvailable()) {
+    state.transports.set(tauriTcp.type, tauriTcp);
   }
 }
 
@@ -60,7 +74,13 @@ export function getDefaultTransportType(state: TransportManagerState): Transport
   }
 
   if (isTauri()) {
-    const priority: TransportType[] = ["tauri-serial", "tauri-bluetooth", "webserial"];
+    const priority: TransportType[] = [
+      "tauri-serial",
+      "tauri-bluetooth",
+      "tauri-tcp",
+      "webserial",
+      "webbluetooth",
+    ];
     for (const type of priority) {
       if (available.some((transport) => transport.type === type)) {
         return type;

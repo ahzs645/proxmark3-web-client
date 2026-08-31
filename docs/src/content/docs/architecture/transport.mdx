@@ -1,52 +1,75 @@
 ---
 title: Transport Layer
-description: How the client communicates with Proxmark3 hardware.
+description: How the client communicates with Proxmark3 and Proxmark5 hardware.
 ---
 
-The transport layer abstracts hardware communication behind a common interface, allowing the UI to work identically regardless of connection method.
+The transport layer abstracts hardware communication behind a common interface, allowing the UI to work identically regardless of connection method. Every transport is a byte pipe: it moves raw PM3 protocol frames between the device and the shared ring buffers the WASM client reads from, so the same client binary serves USB, Bluetooth and TCP links.
 
 ## Transport Interface
 
 All transports implement a shared interface with:
 
 - `connect()` / `disconnect()`
-- Read and write streams
+- Read and write loops that move bytes to/from the ring buffers
 - Event handlers for connection state changes
-- Device path mapping for the WASM layer
+- Device path mapping for the WASM layer (`hw connect -p <path>`)
 
 ## Implementations
+
+| Transport                 | Runtime         | Hardware                                    | Device path        |
+| ------------------------- | --------------- | ------------------------------------------- | ------------------ |
+| `WebSerialTransport`      | Browser         | Proxmark3 / Proxmark5 over USB              | `/dev/webserial`   |
+| `WebBluetoothTransport`   | Browser         | Proxmark5 Battery/Wireless Module (BLE)     | `/dev/webble`      |
+| `TauriSerialTransport`    | Desktop (Tauri) | Proxmark3 / Proxmark5 over USB              | `/dev/tauriserial` |
+| `TauriBluetoothTransport` | Desktop, macOS  | Proxmark3 X (Bluetooth Classic SPP)         | `/dev/rfcomm0`     |
+| `TauriTcpTransport`       | Desktop (Tauri) | Proxmark5 BWM Wi-Fi server, PM3 TCP bridges | `/dev/tauritcp`    |
 
 ### WebSerialTransport
 
 Used in the **browser**. Leverages the [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API) available in Chromium browsers.
 
-- Device path: `/dev/webserial`
-- Requires user gesture to open port picker
-- Supports baud rate configuration
+- Requires a user gesture to open the port picker
+- No USB vendor filter, so both the Proxmark3 (`9AC4:4B8F`) and the Proxmark5 (`2D2D:504D`) appear in the picker
+
+### WebBluetoothTransport
+
+Used in the **browser** with a Proxmark5 that has the Battery/Wireless Module (BWM) fitted. The module's ESP32 advertises as `Proxmark5` with a NimBLE "SPP" service:
+
+- Service `0xAE86`, data characteristic `0xAE88` (`WRITE` / `WRITE_NO_RSP` / `NOTIFY`), no pairing
+- Outgoing frames are chunked to fit the ATT MTU; the chunk size steps down automatically (244 → 128 → 20 bytes) if the host stack negotiated a small MTU
+- Incoming notifications are queued and drained into the ring buffer with backpressure, since BLE notifications cannot be paused
+
+Web Bluetooth is only implemented by Chromium browsers; the Tauri webview does not expose it.
 
 ### TauriSerialTransport
 
 Used in the **desktop app**. Accesses serial ports directly via the Rust `serialport` crate.
 
-- Device path: `/dev/tauriserial`
 - No browser permissions needed
 - Enumerates available ports automatically
 
 ### TauriBluetoothTransport
 
-Used in the **desktop app** on macOS. Connects to Proxmark3 devices over Bluetooth SPP.
+Used in the **desktop app** on macOS. Connects to Proxmark3 X devices over Bluetooth Classic SPP.
 
-- Device path: `/dev/rfcomm0`
-- Uses `objc2` bindings to macOS IOBluetooth framework
-- Requires prior pairing via System Preferences
+- Uses `objc2` bindings to the macOS IOBluetooth framework
+- Requires prior pairing via System Settings
+- Not applicable to the Proxmark5, whose wireless module is BLE + Wi-Fi
+
+### TauriTcpTransport
+
+Used in the **desktop app** for any PM3 protocol endpoint reachable over TCP:
+
+- Proxmark5 BWM in Wi-Fi station mode — run `hw bwmwifi --ssid <ssid> --pwd <pwd>` over USB or BLE, then connect to the IP shown by `hw bwmwifi --status` (default port `7777`)
+- Upstream's `pm5_ble_bridge.py --tcp <port>` relay, or a `socat` serial-to-TCP bridge
+- The endpoint is entered as `host:port` in the Connect ribbon and remembered between sessions; the Rust side (`src-tauri/src/tcp.rs`) uses a blocking `TcpStream` with `TCP_NODELAY` and a short read timeout
 
 ## Transport Manager
 
-The `TransportManager` class uses a factory pattern to create the appropriate transport based on:
+The `TransportManager` class registers whichever transports are available in the current runtime and exposes them to the transport selector:
 
-1. Runtime environment (browser vs. Tauri)
-2. User selection from the transport selector dropdown
-3. Available hardware capabilities
+1. Browser: WebSerial, plus Web Bluetooth when the browser implements it
+2. Tauri: native serial, Bluetooth SPP, TCP, plus WebSerial if the webview supports it
 
 ## Ring Buffers
 

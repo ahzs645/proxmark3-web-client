@@ -48,6 +48,12 @@ export function getDevicePath(transportType: TransportType): string {
       return "/dev/tauriserial";
     case "tauri-bluetooth":
       return "/dev/rfcomm0";
+    case "webbluetooth":
+      return "/dev/webble";
+    case "tauri-tcp":
+      // Deliberately not a "tcp:" URI: the WASM uart layer is the ring buffer
+      // bridge, the socket lives in the Tauri host.
+      return "/dev/tauritcp";
     default:
       return "/dev/webserial";
   }

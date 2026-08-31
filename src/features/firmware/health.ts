@@ -1,4 +1,4 @@
-import type { FirmwareEntry, ReaderInspection } from "./types";
+import { isFlashablePlatform, type FirmwareEntry, type ReaderInspection } from "./types";
 
 export type ReaderHealthLevel = "healthy" | "attention" | "recovery" | "unknown";
 
@@ -46,6 +46,17 @@ export function assessReaderFirmwareHealth(
       level: "recovery",
       title: "Hardware platform is not verified",
       details: ["Flashing remains blocked to prevent writing an image for the wrong board."],
+      recommendedFirmwareId: null,
+    };
+  }
+  if (!isFlashablePlatform(inspection.platform)) {
+    return {
+      level: "attention",
+      title: "Proxmark5 recognised; browser flashing is not supported for this board",
+      details: [
+        "The Proxmark5 (AT32F437) has a different flash layout and no verified image source here.",
+        "Update it with the upstream flasher built with PLATFORM=PM5.",
+      ],
       recommendedFirmwareId: null,
     };
   }

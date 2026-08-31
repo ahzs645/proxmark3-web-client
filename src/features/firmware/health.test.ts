@@ -17,6 +17,7 @@ function inspection(overrides: Partial<ReaderInspection> = {}): ReaderInspection
   return {
     mode: "firmware",
     platform: "PM3GENERIC",
+    chipFamily: "at91",
     chipFlashKB: 512,
     bootloaderType: "iceman",
     bootrom: { version: "4.21000", buildDate: "2026-01-01", gitHash: "abc1234" },

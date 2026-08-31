@@ -122,10 +122,18 @@ export function usePm3CommandChannel({
           throw new Error("WASM client is not ready");
         }
 
-        const shouldUseStructuredApi =
-          supportsStructuredCommandApi(module) &&
-          transportManager.activeTransportType !== "webserial" &&
-          pendingDevicePathRef.current !== "/dev/webserial";
+        // Every hardware transport bridges through the same WASM uart ring
+        // buffers, so a command has to run on the client's own thread, which is
+        // what drains RX. The structured API ccalls pm3_console on the main
+        // browser thread instead, and that path never drains the ring: verified
+        // over BLE, the device's reply reached rxHead=44 while rxTail stayed 0
+        // until TestProxmark timed out. WebSerial only worked because it was
+        // excluded here by name. Keep the structured API for the offline case,
+        // where there is no transport and no ring buffer to service.
+        const usesUartBridge =
+          transportManager.activeTransportType !== null || pendingDevicePathRef.current !== null;
+
+        const shouldUseStructuredApi = supportsStructuredCommandApi(module) && !usesUartBridge;
 
         if (shouldUseStructuredApi) {
           // Resolves when the command actually returns, so the caller gets a

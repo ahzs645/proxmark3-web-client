@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import type { TransportType } from "@/lib/transports";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import { FIRMWARE_SOURCE } from "./api";
+import { isFlashablePlatform } from "./types";
 import { useFirmwareUpdater } from "./useFirmwareUpdater";
 import { firmwareVersionsMatch } from "./health";
 
@@ -22,6 +23,7 @@ const CONFIRMATION_TEXT = "FLASH PM3";
 function platformLabel(platform: string) {
   if (platform === "PM3GENERIC") return "PM3 Easy / Generic";
   if (platform === "PM3RDV4") return "Proxmark3 RDV4";
+  if (platform === "PM5") return "Proxmark5 (AT32F437)";
   return "Unknown hardware";
 }
 
@@ -199,6 +201,13 @@ export function FirmwareUpdateSection({
           ) : updater.inspection?.platform === "unknown" ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
               The hardware platform could not be verified, so flashing is blocked.
+            </p>
+          ) : updater.inspection && !isFlashablePlatform(updater.inspection.platform) ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+              Proxmark5 detected. Its AT32 flash layout differs from the Proxmark3 boards this
+              updater writes, and no verified Proxmark5 images are published yet, so flashing from
+              the browser is disabled. Use <code>pm3-flash-fullimage</code> from an upstream build
+              made with <code>PLATFORM=PM5</code>.
             </p>
           ) : null}
 

@@ -5,7 +5,12 @@ import { useProxmarkWasm } from "@/hooks/useProxmarkWasm";
 import { useTheme } from "@/hooks/useTheme";
 import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyCachePanel";
 import type { PM3DumpJson } from "@/components/panels/CardMemoryMap";
-import { getTransportLabel, type TransportType } from "@/lib/transports";
+import {
+  getTransportLabel,
+  loadStoredTcpEndpoint,
+  TCP_ENDPOINT_STORAGE_KEY,
+  type TransportType,
+} from "@/lib/transports";
 import pm3WebUSB from "@/lib/pm3WebUSB";
 import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory";
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
@@ -78,7 +83,13 @@ const SIMULATED_MODE_STORAGE_KEY = "pm3-simulated-mode";
 const LIBRARY_KEYS_STORAGE_KEY = "pm3-library-key-mode";
 const LEGACY_LIBRARY_KEYS_STORAGE_KEY = "pm3-use-library-keys";
 const CACHE_PATH_PREFIX = "/pm3-cache";
-const TRANSPORT_TYPES: TransportType[] = ["webserial", "tauri-serial", "tauri-bluetooth"];
+const TRANSPORT_TYPES: TransportType[] = [
+  "webserial",
+  "webbluetooth",
+  "tauri-serial",
+  "tauri-bluetooth",
+  "tauri-tcp",
+];
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27);
 const ANSI_ESCAPE_REGEX = new RegExp(
   `${ANSI_ESCAPE_CHAR}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`,
@@ -123,6 +134,13 @@ function App() {
     return localStorage.getItem(LEGACY_LIBRARY_KEYS_STORAGE_KEY) === "1" ? "all" : "default";
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  // Wi-Fi / TCP endpoint for the Proxmark5 BWM (or any PM3 TCP bridge). Kept
+  // alongside the transport choice so reconnects reuse the last address.
+  const [tcpEndpoint, setTcpEndpoint] = useState<string>(() => loadStoredTcpEndpoint());
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(TCP_ENDPOINT_STORAGE_KEY, tcpEndpoint);
+  }, [tcpEndpoint]);
   // Simulated mode: every command is answered by an in-browser virtual card
   // instead of the WASM client / hardware. Persisted like the transport choice.
   const [simulatedMode, setSimulatedMode] = useState<boolean>(() => {
@@ -752,6 +770,10 @@ function App() {
     [commandCenter, prepareLibraryKeyCommand, pushCommand],
   );
 
+  // A freshly attached client can refuse commands for a few hundred ms.
+  const PROBE_MAX_ATTEMPTS = 10;
+  const PROBE_RETRY_MS = 500;
+
   // Probe once per attached hardware session. Parsing remains evidence based,
   // so future PM3 models/firmware simply enrich the profile instead of falling
   // through a hard-coded model allowlist.
@@ -763,12 +785,35 @@ function App() {
     }
     if (capabilityProbeStartedRef.current) return;
     capabilityProbeStartedRef.current = true;
+
+    // The client reports "attached" a beat before it will accept a command, so
+    // a one-shot probe loses that race and leaves the profile empty for the
+    // whole session — which silently disables every hardware-gated control
+    // (the PM5 Auto-off toggle, feature availability) even though the device is
+    // right there. Retry until it takes rather than giving up on the first miss.
+    let cancelled = false;
+    const probe = async (command: string, origin: string) => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await commandCenter.runAndWait(command, origin);
+        } catch (error) {
+          if (cancelled || attempt >= PROBE_MAX_ATTEMPTS - 1) throw error;
+          await new Promise((resolve) => setTimeout(resolve, PROBE_RETRY_MS));
+        }
+      }
+    };
+
     void (async () => {
-      await commandCenter.runAndWait("hw version", "capability-probe");
-      await commandCenter.runAndWait("hw status", "firmware-health-probe");
+      await probe("hw version", "capability-probe");
+      if (cancelled) return;
+      await probe("hw status", "firmware-health-probe");
     })().catch((error) => {
       console.warn("Device capability probe did not complete", error);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [commandCenter, wasmState.isClientAttached]);
 
   const refreshDeviceProfile = useCallback(() => {
@@ -885,42 +930,72 @@ function App() {
     };
   }, []);
 
-  const handleConnect = useCallback(async () => {
-    if (isConnecting) return;
-    if (simulatedModeRef.current) {
-      terminalRef.current?.writeln(
-        "\x1b[33mSimulated mode is on — turn it off to connect real hardware.\x1b[0m",
-      );
-      return;
-    }
-    const transportType =
-      selectedTransport || wasmState.availableTransports[0]?.type || "webserial";
-    const transportName = getTransportLabel(transportType, wasmState.availableTransports);
-
-    terminalRef.current?.writeln(`\x1b[36mConnecting to Proxmark3 via ${transportName}...\x1b[0m`);
-    if (transportType === "webserial") {
-      terminalRef.current?.writeln(
-        "\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m",
-      );
-    } else if (transportType === "tauri-bluetooth") {
-      terminalRef.current?.writeln("\x1b[90mSearching for Proxmark3 X Bluetooth device...\x1b[0m");
-    }
-
-    setIsConnecting(true);
-    try {
-      const success = await wasmState.connectDevice(transportType);
-      if (success) {
-        terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
-        terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
-      } else {
+  const handleConnect = useCallback(
+    async (transportOverride?: TransportType) => {
+      if (isConnecting) return;
+      if (simulatedModeRef.current) {
         terminalRef.current?.writeln(
-          `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
+          "\x1b[33mSimulated mode is on — turn it off to connect real hardware.\x1b[0m",
+        );
+        return;
+      }
+      const transportType =
+        transportOverride ||
+        selectedTransport ||
+        wasmState.availableTransports[0]?.type ||
+        "webserial";
+      if (transportOverride && transportOverride !== selectedTransport) {
+        setSelectedTransport(transportOverride);
+      }
+      const transportName = getTransportLabel(transportType, wasmState.availableTransports);
+
+      terminalRef.current?.writeln(
+        `\x1b[36mConnecting to Proxmark3 via ${transportName}...\x1b[0m`,
+      );
+      if (transportType === "webserial") {
+        terminalRef.current?.writeln(
+          "\x1b[90mSelect your Proxmark3 device in the browser popup.\x1b[0m",
+        );
+      } else if (transportType === "tauri-bluetooth") {
+        terminalRef.current?.writeln(
+          "\x1b[90mSearching for Proxmark3 X Bluetooth device...\x1b[0m",
+        );
+      } else if (transportType === "webbluetooth") {
+        terminalRef.current?.writeln(
+          "\x1b[90mSelect the Proxmark5 (BWM) in the browser Bluetooth picker. Make sure the module is powered on.\x1b[0m",
+        );
+      } else if (transportType === "tauri-tcp") {
+        terminalRef.current?.writeln(
+          `\x1b[90mOpening tcp:${tcpEndpoint} (start the Proxmark5 server with \`hw bwmwifi\` over USB/BLE first).\x1b[0m`,
         );
       }
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [wasmState, selectedTransport, isConnecting]);
+
+      setIsConnecting(true);
+      try {
+        const device =
+          transportType === "tauri-tcp"
+            ? {
+                id: tcpEndpoint,
+                name: `tcp:${tcpEndpoint}`,
+                type: transportType,
+                address: tcpEndpoint,
+              }
+            : undefined;
+        const success = await wasmState.connectDevice(transportType, device);
+        if (success) {
+          terminalRef.current?.writeln(`\x1b[32m${transportName} connected!\x1b[0m`);
+          terminalRef.current?.writeln("\x1b[90mNow connecting WASM client to device...\x1b[0m");
+        } else {
+          terminalRef.current?.writeln(
+            `\x1b[31m${transportName} connection failed or cancelled.\x1b[0m`,
+          );
+        }
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [wasmState, selectedTransport, isConnecting, tcpEndpoint],
+  );
 
   const handleDisconnect = useCallback(async () => {
     await wasmState.disconnectDevice();
@@ -1093,6 +1168,8 @@ function App() {
                 availableTransports={wasmState.availableTransports}
                 selectedTransport={selectedTransport || wasmState.activeTransportType}
                 onTransportChange={setSelectedTransport}
+                tcpEndpoint={tcpEndpoint}
+                onTcpEndpointChange={setTcpEndpoint}
                 simulatedMode={simulatedMode}
                 onToggleSimulated={handleToggleSimulated}
                 onJsonUpload={handleJsonUpload}

@@ -14,7 +14,9 @@ function isFirmwareManifest(value: unknown): value is FirmwareManifest {
         entry &&
         typeof entry.id === "string" &&
         typeof entry.version === "string" &&
-        (entry.platform === "PM3GENERIC" || entry.platform === "PM3RDV4") &&
+        (entry.platform === "PM3GENERIC" ||
+          entry.platform === "PM3RDV4" ||
+          entry.platform === "PM5") &&
         typeof entry.files?.bootloader === "string" &&
         typeof entry.files?.fullimage === "string" &&
         typeof entry.checksums?.bootloader_sha256 === "string" &&

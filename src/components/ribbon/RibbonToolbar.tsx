@@ -57,6 +57,8 @@ export function RibbonToolbar({
   availableTransports = [],
   selectedTransport = null,
   onTransportChange,
+  tcpEndpoint = "",
+  onTcpEndpointChange,
   simulatedMode = false,
   onToggleSimulated,
 }: RibbonToolbarProps) {
@@ -97,6 +99,8 @@ export function RibbonToolbar({
             availableTransports,
             selectedTransport,
             onTransportChange,
+            tcpEndpoint,
+            onTcpEndpointChange,
             simulatedMode,
             onToggleSimulated,
             cacheItems,
@@ -149,6 +153,8 @@ type StripContext = {
   availableTransports: NonNullable<RibbonToolbarProps["availableTransports"]>;
   selectedTransport: RibbonToolbarProps["selectedTransport"];
   onTransportChange: RibbonToolbarProps["onTransportChange"];
+  tcpEndpoint: string;
+  onTcpEndpointChange: RibbonToolbarProps["onTcpEndpointChange"];
   simulatedMode: boolean;
   onToggleSimulated: RibbonToolbarProps["onToggleSimulated"];
   cacheItems: RibbonToolbarProps["cacheItems"];
@@ -179,6 +185,8 @@ function renderStrip(strip: RibbonStripId, ctx: StripContext) {
           availableTransports={ctx.availableTransports}
           selectedTransport={ctx.selectedTransport}
           onTransportChange={ctx.onTransportChange}
+          tcpEndpoint={ctx.tcpEndpoint}
+          onTcpEndpointChange={ctx.onTcpEndpointChange}
           simulatedMode={ctx.simulatedMode}
           onToggleSimulated={ctx.onToggleSimulated}
         />

@@ -1,7 +1,22 @@
+import { chipFamilyFromType, MAIN_CHIP_TYPE, type ChipFamily } from "./flashDevice";
 import type { ElfSegment, FirmwareProgress, ReaderInspection } from "./types";
 
 export const PM3_USB_VENDOR_ID = 0x9ac4;
 export const PM3_USB_PRODUCT_ID = 0x4b8f;
+/** Proxmark5 enumerates with its own USB identity (see upstream `pm3` launcher). */
+export const PM5_USB_VENDOR_ID = 0x2d2d;
+export const PM5_USB_PRODUCT_ID = 0x504d;
+
+export const PROXMARK_USB_IDS: ReadonlyArray<{ usbVendorId: number; usbProductId: number }> = [
+  { usbVendorId: PM3_USB_VENDOR_ID, usbProductId: PM3_USB_PRODUCT_ID },
+  { usbVendorId: PM5_USB_VENDOR_ID, usbProductId: PM5_USB_PRODUCT_ID },
+];
+
+export function isProxmarkUsbId(usbVendorId?: number, usbProductId?: number): boolean {
+  return PROXMARK_USB_IDS.some(
+    (id) => id.usbVendorId === usbVendorId && id.usbProductId === usbProductId,
+  );
+}
 
 const NG_COMMAND_MAGIC = 0x61334d50;
 const NG_RESPONSE_MAGIC = 0x62334d50;
@@ -10,8 +25,9 @@ const LEGACY_PACKET_SIZE = 544;
 const FLASH_BLOCK_SIZE = 512;
 const BOOTLOADER_END = 0x102000;
 const BOOTLOADER_UNLOCK_MAGIC = 0x54494f44;
-const BOOTLOADER_FLAG = 4n;
-const ICEMAN_BOOTLOADER_FLAG = 64n;
+const BOOTLOADER_FLAG = 4n; // DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM (1<<2)
+const ICEMAN_BOOTLOADER_FLAG = 64n; // DEVICE_INFO_FLAG_UNDERSTANDS_VERSION (1<<6)
+const UNDERSTANDS_CHIP_TYPE_FLAG = 256n; // DEVICE_INFO_FLAG_UNDERSTANDS_CHIP_TYPE (1<<8)
 
 export const PM3_COMMAND = {
   DEVICE_INFO: 0,
@@ -20,6 +36,7 @@ export const PM3_COMMAND = {
   START_FLASH: 5,
   CHIP_INFO: 6,
   BL_VERSION: 7,
+  CHIP_TYPE: 8,
   VERSION: 263,
   CAPABILITIES: 274,
   DEBUG_PRINT_STRING: 256,
@@ -50,6 +67,8 @@ export interface BootloaderInfo {
   inBootloader: boolean;
   bootloaderType: "legacy" | "iceman" | "unknown";
   chipId: number | null;
+  /** Silicon family the bootrom reports via CMD_CHIP_TYPE (null if unsupported). */
+  chipFamily: ChipFamily | null;
 }
 
 export function encodeNgCommand(
@@ -216,15 +235,40 @@ function parseVersionResponse(data: Uint8Array) {
   };
 }
 
-function parseCapabilities(data: Uint8Array) {
+/**
+ * Bit offsets follow upstream `capabilities_t` (include/pm3_cmd.h): the flag
+ * bitfield starts at byte 9 with `via_fpc` as bit 0. `is_pm5` is bit 28 and only
+ * exists in capabilities version >= 8, older firmware simply never sets it.
+ */
+export function parseCapabilities(data: Uint8Array) {
   if (data.byteLength < 13) throw new Error("Capabilities response is incomplete");
   let flags = 0;
   for (let index = 0; index < 4; index++) flags |= data[9 + index] << (index * 8);
   const has = (bit: number) => ((flags >>> bit) & 1) === 1;
-  return { hardwareFlash: has(23), hardwareSmartcard: has(24), isRdv4: has(25) };
+  return {
+    hardwareFlash: has(23),
+    hardwareSmartcard: has(24),
+    isRdv4: has(25),
+    isPm5: has(28),
+  };
+}
+
+/**
+ * Proxmark5 MCUs report an ARM DBGMCU IDCODE (0x7008xxxx, Artery AT32F435/437)
+ * instead of an Atmel CIDR. This is the one PM5 signal that even the factory
+ * firmware provides: it predates the `is_pm5` capability bit and its version
+ * banner still reads "Iceman/master" with a Proxmark3 FPGA image name.
+ */
+export function isAt32ChipId(chipId: number): boolean {
+  return chipId >>> 16 === 0x7008;
 }
 
 function flashSizeKb(chipId: number): number {
+  if (isAt32ChipId(chipId)) {
+    // AT32 IDCODE encodes the flash class in bits 8..15: 0x45 -> 4032 KB, 0x33 -> 1024 KB, 0x32 -> 256 KB.
+    const flashClass = (chipId >> 8) & 0xff;
+    return flashClass === 0x45 ? 4032 : flashClass === 0x33 ? 1024 : flashClass === 0x32 ? 256 : 0;
+  }
   const sizeCode = (chipId >> 8) & 0x0f;
   return sizeCode === 9 ? 256 : sizeCode === 10 ? 512 : 0;
 }
@@ -234,6 +278,7 @@ export async function inspectReader(io: FirmwareIo): Promise<ReaderInspection> {
     inBootloader: false,
     bootloaderType: "unknown",
     chipId: null,
+    chipFamily: null,
   };
   try {
     bootloader = await inspectBootloader(io);
@@ -242,9 +287,15 @@ export async function inspectReader(io: FirmwareIo): Promise<ReaderInspection> {
   }
   if (bootloader.inBootloader) {
     const chipFlashKB = bootloader.chipId ? flashSizeKb(bootloader.chipId) : 0;
+    // Prefer the bootrom-reported family; fall back to the chip-id heuristic.
+    const chipFamily =
+      bootloader.chipFamily ??
+      (bootloader.chipId !== null ? (isAt32ChipId(bootloader.chipId) ? "at32" : "at91") : null);
+    const platform = chipFamily === "at32" ? "PM5" : chipFlashKB === 512 ? "PM3GENERIC" : "unknown";
     return {
       mode: "bootloader",
-      platform: chipFlashKB === 512 ? "PM3GENERIC" : "unknown",
+      platform,
+      chipFamily,
       chipFlashKB,
       bootloaderType: bootloader.bootloaderType,
       bootrom: null,
@@ -257,20 +308,36 @@ export async function inspectReader(io: FirmwareIo): Promise<ReaderInspection> {
   if (versionResponse.status !== 0) throw new Error("Reader version query failed");
   const version = parseVersionResponse(versionResponse.data);
   let platform: ReaderInspection["platform"] = "unknown";
+  if (isAt32ChipId(version.chipId)) platform = "PM5";
   try {
     const response = await sendNgCommand(io, PM3_COMMAND.CAPABILITIES, new Uint8Array(), 4_000);
     const capabilities = parseCapabilities(response.data);
-    if (capabilities.hardwareFlash && capabilities.hardwareSmartcard) platform = "PM3RDV4";
+    if (platform === "PM5") {
+      // Chip identity wins; capability bits on factory firmware are unreliable.
+    } else if (capabilities.isPm5) platform = "PM5";
+    else if (capabilities.hardwareFlash && capabilities.hardwareSmartcard) platform = "PM3RDV4";
     else if (!capabilities.hardwareFlash && !capabilities.hardwareSmartcard) {
       if (capabilities.isRdv4 || flashSizeKb(version.chipId) === 512) platform = "PM3GENERIC";
     }
   } catch {
-    if (flashSizeKb(version.chipId) === 512) platform = "PM3GENERIC";
+    if (platform === "unknown" && flashSizeKb(version.chipId) === 512) platform = "PM3GENERIC";
+  }
+  // Firmware older than the capabilities flag still identifies the board in
+  // its version banner (upstream prints "Target.... PM5" / "MCU....... AT32F437").
+  if (platform === "unknown" && /\bAT32F4\d\d\b|Proxmark5|\bPM5\b/i.test(version.raw)) {
+    platform = "PM5";
   }
 
+  const chipFamily: ChipFamily | null =
+    platform === "PM5" || isAt32ChipId(version.chipId)
+      ? "at32"
+      : platform === "PM3GENERIC" || platform === "PM3RDV4"
+        ? "at91"
+        : null;
   return {
     mode: "firmware",
     platform,
+    chipFamily,
     chipFlashKB: flashSizeKb(version.chipId),
     bootloaderType: "unknown",
     bootrom: version.bootrom,
@@ -291,10 +358,10 @@ export async function inspectBootloader(io: FirmwareIo): Promise<BootloaderInfo>
   );
   const command = Number(response.cmd & 0xffffn);
   if (command === PM3_COMMAND.ACK || command === 255) {
-    return { inBootloader: true, bootloaderType: "legacy", chipId: null };
+    return { inBootloader: true, bootloaderType: "legacy", chipId: null, chipFamily: null };
   }
   if (command === PM3_COMMAND.DEBUG_PRINT_STRING || command === 256) {
-    return { inBootloader: false, bootloaderType: "unknown", chipId: null };
+    return { inBootloader: false, bootloaderType: "unknown", chipId: null, chipFamily: null };
   }
   const flags = response.arg0;
   const inBootloader = (flags & BOOTLOADER_FLAG) !== 0n;
@@ -317,7 +384,33 @@ export async function inspectBootloader(io: FirmwareIo): Promise<BootloaderInfo>
       chipId = null;
     }
   }
-  return { inBootloader, bootloaderType, chipId };
+  // A modern bootrom reports its silicon family directly. Only the Proxmark5
+  // bootrom answers AT32; older/PM3 bootroms either report AT91 or lack the
+  // command entirely (flag clear), in which case we fall back to the chip id.
+  let chipFamily: ChipFamily | null = null;
+  if (inBootloader && (flags & UNDERSTANDS_CHIP_TYPE_FLAG) !== 0n) {
+    try {
+      const type = await sendLegacyCommand(
+        io,
+        PM3_COMMAND.CHIP_TYPE,
+        0,
+        0,
+        0,
+        new Uint8Array(),
+        3_000,
+      );
+      const value = Number(type.arg0);
+      if (value === MAIN_CHIP_TYPE.AT32 || value === MAIN_CHIP_TYPE.AT91) {
+        chipFamily = chipFamilyFromType(value);
+      }
+    } catch {
+      chipFamily = null;
+    }
+  }
+  if (chipFamily === null && chipId !== null) {
+    chipFamily = isAt32ChipId(chipId) ? "at32" : "at91";
+  }
+  return { inBootloader, bootloaderType, chipId, chipFamily };
 }
 
 export async function enterBootloader(io: FirmwareIo): Promise<void> {

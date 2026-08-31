@@ -1,16 +1,16 @@
 ---
 title: Connecting Your Device
-description: How to connect your Proxmark3 to the web client via USB or Bluetooth.
+description: How to connect a Proxmark3 or Proxmark5 via USB, Bluetooth, or Wi-Fi.
 ---
 
 ## USB (Web Serial)
 
-This is the primary connection method for the browser version.
+This is the primary connection method for the browser version, and it works for both the Proxmark3 and the Proxmark5.
 
-1. Plug your Proxmark3 into a USB port
+1. Plug your Proxmark into a USB port (Proxmark5: use the yellow USB-C port on the button side)
 2. Open the app in Chrome, Edge, or Brave
 3. Click the **Connect** button in the ribbon toolbar
-4. Select your Proxmark3 from the browser's serial port picker
+4. Select your device from the browser's serial port picker
 5. The client will automatically run `hw connect` and establish the link
 
 The device appears as `/dev/webserial` internally. The connection status indicator in the toolbar shows when you're connected.
@@ -18,6 +18,26 @@ The device appears as `/dev/webserial` internally. The connection status indicat
 :::note
 Web Serial requires a Chromium-based browser. Firefox and Safari are not supported.
 :::
+
+## Proxmark5 over Bluetooth LE (browser)
+
+A Proxmark5 with the Battery/Wireless Module can be used wirelessly from Chrome or Edge:
+
+1. Power on the Proxmark5 (short button press)
+2. Select **Bluetooth LE** from the transport selector
+3. Click **Connect** and choose `Proxmark5` in the Bluetooth chooser
+
+See [Bluetooth Support](/desktop/bluetooth/) for details and limitations.
+
+## Proxmark5 over Wi-Fi (Tauri Desktop)
+
+The BWM can also join a Wi-Fi network and serve the PM3 protocol over TCP:
+
+1. Connect over USB (or BLE) first and run `hw bwmwifi --ssid <ssid> --pwd <password>`
+2. Note the IP address printed by `hw bwmwifi --status`
+3. In the desktop app select **Wi-Fi / TCP**, enter `<ip>:7777` in the endpoint field, and click **Connect**
+
+The same transport works with upstream's `pm5_ble_bridge.py --tcp` relay and with `socat`-style serial-to-TCP bridges.
 
 ## Native Serial (Tauri Desktop)
 
@@ -28,9 +48,9 @@ In the Tauri desktop app, serial ports are accessed directly via the Rust `seria
 3. Choose your port from the detected list
 4. Click **Connect**
 
-## Bluetooth (Tauri Desktop — macOS)
+## Bluetooth SPP (Tauri Desktop — macOS)
 
-For Proxmark3 devices with Bluetooth (like the PM3 X):
+For Proxmark3 devices with Bluetooth Classic (like the PM3 X):
 
 1. Pair your Proxmark3 via macOS Bluetooth settings first
 2. Open the desktop app
@@ -41,14 +61,20 @@ For Proxmark3 devices with Bluetooth (like the PM3 X):
 The Bluetooth transport uses SPP (Serial Port Profile) via macOS IOBluetooth.
 
 :::caution
-Bluetooth support is currently macOS only. Windows and Linux Bluetooth support is planned.
+Bluetooth SPP support is currently macOS only. Windows and Linux support is planned.
 :::
+
+## Proxmark5 notes
+
+- The bundled WASM client tracks upstream master, which recognises the Proxmark5 (`hw version` reports `MCU....... AT32F437` and `Target.... PM5`) and includes the PM5-only commands (`hw fpga config`, `hw ant_pm5`, `hw qc_pm5`, `hw bwm*`).
+- The in-app firmware updater identifies a Proxmark5 but does not flash it: the AT32 flash layout differs from the Proxmark3 boards and no verified Proxmark5 images are published yet. Use upstream's `pm3-flash-fullimage` from a `PLATFORM=PM5` build.
 
 ## Troubleshooting
 
-| Issue             | Solution                                                                 |
-| ----------------- | ------------------------------------------------------------------------ |
-| No ports shown    | Check USB cable, try a different port, ensure drivers are installed      |
-| Permission denied | On Linux, add your user to the `dialout` group                           |
-| Connection drops  | Ensure COOP/COEP headers are set (required for SharedArrayBuffer)        |
-| Slow response     | Check that WASM threading is working (requires secure context + headers) |
+| Issue                 | Solution                                                                        |
+| --------------------- | ------------------------------------------------------------------------------- |
+| No ports shown        | Check USB cable, try a different port, ensure drivers are installed             |
+| Permission denied     | On Linux, add your user to the `dialout` group                                  |
+| Connection drops      | Ensure COOP/COEP headers are set (required for SharedArrayBuffer)               |
+| Slow response         | Check that WASM threading is working (requires secure context + headers)        |
+| TCP connect times out | Verify the IP with `hw bwmwifi --status`; the BWM and host must share a network |

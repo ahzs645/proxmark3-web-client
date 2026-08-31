@@ -1,18 +1,23 @@
-import { Bluetooth, FlaskConical, HelpCircle, RefreshCw, Settings, Usb, Zap } from "lucide-react";
-import { TransportSelector } from "@/components/ribbon/TransportSelector";
-import type { TransportInfo, TransportType } from "@/lib/transports";
+import { FlaskConical, HelpCircle, Power, PowerOff, RefreshCw, Settings, Zap } from "lucide-react";
+import { useContext, useEffect, useState } from "react";
+import { ConnectControl } from "@/components/ribbon/ConnectControl";
+import { Input } from "@/components/ui/input";
+import { DeviceProfileContext } from "@/features/device/context";
+import { normalizeTcpEndpoint, type TransportInfo, type TransportType } from "@/lib/transports";
 import { RibbonStrip, RibbonDivider, RibbonGroup, RibbonButton } from "../primitives";
 import type { ConnectionStatus } from "../types";
 
 interface ConnectTabProps {
   connectionStatus: ConnectionStatus;
-  onConnect: () => void;
+  onConnect: (transport?: TransportType) => void;
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
   commandsEnabled: boolean;
   availableTransports?: TransportInfo[];
   selectedTransport?: TransportType | null;
   onTransportChange?: (type: TransportType) => void;
+  tcpEndpoint?: string;
+  onTcpEndpointChange?: (endpoint: string) => void;
   simulatedMode?: boolean;
   onToggleSimulated?: () => void;
 }
@@ -26,28 +31,42 @@ export function ConnectTab({
   availableTransports = [],
   selectedTransport = null,
   onTransportChange,
+  tcpEndpoint = "",
+  onTcpEndpointChange,
   simulatedMode = false,
   onToggleSimulated,
 }: ConnectTabProps) {
   const isConnected = connectionStatus === "connected";
   const isConnecting = connectionStatus === "connecting";
+
+  // `hw bwmautooff` only exists on a PM5 built with the BWM extras. Reading the
+  // context rather than taking a prop keeps the ribbon's plumbing unchanged; a
+  // tab rendered outside the provider simply hides the control.
+  const isPm5 = useContext(DeviceProfileContext)?.profile.hardwareVariant === "pm5";
+  // The firmware flag is runtime-only and boots back to enabled, so this tracks
+  // what this session last sent rather than a value read back from the device —
+  // there is no query for it. Assume the firmware default again once the link
+  // drops, since the board may have power-cycled in the meantime.
+  const [autoOffEnabled, setAutoOffEnabled] = useState(true);
+  useEffect(() => {
+    if (!isConnected) setAutoOffEnabled(true);
+  }, [isConnected]);
   const hasTransport = availableTransports.length > 0;
+  const isTcp = selectedTransport === "tauri-tcp";
+  const tcpEndpointValid = !isTcp || normalizeTcpEndpoint(tcpEndpoint) !== null;
 
   return (
     <RibbonStrip>
       <RibbonGroup title="Connection">
-        <RibbonButton
-          icon={
-            selectedTransport === "tauri-bluetooth" ? (
-              <Bluetooth className={isConnected ? "text-blue-500" : ""} />
-            ) : (
-              <Usb className={isConnected ? "text-green-500" : ""} />
-            )
-          }
-          label={isConnected ? "Disconnect" : isConnecting ? "Connecting…" : "Connect"}
-          onClick={isConnected ? onDisconnect : onConnect}
-          disabled={simulatedMode || isConnecting || (!isConnected && !hasTransport)}
-          variant={isConnected ? "secondary" : "default"}
+        <ConnectControl
+          isConnected={isConnected}
+          isConnecting={isConnecting}
+          disabled={simulatedMode || (!isConnected && !tcpEndpointValid)}
+          availableTransports={availableTransports}
+          selectedTransport={selectedTransport}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+          onTransportChange={onTransportChange}
         />
         <RibbonButton
           icon={<RefreshCw />}
@@ -56,9 +75,35 @@ export function ConnectTab({
             onDisconnect();
             setTimeout(onConnect, 500);
           }}
-          disabled={simulatedMode || !commandsEnabled || isConnecting || !hasTransport}
+          disabled={
+            simulatedMode || !commandsEnabled || isConnecting || !hasTransport || !tcpEndpointValid
+          }
         />
       </RibbonGroup>
+
+      {isTcp && onTcpEndpointChange ? (
+        <>
+          <RibbonDivider />
+          <div className="flex flex-col gap-1 shrink-0">
+            <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+              TCP endpoint
+            </div>
+            <Input
+              value={tcpEndpoint}
+              onChange={(event) => onTcpEndpointChange(event.target.value)}
+              placeholder="192.168.1.100:7777"
+              spellCheck={false}
+              disabled={isConnected || isConnecting}
+              aria-invalid={!tcpEndpointValid}
+              className={`h-7 w-44 font-mono text-xs ${tcpEndpointValid ? "" : "border-destructive"}`}
+              title="Proxmark5 BWM Wi-Fi server (hw bwmwifi, default port 7777) or a PM3 TCP bridge"
+            />
+            <div className="text-[9px] text-muted-foreground px-1">
+              {isConnected ? "Disconnect to change" : "host:port from `hw bwmwifi --status`"}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {onToggleSimulated ? (
         <>
@@ -86,19 +131,6 @@ export function ConnectTab({
         </div>
       ) : null}
 
-      {availableTransports.length > 1 && onTransportChange ? (
-        <>
-          <RibbonDivider />
-          <TransportSelector
-            availableTransports={availableTransports}
-            selectedTransport={selectedTransport}
-            onTransportChange={onTransportChange}
-            disabled={isConnecting}
-            isConnected={isConnected}
-          />
-        </>
-      ) : null}
-
       <RibbonDivider />
 
       <RibbonGroup title="Device">
@@ -120,6 +152,23 @@ export function ConnectTab({
           onClick={() => onCommand("hw status")}
           disabled={!commandsEnabled}
         />
+        {isPm5 ? (
+          <RibbonButton
+            icon={autoOffEnabled ? <Power /> : <PowerOff className="text-amber-500" />}
+            label={autoOffEnabled ? "Auto-off: On" : "Auto-off: Off"}
+            onClick={() => {
+              const next = !autoOffEnabled;
+              setAutoOffEnabled(next);
+              onCommand(`hw bwmautooff ${next ? "--on" : "--off"}`);
+            }}
+            disabled={!commandsEnabled}
+            title={
+              autoOffEnabled
+                ? "The PM5 powers itself down when USB is unplugged. Turn this off before going wireless, or the board dies while the BWM keeps advertising. Resets to on at every boot."
+                : "The PM5 stays powered after USB is unplugged, so it can be used over BLE on battery. Resets to on at every boot."
+            }
+          />
+        ) : null}
       </RibbonGroup>
     </RibbonStrip>
   );

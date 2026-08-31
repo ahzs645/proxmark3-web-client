@@ -1,9 +1,16 @@
 /**
- * Transport abstraction layer for Proxmark3 communication
- * Supports multiple backends: WebSerial (browser), native serial (Tauri), Bluetooth SPP (Tauri)
+ * Transport abstraction layer for Proxmark3 / Proxmark5 communication
+ * Backends: WebSerial (browser), Web Bluetooth BLE (browser, Proxmark5 BWM),
+ * native serial (Tauri), Bluetooth SPP (Tauri, Proxmark3 X), TCP (Tauri,
+ * Proxmark5 BWM Wi-Fi or serial bridges)
  */
 
-export type TransportType = "webserial" | "tauri-serial" | "tauri-bluetooth";
+export type TransportType =
+  | "webserial"
+  | "webbluetooth"
+  | "tauri-serial"
+  | "tauri-bluetooth"
+  | "tauri-tcp";
 
 export interface TransportDevice {
   /** Unique identifier for this device */
@@ -12,7 +19,7 @@ export interface TransportDevice {
   name: string;
   /** Transport type this device belongs to */
   type: TransportType;
-  /** Address/path (port path for serial, MAC address for Bluetooth) */
+  /** Address/path (port path for serial, MAC/GATT id for Bluetooth, host:port for TCP) */
   address?: string;
 }
 

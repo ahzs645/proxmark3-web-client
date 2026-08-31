@@ -12,6 +12,7 @@
     "lint": "vp lint .",
     "preview": "vp preview",
     "smoke:pm3-wasm": "node scripts/pm3-wasm-smoke.cjs",
+    "smoke:pm3-wasm-offline": "node scripts/pm3-wasm-offline-check.cjs",
     "prepare": "vp config"
   },
   "dependencies": {

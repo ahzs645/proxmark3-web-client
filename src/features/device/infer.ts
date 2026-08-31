@@ -60,6 +60,22 @@ function firstCapture(output: string, patterns: RegExp[]): string | null {
   return null;
 }
 
+function looksLikeVersion(value: string): boolean {
+  return /iceman|\bv?\d+\.\d+/i.test(value);
+}
+
+function firstVersionCapture(output: string, patterns: RegExp[]): string | null {
+  for (const pattern of patterns) {
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    const global = new RegExp(pattern.source, flags);
+    for (const match of output.matchAll(global)) {
+      const value = match[1]?.trim();
+      if (value && looksLikeVersion(value)) return value;
+    }
+  }
+  return null;
+}
+
 function versionCommit(value: string | null): string | null {
   return value?.match(/-g([0-9a-f]{7,})/i)?.[1]?.toLowerCase() ?? null;
 }
@@ -94,6 +110,15 @@ function inferVariant(
   microcontroller: string | null,
   features: DeviceFeatureSet,
 ): HardwareVariant {
+  // Proxmark5: AT32F4xx MCU, "Target.... PM5" and a "[ Proxmark5 ]" banner
+  // (upstream cmdhw.c). Checked first because a PM5 also reports external
+  // flash / smartcard style capabilities that would otherwise look like an RDV4.
+  if (
+    /\bAT32F4\d\d\b/i.test(microcontroller ?? "") ||
+    /\bAT32F4\d\d\b|Target[.\s:]+PM5\b|\bProxmark5\b/i.test(output)
+  ) {
+    return "pm5";
+  }
   if (/AT91SAM7S256/i.test(microcontroller ?? output)) return "generic-256";
   if (features.externalFlash === "supported" && features.smartcard === "supported") {
     return features.bluetoothAddon === "supported" ? "rdv4-bt" : "rdv4";
@@ -127,10 +152,13 @@ export function inferDeviceProfile(
   const clientVersion =
     firstCapture(output, [/^\s*client[\s.:]+(.+)$/im, /\[\s*Client\s*\]\s*\n\s*([^\n]+)/i]) ??
     previous.clientVersion;
+  // The PM5 banner has a "[ Model ] Firmware.... PM5" line that is a platform
+  // name, not a version; only accept captures that look like a version string.
   const firmwareVersion =
-    firstCapture(output, [
-      /^\s*(?:os|firmware)[\s.:]+(.+)$/im,
+    firstVersionCapture(output, [
+      /^\s*os[\s.:]+(.+)$/im,
       /\[\s*(?:OS|Firmware)\s*\]\s*\n\s*([^\n]+)/i,
+      /^\s*firmware[\s.:]+(.+)$/im,
     ]) ?? previous.firmwareVersion;
   const bootromVersion =
     firstCapture(output, [/^\s*bootrom[\s.:]+(.+)$/im, /\[\s*Bootrom\s*\]\s*\n\s*([^\n]+)/i]) ??
@@ -141,19 +169,25 @@ export function inferDeviceProfile(
       /\[\s*FPGA\s*\]\s*\n\s*([^\n]+)/i,
     ]) ?? previous.fpgaVersion;
   const microcontroller =
-    firstCapture(output, [/^\s*(?:uC|microcontroller)[\s.:]+(.+)$/im, /\b(AT91SAM7S\d+)\b/i]) ??
-    previous.microcontroller;
+    firstCapture(output, [
+      /^\s*(?:uC|MCU|microcontroller)[\s.:]+(.+)$/im,
+      /--=\s*uC:\s*([^\n]+)/i,
+      /\b(AT91SAM7S\d+)\b/i,
+      /\b(AT32F4\d\d\w*)\b/i,
+    ]) ?? previous.microcontroller;
   const model =
     firstCapture(output, [
       /^\s*(?:device|model|board)[\s.:]+(.+)$/im,
       /\b(Proxmark3\s+(?:RDV4|Easy|Generic|X)[^\n]*)/i,
+      /\[\s*(Proxmark5)\s*\]/i,
+      /Target[.\s:]+(PM5)\b/i,
     ]) ?? previous.model;
 
   const nextFeature = (label: string, current: SupportLevel): SupportLevel => {
     const inferred = supportFromLine(output, label);
     return inferred === "unknown" ? current : inferred;
   };
-  const hasPm3Identity = /proxmark3|iceman|armsrc|bootrom/i.test(output);
+  const hasPm3Identity = /proxmark3|proxmark5|iceman|armsrc|bootrom/i.test(output);
   const features: DeviceFeatureSet = {
     lf: hasPm3Identity ? "supported" : previous.features.lf,
     hf: hasPm3Identity ? "supported" : previous.features.hf,
@@ -179,7 +213,7 @@ export function inferDeviceProfile(
     .split("\n")
     .map((line) => line.trim())
     .filter((line) =>
-      /client|firmware|^os[\s.:]|proxmark3|AT91SAM|external flash|smartcard|fpc usart|capabilit/i.test(
+      /client|firmware|^os[\s.:]|proxmark[35]|AT91SAM|AT32F4|target[.\s:]|external flash|smartcard|fpc usart|capabilit/i.test(
         line,
       ),
     )

@@ -9,7 +9,7 @@ export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "er
 export interface RibbonToolbarProps {
   /** The single derived connection state (runtime → transport → client). */
   connection: ConnectionState;
-  onConnect: () => void;
+  onConnect: (transport?: TransportType) => void;
   onDisconnect: () => void;
   onCommand: (cmd: string) => void;
   libraryKeyMode: LibraryKeyMode;
@@ -40,6 +40,9 @@ export interface RibbonToolbarProps {
   availableTransports?: TransportInfo[];
   selectedTransport?: TransportType | null;
   onTransportChange?: (type: TransportType) => void;
+  /** `host:port` used by the Wi-Fi / TCP transport (Proxmark5 BWM). */
+  tcpEndpoint?: string;
+  onTcpEndpointChange?: (endpoint: string) => void;
   /** Simulated mode: commands run against a virtual card, no hardware. */
   simulatedMode?: boolean;
   onToggleSimulated?: () => void;

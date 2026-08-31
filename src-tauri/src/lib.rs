@@ -1,6 +1,7 @@
 mod bluetooth;
 mod native_pm3;
 mod serial;
+mod tcp;
 
 use tauri::Manager;
 
@@ -12,6 +13,8 @@ pub fn run() {
             app.manage(serial::SerialState::new());
             // Initialize Bluetooth state
             app.manage(bluetooth::BluetoothState::new());
+            // Initialize TCP (Proxmark5 BWM Wi-Fi / bridges) state
+            app.manage(tcp::TcpState::new());
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -42,6 +45,12 @@ pub fn run() {
             bluetooth::bt_is_connected,
             bluetooth::bt_read,
             bluetooth::bt_write,
+            // TCP commands
+            tcp::tcp_connect,
+            tcp::tcp_disconnect,
+            tcp::tcp_is_connected,
+            tcp::tcp_read,
+            tcp::tcp_write,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

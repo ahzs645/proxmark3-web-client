@@ -11,9 +11,10 @@ export function stripAnsi(value: string): string {
 
 // The pm3 client prints its prompt whenever it is ready for the next command:
 // `[usb] pm3 --> `, `[offline] pm3 --> `, `[fpc] pm3 --> `, and the bare
-// `pm3 --> ` some builds emit. Seeing it is how we know a command finished —
-// the WASM client has no completion callback for the stdin path.
-const PROMPT_REGEX = /(?:^|\s)(?:\[[a-z0-9 _-]{1,12}\]\s*)?pm3\s*-->/i;
+// `pm3 --> ` some builds emit. A connected Proxmark5 changes the device name,
+// so the prompt reads `[usb] pm5 --> `. Seeing it is how we know a command
+// finished — the WASM client has no completion callback for the stdin path.
+const PROMPT_REGEX = /(?:^|\s)(?:\[[a-z0-9 _-]{1,12}\]\s*)?pm[35]\s*-->/i;
 
 /** True when a line of pm3 output is (or ends with) the interactive prompt. */
 export function isPromptLine(line: string): boolean {

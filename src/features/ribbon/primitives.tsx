@@ -35,6 +35,8 @@ interface RibbonButtonProps {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Hover text, for a control whose label cannot carry the whole explanation. */
+  title?: string;
   /** `default` marks the one recommended action in a group; the rest stay outline. */
   variant?: "default" | "secondary" | "outline" | "ghost";
 }
@@ -45,6 +47,7 @@ export function RibbonButton({
   label,
   onClick,
   disabled,
+  title,
   variant = "outline",
 }: RibbonButtonProps) {
   return (
@@ -53,6 +56,7 @@ export function RibbonButton({
       size="sm"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       className={RIBBON_CONTROL}
     >
       {icon}

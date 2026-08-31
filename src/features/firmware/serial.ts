@@ -1,4 +1,4 @@
-import { PM3_USB_PRODUCT_ID, PM3_USB_VENDOR_ID, type FirmwareIo } from "./protocol";
+import { isProxmarkUsbId, PROXMARK_USB_IDS, type FirmwareIo } from "./protocol";
 
 const OPEN_OPTIONS: SerialOptions = { baudRate: 115200, bufferSize: 64 * 1024 };
 const OPEN_TIMEOUT_MS = 5_000;
@@ -174,7 +174,7 @@ export class FirmwareSerialConnection implements FirmwareIo {
 
 function isPm3Port(port: SerialPort): boolean {
   const info = port.getInfo();
-  return info.usbVendorId === PM3_USB_VENDOR_ID && info.usbProductId === PM3_USB_PRODUCT_ID;
+  return isProxmarkUsbId(info.usbVendorId, info.usbProductId);
 }
 
 async function tryAuthorizedPorts(): Promise<FirmwareSerialConnection | null> {
@@ -216,7 +216,7 @@ export async function openFirmwareSerial(
   if (authorized) return authorized;
   if (!requestIfMissing) throw new Error("The Proxmark3 serial port is not available");
   const port = await navigator.serial.requestPort({
-    filters: [{ usbVendorId: PM3_USB_VENDOR_ID, usbProductId: PM3_USB_PRODUCT_ID }],
+    filters: [...PROXMARK_USB_IDS],
   });
   return FirmwareSerialConnection.open(port);
 }

@@ -14,7 +14,7 @@ export default defineConfig({
     env: {
       builtin: true,
     },
-    ignorePatterns: ["dist", "public/wasm"],
+    ignorePatterns: ["dist", "public/wasm", "proxmark3wasm"],
     overrides: [
       {
         files: ["**/*.{ts,tsx}"],

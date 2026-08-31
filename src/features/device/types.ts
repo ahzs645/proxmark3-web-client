@@ -2,7 +2,7 @@ import type { FirmwareHealth } from "./health";
 
 export type SupportLevel = "supported" | "unsupported" | "unknown";
 
-export type HardwareVariant = "rdv4" | "rdv4-bt" | "generic-256" | "generic" | "unknown";
+export type HardwareVariant = "pm5" | "rdv4" | "rdv4-bt" | "generic-256" | "generic" | "unknown";
 
 export interface DeviceFeatureSet {
   lf: SupportLevel;

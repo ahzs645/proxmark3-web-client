@@ -156,12 +156,16 @@ export function useCommandCenter({
         setActiveLine("");
       }
 
-      let created: CommandJob | null = null;
-      updateJobs((prev) => {
-        const { jobs: next, job } = appendJob(prev, { id, command: trimmed, origin, now });
-        created = job;
-        return next;
-      });
+      // React only evaluates a setState updater eagerly when nothing else is
+      // pending, so reading the new job out of the updater's closure returned
+      // null whenever a command was dispatched mid-commit — which is exactly
+      // when the post-connect capability probe fires. runAndWait then threw
+      // "not ready" even though the command had already been dispatched, and
+      // the device profile stayed empty for the whole session. Derive the job
+      // from the ref, which updateJobs keeps in step, so the return is real.
+      const spec = { id, command: trimmed, origin, now };
+      const created: CommandJob = appendJob(jobsRef.current, spec).job;
+      updateJobs((prev) => appendJob(prev, spec).jobs);
 
       void outcome.then((result) => {
         if (result === "queued") {

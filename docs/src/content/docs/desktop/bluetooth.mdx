@@ -1,39 +1,69 @@
 ---
 title: Bluetooth Support
-description: Connecting to Proxmark3 via Bluetooth in the desktop app.
+description: Connecting to Proxmark3 X (SPP) and Proxmark5 BWM (BLE) devices.
 ---
+
+Two different Bluetooth technologies are involved, depending on the hardware:
+
+| Device                                  | Radio                       | Where it works                      |
+| --------------------------------------- | --------------------------- | ----------------------------------- |
+| Proxmark3 X / BlueShark add-on          | Bluetooth Classic SPP       | Tauri desktop app, macOS only       |
+| Proxmark5 Battery/Wireless Module (BWM) | Bluetooth Low Energy (GATT) | Chromium browsers via Web Bluetooth |
+
+## Proxmark5 BWM (Bluetooth LE, browser)
+
+The Proxmark5's optional BWM contains an ESP32-C2 that advertises a BLE "SPP" service (`0xAE86`) named `Proxmark5`. Chrome and Edge can talk to it directly through Web Bluetooth — no pairing, no desktop app.
+
+1. Power on the Proxmark5 with the BWM fitted (short button press; the RGB LED turns green)
+2. Open the web client in Chrome or Edge on a machine with a Bluetooth radio
+3. Select **Bluetooth LE** from the transport selector
+4. Click **Connect** and pick `Proxmark5` in the browser's Bluetooth chooser
+5. The client runs `hw connect -p /dev/webble` automatically
+
+:::caution
+Upstream lists the BWM as not fully supported yet. Firmware must be built with `PLATFORM=PM5 PLATFORM_EXTRAS=BWM`. Expect lower throughput than USB — large dumps and `hf mf hardnested` nonce collection are noticeably slower over BLE.
+:::
+
+Web Bluetooth availability:
+
+- Chrome / Edge on Windows, macOS, Linux (Linux may need `chrome://flags/#enable-web-bluetooth-new-permissions-backend`) and Android
+- Not available in Firefox, Safari, or the Tauri desktop webview
+
+## Proxmark3 X (Bluetooth SPP, desktop app)
 
 The Tauri desktop app supports Bluetooth SPP connections to Proxmark3 devices (like the PM3 X) on macOS.
 
-## Requirements
+### Requirements
 
 - macOS 10.13+
 - Proxmark3 with Bluetooth module (PM3 X, or aftermarket BT add-on)
-- Device paired via macOS System Preferences > Bluetooth
+- Device paired via System Settings > Bluetooth
 
-## How It Works
+### How It Works
 
 The Bluetooth transport uses Rust bindings to macOS's **IOBluetooth** framework via the `objc2` crate. It establishes a Serial Port Profile (SPP) connection, which the WASM module sees as `/dev/rfcomm0`.
 
-## Setup Steps
+### Setup Steps
 
-1. **Pair your device** — go to System Preferences > Bluetooth, put your PM3 in pairing mode, and pair it
+1. **Pair your device** — go to System Settings > Bluetooth, put your PM3 in pairing mode, and pair it
 2. **Open the desktop app**
 3. **Select Bluetooth** from the transport selector in the toolbar
 4. **Choose your device** from the list of paired Bluetooth devices
 5. **Click Connect**
 
-## Limitations
+### Limitations
 
-- **macOS only** — Windows and Linux Bluetooth support is not yet implemented
-- **SPP only** — BLE (Bluetooth Low Energy) is not supported
+- **macOS only** — Windows and Linux Bluetooth Classic support is not yet implemented
+- **SPP only** — this transport does not speak BLE; use the browser's Bluetooth LE transport for the Proxmark5
 - **Pairing required** — the device must be paired at the OS level first
 
 ## Troubleshooting
 
-| Issue                | Solution                                                     |
-| -------------------- | ------------------------------------------------------------ |
-| Device not listed    | Ensure it's paired in System Preferences                     |
-| Connection fails     | Try unpairing and re-pairing the device                      |
-| Slow data transfer   | SPP bandwidth is limited compared to USB — expected behavior |
-| Disconnects randomly | Check device battery, move closer to reduce interference     |
+| Issue                      | Solution                                                                  |
+| -------------------------- | ------------------------------------------------------------------------- |
+| Device not listed (SPP)    | Ensure it's paired in System Settings                                     |
+| `Proxmark5` not in chooser | Power the BWM on, stay within a few metres, close other apps holding BLE  |
+| Connection fails           | Try unpairing and re-pairing (SPP); power-cycle the BWM (BLE)             |
+| Writes fail after connect  | The BLE transport steps down its chunk size automatically; reconnect once |
+| Slow data transfer         | Bluetooth bandwidth is limited compared to USB — expected behavior        |
+| Disconnects randomly       | Check device battery, move closer to reduce interference                  |

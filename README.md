@@ -1,11 +1,12 @@
 # Proxmark3 Web Client
 
-A browser-based client for the [Proxmark3](https://github.com/RfidResearchGroup/proxmark3) RFID research tool. Runs the full PM3 client as WebAssembly in your browser, communicating with real hardware over WebSerial.
+A browser-based client for the [Proxmark3](https://github.com/RfidResearchGroup/proxmark3) and [Proxmark5](https://github.com/RfidResearchGroup/proxmark3/blob/master/doc/md/Installation_Instructions/Proxmark5-Instructions.md) RFID research tools. Runs the full Iceman client as WebAssembly in your browser, communicating with real hardware over WebSerial, Web Bluetooth, or (in the desktop app) native serial, Bluetooth SPP and TCP.
 
 ## Features
 
 - Full Proxmark3 client compiled to WASM via Emscripten
-- WebSerial bridge to real PM3 hardware (Chrome/Edge)
+- WebSerial bridge to real PM3/PM5 hardware (Chrome/Edge)
+- Web Bluetooth (BLE) link to the Proxmark5 Battery/Wireless Module (Chrome/Edge)
 - Interactive xterm.js terminal with live PM3 output
 - GUI panels for MIFARE Classic attacks (Autopwn, Nested, Hardnested, Darkside, etc.)
 - Card detection and tag info display
@@ -15,12 +16,12 @@ A browser-based client for the [Proxmark3](https://github.com/RfidResearchGroup/
 - Browser-native before-image backups, structured reports, and byte-for-byte verification
 - Multi-select MIFARE block read/write with key fallback and failed-block retry
 - LF/HF operations, traffic capture, magic card support
-- Optional Tauri desktop app with native serial and Bluetooth transports
+- Optional Tauri desktop app with native serial, Bluetooth SPP (Proxmark3 X) and Wi-Fi/TCP (Proxmark5 BWM, serial bridges) transports
 
 ## Requirements
 
 - **Browser**: Chrome or Edge (WebSerial API required)
-- **Hardware**: Proxmark3 connected via USB
+- **Hardware**: Proxmark3 or Proxmark5 connected via USB (or a Proxmark5 BWM over BLE / Wi-Fi)
 - **Node.js**: 18+ (for building)
 - **Emscripten SDK**: For rebuilding the WASM binary
 
@@ -40,21 +41,41 @@ Open `http://localhost:5173` in Chrome/Edge, click **Connect**, and select your 
 npm run build
 
 # Rebuild the PM3 WASM binary (requires Emscripten SDK)
+# One-time: the Emscripten build compiles lz4 from source (not vendored in the submodule)
+git -C proxmark3wasm/client clone --depth 1 --branch v1.10.0 https://github.com/lz4/lz4.git deps/lz4
+printf 'CACHED_PLATFORM=PM3RDV4\nCACHED_PLATFORM_EXTRAS=\nCACHED_PLATFORM_DEFS=\n' > proxmark3wasm/.Makefile.options.cache
 npm run build:pm3-wasm
 
 # Copy rebuilt WASM to public directory
 cp proxmark3wasm/client/proxmark3.js proxmark3wasm/client/proxmark3.wasm public/wasm/
 ```
 
+## Testing without Hardware
+
+`npm run smoke:pm3-wasm-offline` boots the bundled WASM client in Node, runs `hw version` offline and checks that the client answers. Pass `--command`/`--expect` to run other offline commands.
+
 ## Testing with Hardware
 
 A Node.js smoke test runner is included for validating the WASM binary against real hardware without a browser:
+
+The runner advances to the next command after the output has been idle for `--advance-idle-ms` (default 1500 ms). Commands with long silent phases (`hf search`, `lf search`, `hf mf autopwn`) need a larger value, otherwise the next command is typed while the previous one is still running and the reader can be left waiting inside it (press its button to abort). A connected Proxmark5 prints `pm5 -->` as its prompt; the runner and the app accept both.
 
 ```bash
 # Auto-detect port, run default commands (hw connect + hw version)
 node scripts/pm3-wasm-smoke.cjs
 
 # Specify port and commands
+# Stage a dump into the WASM filesystem and load it into the reader's emulator memory
+node scripts/pm3-wasm-smoke.cjs --port /dev/cu.usbmodem101 --advance-idle-ms 4000 \
+  --file card-dumps/hf-mf-84F0B240-dump.bin:/tmp/hf-mf-84F0B240-dump.bin \
+  --command "hw connect -p /dev/webserial" \
+  --command "hf mf eload --4k -f /tmp/hf-mf-84F0B240-dump.bin" \
+  --command "hf mf eview --4k"
+
+# Probe a reader's identity without the client (works even when the client refuses a
+# capabilities-version mismatch, e.g. Proxmark5 factory firmware)
+node scripts/pm3-probe.cjs --port /dev/cu.usbmodem101
+
 node scripts/pm3-wasm-smoke.cjs --port /dev/cu.usbmodemiceman1 \
   --command "hw connect -p /dev/webserial" \
   --command "hf 14a info" \
@@ -88,6 +109,23 @@ Browser
 **Data flow**: User input → xterm → stdin ring buffer → WASM PM3 client → TX ring buffer → WebSerial → PM3 hardware → WebSerial → RX ring buffer → WASM PM3 client → stdout → xterm.
 
 ---
+
+## Proxmark5 support
+
+The Proxmark5 (AT32F437 + GOWIN FPGA, RfidResearchGroup, 2026) speaks the same client protocol as the Proxmark3, and upstream keeps a single client for both. Support in this project:
+
+| Area                    | Status                                                                                                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| USB (WebSerial / Tauri) | Works like a Proxmark3. No vendor filter, so the PM5's `2D2D:504D` identity appears in the picker.                                                                                                                       |
+| WASM client             | Built from the upstream master merge in `proxmark3wasm` (branch `pm5-upstream-merge`), which contains PM5 detection, `hw version` output and PM5-only commands (`hw fpga config`, `hw ant_pm5`, `hw qc_pm5`, `hw bwm*`). |
+| Device profile          | `hw version` / `hw status` output is recognised as `pm5` (MCU `AT32F4xx`, `Target.... PM5`, `[ Proxmark5 ]`).                                                                                                            |
+| Bluetooth LE (browser)  | `WebBluetoothTransport` talks to the Battery/Wireless Module's BLE SPP service (`0xAE86` / `0xAE88`, name `Proxmark5`).                                                                                                  |
+| Wi-Fi (desktop)         | `TauriTcpTransport` connects to the BWM TCP server started with `hw bwmwifi` (default port 7777) or any PM3 TCP bridge.                                                                                                  |
+| Firmware updater        | Recognises a PM5 but refuses to flash it: the AT32 flash layout differs from the SAM7 boards this flasher writes and proxmark3.app publishes no PM5 images yet.                                                          |
+
+Factory units ship with firmware whose capabilities struct is **v6**; every current client (including this one, v9) refuses to attach to it. Update the board first, per upstream's Proxmark5 instructions: build `bootrom`/`fullimage` with `PLATFORM=PM5` (Arm GNU toolchain), enter boot mode by holding the button while plugging in (~4 s, LEDs B+D), flash the bootrom, repeat for the full image, then upload the FPGA image with `hw fpga config -f PM5_FPGA_fix_loedge_bug.bin`. The PM5 keeps the classic `9AC4:4B8F` / "proxmark.org" USB identity after flashing. Verified 2026-08-31 on an AT32F435RGT7 unit: USB, `hw version`/`hw status`, `hf mf eload` all work through the WASM client.
+
+Caveats: upstream marks PM5 firmware as unstable and the BWM as not fully supported; the wireless transports here follow the documented BWM interfaces but have not been exercised against shipping hardware.
 
 ## WASM Build: Technical Decisions and Notes
 
@@ -194,7 +232,13 @@ PM3LDFLAGS += -sMAXIMUM_MEMORY=2147483648  # 2 GB
 
 **Why**: Hardnested allocates large state arrays during nonce processing. With 512MB it hit `Cannot enlarge memory` and aborted. 2GB is the WASM limit for 32-bit address space and works in modern browsers.
 
-#### 8. Remove SAFE_HEAP
+#### 8. Emscripten's newer clang
+
+**File**: `proxmark3wasm/client/Makefile`
+
+`-Wno-error` is added to `CFLAGS` for Emscripten builds, and the deprecated `-sUSE_PTHREADS=1` link flag was dropped in favour of plain `-pthread`. Upstream targets older GCC/clang and builds with `-Werror`; emsdk's clang adds diagnostics (e.g. `-Wunused-but-set-global`) that would otherwise fail on unmodified upstream sources.
+
+#### 9. Remove SAFE_HEAP
 
 **File**: `proxmark3wasm/client/Makefile`
 
