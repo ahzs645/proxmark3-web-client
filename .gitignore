@@ -27,18 +27,21 @@ card-dumps/
 *.sln
 *.sw?
 
-# Proxmark3 WebAssembly Build Artifacts
+# Proxmark3 WebAssembly build artifacts.
+# NOTE: proxmark3wasm/ is a submodule, so git never tracks its contents from
+# here -- its own .gitignore governs that tree. Rules scoped to paths inside it
+# are inert, and are deliberately not repeated: the submodule intentionally
+# tracks vendored sources under client/deps/ (id48, openjpeg) that a blanket
+# rule here would wrongly hide if the path ever stopped being a submodule.
 *.o
 *.a
 *.bc
 *.wasm
 *.js.mem
 *.js.symbols
-proxmark3wasm/client/proxmark3.js
-proxmark3wasm/client/proxmark3.worker.js
-proxmark3wasm/client/obj/
-proxmark3wasm/client/deps/
 
-# Unignore public WASM files (needed for deployment)
-!public/wasm/proxmark3.wasm
-!public/wasm/proxmark3.js
+# The built WASM client is committed and shipped by the Pages deploy, so it
+# must survive the *.wasm rule above. Un-ignore the whole directory rather than
+# individual filenames -- a renamed or added artifact would otherwise be
+# silently dropped and break the deploy.
+!public/wasm/**

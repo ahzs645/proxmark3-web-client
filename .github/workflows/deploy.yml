@@ -8,6 +8,48 @@ permissions:
   contents: write
 
 jobs:
+  # The Pages build compiles from the committed public/wasm/ blobs and does NOT
+  # check out the proxmark3wasm submodule, so a submodule pointer left dangling
+  # (commit never pushed to its own remote) would deploy green while breaking
+  # every fresh `clone --recurse-submodules`. This job catches that. It runs
+  # alongside the deploy rather than gating it: the pointer does not affect the
+  # built site, so a dangling one should surface as a red run, not a blocked
+  # release.
+  verify-submodules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify each submodule pointer is published
+        run: |
+          set -uo pipefail
+          status=0
+          paths=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+          if [ -z "$paths" ]; then echo "No submodules declared."; exit 0; fi
+          for path in $paths; do
+            url=$(git config -f .gitmodules --get "submodule.$path.url")
+            sha=$(git ls-tree HEAD "$path" | awk '{print $3}')
+            if [ -z "$sha" ]; then
+              echo "::error::Could not read pinned commit for submodule '$path'."
+              status=1
+              continue
+            fi
+            printf '%s -> %s on %s ... ' "$path" "${sha:0:12}" "$url"
+            # --filter=blob:none --depth=1 fetches only the commit and its trees
+            # (~200 KB here, vs ~200 MB for a real checkout). Ancestors count as
+            # reachable, so this does not false-alarm when the pointer lags the
+            # branch tip.
+            if git fetch -q --filter=blob:none --depth=1 "$url" "$sha" >/dev/null 2>&1; then
+              echo "published"
+            else
+              echo "MISSING"
+              echo "::error::Submodule '$path' pins commit $sha, which is not reachable on $url. Push the submodule's branch before pushing this repo, or clones will fail to initialise it."
+              status=1
+            fi
+          done
+          exit $status
+
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
