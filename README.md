@@ -48,7 +48,12 @@ npm run build:pm3-wasm
 
 # Copy rebuilt WASM to public directory
 cp proxmark3wasm/client/proxmark3.js proxmark3wasm/client/proxmark3.wasm public/wasm/
+
+# Repack the client's dictionaries, Lua scripts and resource files
+npm run pack:pm3-resources
 ```
+
+The WASM binary only embeds the hardnested tables. `public/pm3-resources/` carries everything else the client loads from `~/.proxmark3` (dictionaries such as `mfc_default_keys`, `luascripts/`, `lualibs/`, `cmdscripts/` and resource JSON like `mad.json` and `aidlist.json`); the app writes it into the WASM filesystem at startup. The large `dictionaries/extras/` set is not packed: the first command that names one (`-f extras/16_byte_words`) fetches that file from GitHub, pinned to the submodule commit. Re-run the pack whenever the submodule moves, and commit the output alongside `public/wasm/`.
 
 ## Testing without Hardware
 

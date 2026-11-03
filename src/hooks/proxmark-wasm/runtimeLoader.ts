@@ -1,5 +1,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { uartShared } from "../../lib/pm3WebUSB";
+import { installPm3Resources, prefetchPm3Resources } from "@/features/runtime/pm3Resources";
+import { getEmscriptenFs } from "@/lib/emscriptenFs";
 import {
   getGlobalModule,
   getWasmLoadAttempted,
@@ -43,6 +45,10 @@ export function ensureWasmRuntimeLoaded({
   }
 
   setWasmLoadAttempted(true);
+
+  // Downloads alongside the WASM binary, so it is normally ready by the time
+  // the runtime initialises.
+  const resourcePack = prefetchPm3Resources();
 
   const module: WasmModule = {
     locateFile: (path: string, prefix: string) => {
@@ -99,8 +105,15 @@ export function ensureWasmRuntimeLoaded({
     },
   };
 
-  module.onRuntimeInitialized = () => {
+  module.onRuntimeInitialized = async () => {
     uartShared.init(module);
+
+    const pack = await resourcePack;
+    const fs = getEmscriptenFs();
+    if (pack && fs) {
+      const count = installPm3Resources(fs, pack);
+      console.info(`[PM3] Installed ${count} client resource files into ~/.proxmark3`);
+    }
     console.info(
       supportsStructuredCommandApi(module)
         ? "[PM3] Structured command API detected"

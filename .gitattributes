@@ -1,0 +1,3 @@
+# Packed client resources (scripts/pack-pm3-resources.cjs): mostly text inside,
+# but a generated blob addressed by byte offsets, so never diff or normalise it.
+public/pm3-resources/core.bin binary

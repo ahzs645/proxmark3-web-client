@@ -6,6 +6,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
+import { ensureExtraDictionaries } from "@/features/runtime/pm3Resources";
 import { uartShared } from "../../lib/pm3WebUSB";
 import {
   getTransportManager,
@@ -121,6 +122,8 @@ export function usePm3CommandChannel({
         if (!module || !isReadyRef.current) {
           throw new Error("WASM client is not ready");
         }
+
+        await ensureExtraDictionaries(command);
 
         // Every hardware transport bridges through the same WASM uart ring
         // buffers, so a command has to run on the client's own thread, which is

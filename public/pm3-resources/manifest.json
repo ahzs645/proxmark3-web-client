@@ -1,0 +1,1056 @@
+{
+  "version": 1,
+  "source": {
+    "repo": "ahzs645/proxmark3wasm",
+    "commit": "3a99ab005b308fdc2a4e9d3663b69d566aaabce3"
+  },
+  "bundle": "core.bin",
+  "bundleSize": 2970638,
+  "files": [
+    {
+      "path": "cmdscripts/example.cmd",
+      "offset": 0,
+      "size": 56
+    },
+    {
+      "path": "cmdscripts/rdv4_init_extflash.cmd",
+      "offset": 56,
+      "size": 517
+    },
+    {
+      "path": "cmdscripts/test_psk_clone.cmd",
+      "offset": 573,
+      "size": 511
+    },
+    {
+      "path": "cmdscripts/update_fpga.cmd",
+      "offset": 1084,
+      "size": 91
+    },
+    {
+      "path": "cmdscripts/update_fpga_and_bwm.cmd",
+      "offset": 1175,
+      "size": 164
+    },
+    {
+      "path": "dictionaries/ht2_default.dic",
+      "offset": 1339,
+      "size": 385
+    },
+    {
+      "path": "dictionaries/iclass_default_keys.dic",
+      "offset": 1724,
+      "size": 1005
+    },
+    {
+      "path": "dictionaries/iclass_elite_keys.dic",
+      "offset": 2729,
+      "size": 12483
+    },
+    {
+      "path": "dictionaries/mfc_default_keys.dic",
+      "offset": 15212,
+      "size": 46037
+    },
+    {
+      "path": "dictionaries/mfc_keys_bmp_sorted.dic",
+      "offset": 61249,
+      "size": 13000
+    },
+    {
+      "path": "dictionaries/mfc_keys_icbmp_sorted.dic",
+      "offset": 74249,
+      "size": 13000
+    },
+    {
+      "path": "dictionaries/mfc_keys_mrzd_sorted.dic",
+      "offset": 87249,
+      "size": 741
+    },
+    {
+      "path": "dictionaries/mfdes_default_keys.dic",
+      "offset": 87990,
+      "size": 2306
+    },
+    {
+      "path": "dictionaries/mfp_default_keys.dic",
+      "offset": 90296,
+      "size": 1077
+    },
+    {
+      "path": "dictionaries/mfulaes_hw1.dic",
+      "offset": 91373,
+      "size": 4257
+    },
+    {
+      "path": "dictionaries/mfulaes_hw2.dic",
+      "offset": 95630,
+      "size": 272481
+    },
+    {
+      "path": "dictionaries/mfulaes_segment_hw1.dic",
+      "offset": 368111,
+      "size": 297
+    },
+    {
+      "path": "dictionaries/mfulaes_segment_hw2.dic",
+      "offset": 368408,
+      "size": 4761
+    },
+    {
+      "path": "dictionaries/mfulaes_segment_hw3.dic",
+      "offset": 373169,
+      "size": 49401
+    },
+    {
+      "path": "dictionaries/mfulc_default_keys.dic",
+      "offset": 422570,
+      "size": 640
+    },
+    {
+      "path": "dictionaries/mfulc_hw1.dic",
+      "offset": 423210,
+      "size": 3729
+    },
+    {
+      "path": "dictionaries/mfulc_hw2.dic",
+      "offset": 426939,
+      "size": 208857
+    },
+    {
+      "path": "dictionaries/mfulc_segment_hw1.dic",
+      "offset": 635796,
+      "size": 261
+    },
+    {
+      "path": "dictionaries/mfulc_segment_hw2.dic",
+      "offset": 636057,
+      "size": 3663
+    },
+    {
+      "path": "dictionaries/mfulc_segment_hw3.dic",
+      "offset": 639720,
+      "size": 33147
+    },
+    {
+      "path": "dictionaries/t55xx_default_pwds.dic",
+      "offset": 672867,
+      "size": 2506
+    },
+    {
+      "path": "lualibs/7816_error.lua",
+      "offset": 675373,
+      "size": 3974
+    },
+    {
+      "path": "lualibs/amiibo_tools.lua",
+      "offset": 679347,
+      "size": 60537
+    },
+    {
+      "path": "lualibs/ansicolors.lua",
+      "offset": 739884,
+      "size": 1065
+    },
+    {
+      "path": "lualibs/commands.lua",
+      "offset": 740949,
+      "size": 7479
+    },
+    {
+      "path": "lualibs/default_toys.lua",
+      "offset": 748428,
+      "size": 24898
+    },
+    {
+      "path": "lualibs/default_toys_di.lua",
+      "offset": 773326,
+      "size": 11995
+    },
+    {
+      "path": "lualibs/dkjson.lua",
+      "offset": 785321,
+      "size": 23790
+    },
+    {
+      "path": "lualibs/getopt.lua",
+      "offset": 809111,
+      "size": 3196
+    },
+    {
+      "path": "lualibs/hf_reader.lua",
+      "offset": 812307,
+      "size": 1027
+    },
+    {
+      "path": "lualibs/html_dumplib.lua",
+      "offset": 813334,
+      "size": 5383
+    },
+    {
+      "path": "lualibs/htmlskel.lua",
+      "offset": 818717,
+      "size": 12052
+    },
+    {
+      "path": "lualibs/md5.lua",
+      "offset": 830769,
+      "size": 9583
+    },
+    {
+      "path": "lualibs/mfc_default_keys.lua",
+      "offset": 840352,
+      "size": 48385
+    },
+    {
+      "path": "lualibs/pm3_cmd.lua",
+      "offset": 888737,
+      "size": 10565
+    },
+    {
+      "path": "lualibs/precalc.lua",
+      "offset": 899302,
+      "size": 4431
+    },
+    {
+      "path": "lualibs/read14a.lua",
+      "offset": 903733,
+      "size": 4615
+    },
+    {
+      "path": "lualibs/read14b.lua",
+      "offset": 908348,
+      "size": 3979
+    },
+    {
+      "path": "lualibs/read15.lua",
+      "offset": 912327,
+      "size": 4847
+    },
+    {
+      "path": "lualibs/t55xx_config.lua",
+      "offset": 917174,
+      "size": 10035
+    },
+    {
+      "path": "lualibs/taglib.lua",
+      "offset": 927209,
+      "size": 4635
+    },
+    {
+      "path": "lualibs/testresult.lua",
+      "offset": 931844,
+      "size": 1320
+    },
+    {
+      "path": "lualibs/trace_parse.lua",
+      "offset": 933164,
+      "size": 3052
+    },
+    {
+      "path": "lualibs/utils.lua",
+      "offset": 936216,
+      "size": 13440
+    },
+    {
+      "path": "luascripts/data_hex_crc.lua",
+      "offset": 949656,
+      "size": 4986
+    },
+    {
+      "path": "luascripts/data_mf_accessdecode.lua",
+      "offset": 954642,
+      "size": 5042
+    },
+    {
+      "path": "luascripts/data_mf_bin2eml.lua",
+      "offset": 959684,
+      "size": 3824
+    },
+    {
+      "path": "luascripts/data_mf_bin2html.lua",
+      "offset": 963508,
+      "size": 2324
+    },
+    {
+      "path": "luascripts/data_mf_eml2bin.lua",
+      "offset": 965832,
+      "size": 2244
+    },
+    {
+      "path": "luascripts/data_mf_eml2html.lua",
+      "offset": 968076,
+      "size": 2308
+    },
+    {
+      "path": "luascripts/data_mfu_bin2eml.lua",
+      "offset": 970384,
+      "size": 4000
+    },
+    {
+      "path": "luascripts/examples/example_cmdline.lua",
+      "offset": 974384,
+      "size": 524
+    },
+    {
+      "path": "luascripts/examples/example_parameters.lua",
+      "offset": 974908,
+      "size": 2188
+    },
+    {
+      "path": "luascripts/hf_14a_aztek.lua",
+      "offset": 977096,
+      "size": 4786
+    },
+    {
+      "path": "luascripts/hf_14a_i2crevive.lua",
+      "offset": 981882,
+      "size": 1691
+    },
+    {
+      "path": "luascripts/hf_14a_protectimus_nfc.lua",
+      "offset": 983573,
+      "size": 13570
+    },
+    {
+      "path": "luascripts/hf_14a_raw.lua",
+      "offset": 997143,
+      "size": 5304
+    },
+    {
+      "path": "luascripts/hf_14a_read_ltocm.lua",
+      "offset": 1002447,
+      "size": 5111
+    },
+    {
+      "path": "luascripts/hf_14b_calypso.lua",
+      "offset": 1007558,
+      "size": 8591
+    },
+    {
+      "path": "luascripts/hf_14b_mobib.lua",
+      "offset": 1016149,
+      "size": 9066
+    },
+    {
+      "path": "luascripts/hf_15_magic.lua",
+      "offset": 1025215,
+      "size": 3361
+    },
+    {
+      "path": "luascripts/hf_i2c_plus_2k_utils.lua",
+      "offset": 1028576,
+      "size": 7390
+    },
+    {
+      "path": "luascripts/hf_legic.lua",
+      "offset": 1035966,
+      "size": 100253
+    },
+    {
+      "path": "luascripts/hf_legic_buffer2card.lua",
+      "offset": 1136219,
+      "size": 1606
+    },
+    {
+      "path": "luascripts/hf_legic_clone.lua",
+      "offset": 1137825,
+      "size": 23151
+    },
+    {
+      "path": "luascripts/hf_mf_autopwn.lua",
+      "offset": 1160976,
+      "size": 6288
+    },
+    {
+      "path": "luascripts/hf_mf_dump_luxeo.lua",
+      "offset": 1167264,
+      "size": 10724
+    },
+    {
+      "path": "luascripts/hf_mf_em_util.lua",
+      "offset": 1177988,
+      "size": 3098
+    },
+    {
+      "path": "luascripts/hf_mf_format.lua",
+      "offset": 1181086,
+      "size": 6446
+    },
+    {
+      "path": "luascripts/hf_mf_gen3_writer.lua",
+      "offset": 1187532,
+      "size": 11500
+    },
+    {
+      "path": "luascripts/hf_mf_keycheck.lua",
+      "offset": 1199032,
+      "size": 8396
+    },
+    {
+      "path": "luascripts/hf_mf_magicrevive.lua",
+      "offset": 1207428,
+      "size": 3001
+    },
+    {
+      "path": "luascripts/hf_mf_mini_dumpdecrypt.lua",
+      "offset": 1210429,
+      "size": 17029
+    },
+    {
+      "path": "luascripts/hf_mf_sim_hid.lua",
+      "offset": 1227458,
+      "size": 5312
+    },
+    {
+      "path": "luascripts/hf_mf_tnp3_clone.lua",
+      "offset": 1232770,
+      "size": 5653
+    },
+    {
+      "path": "luascripts/hf_mf_tnp3_dump.lua",
+      "offset": 1238423,
+      "size": 8615
+    },
+    {
+      "path": "luascripts/hf_mf_tnp3_sim.lua",
+      "offset": 1247038,
+      "size": 15418
+    },
+    {
+      "path": "luascripts/hf_mf_uid_downgrade.lua",
+      "offset": 1262456,
+      "size": 3819
+    },
+    {
+      "path": "luascripts/hf_mf_uidbruteforce.lua",
+      "offset": 1266275,
+      "size": 3799
+    },
+    {
+      "path": "luascripts/hf_mf_uidkeycalc.lua",
+      "offset": 1270074,
+      "size": 4631
+    },
+    {
+      "path": "luascripts/hf_mf_uidkeycalc_mizip.lua",
+      "offset": 1274705,
+      "size": 5559
+    },
+    {
+      "path": "luascripts/hf_mf_ultimatecard.lua",
+      "offset": 1280264,
+      "size": 44083
+    },
+    {
+      "path": "luascripts/hf_mf_uscuid_prog.lua",
+      "offset": 1324347,
+      "size": 22787
+    },
+    {
+      "path": "luascripts/hf_mfp_raw.lua",
+      "offset": 1347134,
+      "size": 12366
+    },
+    {
+      "path": "luascripts/hf_mfu_amiibo_restore.lua",
+      "offset": 1359500,
+      "size": 5469
+    },
+    {
+      "path": "luascripts/hf_mfu_amiibo_sim.lua",
+      "offset": 1364969,
+      "size": 4833
+    },
+    {
+      "path": "luascripts/hf_mfu_magicwrite.lua",
+      "offset": 1369802,
+      "size": 20696
+    },
+    {
+      "path": "luascripts/hf_mfu_pwdgen_italy.lua",
+      "offset": 1390498,
+      "size": 4523
+    },
+    {
+      "path": "luascripts/hf_mfu_setuid.lua",
+      "offset": 1395021,
+      "size": 4355
+    },
+    {
+      "path": "luascripts/hf_mfu_ultra.lua",
+      "offset": 1399376,
+      "size": 11876
+    },
+    {
+      "path": "luascripts/hf_ndef_dump.lua",
+      "offset": 1411252,
+      "size": 8314
+    },
+    {
+      "path": "luascripts/hf_ntag_3d.lua",
+      "offset": 1419566,
+      "size": 10454
+    },
+    {
+      "path": "luascripts/hf_ntag_bruteforce.lua",
+      "offset": 1430020,
+      "size": 16736
+    },
+    {
+      "path": "luascripts/hf_ntag_dt.lua",
+      "offset": 1446756,
+      "size": 5862
+    },
+    {
+      "path": "luascripts/init_rdv4.lua",
+      "offset": 1452618,
+      "size": 2640
+    },
+    {
+      "path": "luascripts/lf_awid_bulkclone.lua",
+      "offset": 1455258,
+      "size": 2993
+    },
+    {
+      "path": "luascripts/lf_electra.lua",
+      "offset": 1458251,
+      "size": 11262
+    },
+    {
+      "path": "luascripts/lf_em4100_bulk.lua",
+      "offset": 1469513,
+      "size": 6026
+    },
+    {
+      "path": "luascripts/lf_em4x05_kybercrystals.lua",
+      "offset": 1475539,
+      "size": 21422
+    },
+    {
+      "path": "luascripts/lf_em_tearoff.lua",
+      "offset": 1496961,
+      "size": 4934
+    },
+    {
+      "path": "luascripts/lf_em_tearoff_protect.lua",
+      "offset": 1501895,
+      "size": 11836
+    },
+    {
+      "path": "luascripts/lf_hid_bulkclone.lua",
+      "offset": 1513731,
+      "size": 6149
+    },
+    {
+      "path": "luascripts/lf_hid_bulkclone_v2.lua",
+      "offset": 1519880,
+      "size": 3614
+    },
+    {
+      "path": "luascripts/lf_ht2_paxton.lua",
+      "offset": 1523494,
+      "size": 19119
+    },
+    {
+      "path": "luascripts/lf_ident_json.lua",
+      "offset": 1542613,
+      "size": 10363
+    },
+    {
+      "path": "luascripts/lf_ioprox_bulkclone.lua",
+      "offset": 1552976,
+      "size": 3209
+    },
+    {
+      "path": "luascripts/lf_t55xx_chk.lua",
+      "offset": 1556185,
+      "size": 4993
+    },
+    {
+      "path": "luascripts/lf_t55xx_chk_date.lua",
+      "offset": 1561178,
+      "size": 5400
+    },
+    {
+      "path": "luascripts/lf_t55xx_fix.lua",
+      "offset": 1566578,
+      "size": 4601
+    },
+    {
+      "path": "luascripts/lf_t55xx_multiwriter.lua",
+      "offset": 1571179,
+      "size": 9615
+    },
+    {
+      "path": "luascripts/lf_t55xx_reset.lua",
+      "offset": 1580794,
+      "size": 2082
+    },
+    {
+      "path": "luascripts/mem_readpwd.lua",
+      "offset": 1582876,
+      "size": 4549
+    },
+    {
+      "path": "luascripts/mem_spiffs_readpwd.lua",
+      "offset": 1587425,
+      "size": 2710
+    },
+    {
+      "path": "luascripts/mfc_hammerlite.lua",
+      "offset": 1590135,
+      "size": 2015
+    },
+    {
+      "path": "luascripts/mfuev1_counter_reset.lua",
+      "offset": 1592150,
+      "size": 23776
+    },
+    {
+      "path": "luascripts/multi_bruteforce.lua",
+      "offset": 1615926,
+      "size": 10595
+    },
+    {
+      "path": "luascripts/ntag_clean.lua",
+      "offset": 1626521,
+      "size": 3652
+    },
+    {
+      "path": "luascripts/ntag_getsig.lua",
+      "offset": 1630173,
+      "size": 3236
+    },
+    {
+      "path": "luascripts/ntag_hammertime.lua",
+      "offset": 1633409,
+      "size": 6897
+    },
+    {
+      "path": "luascripts/tests/data_tracetest.lua",
+      "offset": 1640306,
+      "size": 5497
+    },
+    {
+      "path": "luascripts/tests/hf_read.lua",
+      "offset": 1645803,
+      "size": 1684
+    },
+    {
+      "path": "luascripts/tests/lf_t55xx_defaultask.lua",
+      "offset": 1647487,
+      "size": 1792
+    },
+    {
+      "path": "luascripts/tests/lf_t55xx_defaultbi.lua",
+      "offset": 1649279,
+      "size": 1814
+    },
+    {
+      "path": "luascripts/tests/lf_t55xx_defaultfsk.lua",
+      "offset": 1651093,
+      "size": 2086
+    },
+    {
+      "path": "luascripts/tests/lf_t55xx_defaultpsk.lua",
+      "offset": 1653179,
+      "size": 2394
+    },
+    {
+      "path": "luascripts/tests/lf_t55xx_writetest.lua",
+      "offset": 1655573,
+      "size": 11167
+    },
+    {
+      "path": "resources/PM5_FPGA_fix_loedge_bug.bin",
+      "offset": 1666740,
+      "size": 221368
+    },
+    {
+      "path": "resources/PM5_FPGA_fix_loedge_bug.sha512.txt",
+      "offset": 1888108,
+      "size": 158
+    },
+    {
+      "path": "resources/aid_desfire.json",
+      "offset": 1888266,
+      "size": 60850
+    },
+    {
+      "path": "resources/aidlist.json",
+      "offset": 1949116,
+      "size": 115575
+    },
+    {
+      "path": "resources/calypso/ic_families.json",
+      "offset": 2064691,
+      "size": 4883
+    },
+    {
+      "path": "resources/calypso/manufacturers.json",
+      "offset": 2069574,
+      "size": 7483
+    },
+    {
+      "path": "resources/calypso/nodes.json",
+      "offset": 2077057,
+      "size": 21697
+    },
+    {
+      "path": "resources/calypso/operators.json",
+      "offset": 2098754,
+      "size": 3375
+    },
+    {
+      "path": "resources/capk.txt",
+      "offset": 2102129,
+      "size": 19976
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-auth-e201-sn63709320101001-c01.pem",
+      "offset": 2122105,
+      "size": 717
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-auth-e202-sn63709320101002-c01.pem",
+      "offset": 2122822,
+      "size": 717
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-auth-e203-sn63709320101003-c01.pem",
+      "offset": 2123539,
+      "size": 717
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-evcharging-e201-sn63709320010001-c03.pem",
+      "offset": 2124256,
+      "size": 635
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-evcharging-e201-sn63709320010002-c02.pem",
+      "offset": 2124891,
+      "size": 635
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-leaf-e200-sn63709320131000-c02.pem",
+      "offset": 2125526,
+      "size": 810
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-leaf-e500-sn63709320130000-c01.pem",
+      "offset": 2126336,
+      "size": 899
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-orig-e200-sn63709320111000-c02.pem",
+      "offset": 2127235,
+      "size": 810
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-orig-e201-sn63709320110001-c01.pem",
+      "offset": 2128045,
+      "size": 717
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-orig-e202-sn63709320110002-c01.pem",
+      "offset": 2128762,
+      "size": 713
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-orig-e203-sn63709320110003-c01.pem",
+      "offset": 2129475,
+      "size": 717
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-orig-e500-sn63709320110000-c01.pem",
+      "offset": 2130192,
+      "size": 895
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-picc-e200-sn63709320121000-c02.pem",
+      "offset": 2131087,
+      "size": 806
+    },
+    {
+      "path": "resources/duox_trust/nxp/nxp-picc-e500-sn63709320120000-c01.pem",
+      "offset": 2131893,
+      "size": 899
+    },
+    {
+      "path": "resources/ecp_taxonomy.json",
+      "offset": 2132792,
+      "size": 5484
+    },
+    {
+      "path": "resources/ecplist.json",
+      "offset": 2138276,
+      "size": 9098
+    },
+    {
+      "path": "resources/emv_defparams.json",
+      "offset": 2147374,
+      "size": 1319
+    },
+    {
+      "path": "resources/felica/felica_container_issue_information_list.json",
+      "offset": 2148693,
+      "size": 82534
+    },
+    {
+      "path": "resources/felica/felica_system_code_list.json",
+      "offset": 2231227,
+      "size": 22320
+    },
+    {
+      "path": "resources/felica/group_user_keys.json",
+      "offset": 2253547,
+      "size": 108
+    },
+    {
+      "path": "resources/felica/ic_code_list.json",
+      "offset": 2253655,
+      "size": 22502
+    },
+    {
+      "path": "resources/felica/issuers.json",
+      "offset": 2276157,
+      "size": 4164
+    },
+    {
+      "path": "resources/felica/node_keys.json",
+      "offset": 2280321,
+      "size": 100
+    },
+    {
+      "path": "resources/gst.google.der",
+      "offset": 2280421,
+      "size": 138
+    },
+    {
+      "path": "resources/gst.passkit.der",
+      "offset": 2280559,
+      "size": 138
+    },
+    {
+      "path": "resources/hf_fido2_defparams.json",
+      "offset": 2280697,
+      "size": 680
+    },
+    {
+      "path": "resources/hidconfig_sample.json",
+      "offset": 2281377,
+      "size": 1127
+    },
+    {
+      "path": "resources/iceman.txt",
+      "offset": 2282504,
+      "size": 4329
+    },
+    {
+      "path": "resources/iclass_decryptionkey.bin",
+      "offset": 2286833,
+      "size": 16
+    },
+    {
+      "path": "resources/iclass_dump.bin",
+      "offset": 2286849,
+      "size": 3024
+    },
+    {
+      "path": "resources/key_retail.bin",
+      "offset": 2289873,
+      "size": 160
+    },
+    {
+      "path": "resources/mad.json",
+      "offset": 2290033,
+      "size": 453753
+    },
+    {
+      "path": "resources/oids.json",
+      "offset": 2743786,
+      "size": 193938
+    },
+    {
+      "path": "resources/pm3_generic_private_key.pem",
+      "offset": 2937724,
+      "size": 916
+    },
+    {
+      "path": "resources/pm3_generic_private_key.sha512.txt",
+      "offset": 2938640,
+      "size": 158
+    },
+    {
+      "path": "resources/sim011.bin",
+      "offset": 2938798,
+      "size": 733
+    },
+    {
+      "path": "resources/sim011.sha512.txt",
+      "offset": 2939531,
+      "size": 141
+    },
+    {
+      "path": "resources/sim013.bin",
+      "offset": 2939672,
+      "size": 866
+    },
+    {
+      "path": "resources/sim013.sha512.txt",
+      "offset": 2940538,
+      "size": 141
+    },
+    {
+      "path": "resources/sim020.bin",
+      "offset": 2940679,
+      "size": 6906
+    },
+    {
+      "path": "resources/sim020.sha512.txt",
+      "offset": 2947585,
+      "size": 158
+    },
+    {
+      "path": "resources/sim022.bin",
+      "offset": 2947743,
+      "size": 7017
+    },
+    {
+      "path": "resources/sim022.sha512.txt",
+      "offset": 2954760,
+      "size": 158
+    },
+    {
+      "path": "resources/sim023.bin",
+      "offset": 2954918,
+      "size": 7160
+    },
+    {
+      "path": "resources/sim023.sha512.txt",
+      "offset": 2962078,
+      "size": 128
+    },
+    {
+      "path": "resources/sim024.bin",
+      "offset": 2962206,
+      "size": 7940
+    },
+    {
+      "path": "resources/sim024.sha512.txt",
+      "offset": 2970146,
+      "size": 129
+    },
+    {
+      "path": "resources/vas.passkit.der",
+      "offset": 2970275,
+      "size": 121
+    },
+    {
+      "path": "resources/vas.springcard.der",
+      "offset": 2970396,
+      "size": 121
+    },
+    {
+      "path": "resources/vas.zebra.der",
+      "offset": 2970517,
+      "size": 121
+    }
+  ],
+  "extras": [
+    {
+      "path": "dictionaries/extras/12_byte_most_common_password.dic",
+      "size": 397300
+    },
+    {
+      "path": "dictionaries/extras/12_byte_most_common_password_uppercase.dic",
+      "size": 393700
+    },
+    {
+      "path": "dictionaries/extras/12_byte_words.dic",
+      "size": 728100
+    },
+    {
+      "path": "dictionaries/extras/12_byte_words_uppercase.dic",
+      "size": 728100
+    },
+    {
+      "path": "dictionaries/extras/16_byte_most_common_password.dic",
+      "size": 91245
+    },
+    {
+      "path": "dictionaries/extras/16_byte_most_common_password_uppercase.dic",
+      "size": 91047
+    },
+    {
+      "path": "dictionaries/extras/16_byte_words.dic",
+      "size": 171006
+    },
+    {
+      "path": "dictionaries/extras/16_byte_words_uppercase.dic",
+      "size": 171006
+    },
+    {
+      "path": "dictionaries/extras/4_byte_ascii_numbers.dic",
+      "size": 90000
+    },
+    {
+      "path": "dictionaries/extras/4_byte_most_common_password.dic",
+      "size": 241470
+    },
+    {
+      "path": "dictionaries/extras/4_byte_most_common_password_uppercase.dic",
+      "size": 228339
+    },
+    {
+      "path": "dictionaries/extras/4_byte_words.dic",
+      "size": 64674
+    },
+    {
+      "path": "dictionaries/extras/4_byte_words_uppercase.dic",
+      "size": 64674
+    },
+    {
+      "path": "dictionaries/extras/6_byte_ascii_numbers.dic",
+      "size": 6908733
+    },
+    {
+      "path": "dictionaries/extras/6_byte_most_common_password.dic",
+      "size": 3234712
+    },
+    {
+      "path": "dictionaries/extras/6_byte_most_common_password_uppercase.dic",
+      "size": 3082833
+    },
+    {
+      "path": "dictionaries/extras/6_byte_words.dic",
+      "size": 175098
+    },
+    {
+      "path": "dictionaries/extras/6_byte_words_uppercase.dic",
+      "size": 175098
+    },
+    {
+      "path": "dictionaries/extras/8_byte_most_common_password.dic",
+      "size": 5186426
+    },
+    {
+      "path": "dictionaries/extras/8_byte_most_common_password_uppercase.dic",
+      "size": 5186426
+    },
+    {
+      "path": "dictionaries/extras/8_byte_words.dic",
+      "size": 877659
+    },
+    {
+      "path": "dictionaries/extras/8_byte_words_uppercase.dic",
+      "size": 877659
+    },
+    {
+      "path": "dictionaries/extras/iclass_other.dic",
+      "size": 1420
+    }
+  ],
+  "extrasBaseUrl": "https://raw.githubusercontent.com/ahzs645/proxmark3wasm/3a99ab005b308fdc2a4e9d3663b69d566aaabce3/client/"
+}

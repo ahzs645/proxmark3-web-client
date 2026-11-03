@@ -8,6 +8,7 @@
     "dev:tauri": "tauri dev",
     "build": "tsc -b && vp build",
     "build:pm3-wasm": "emmake make -C proxmark3wasm/client EMSCRIPTEN=1 SKIPREVENGTEST=1 SKIPREADLINE=1 proxmark3",
+    "pack:pm3-resources": "node scripts/pack-pm3-resources.cjs",
     "build:tauri": "tauri build",
     "lint": "vp lint .",
     "preview": "vp preview",

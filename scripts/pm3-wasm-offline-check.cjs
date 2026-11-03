@@ -3,7 +3,11 @@
 // through the stdin ring buffer and checks the output. Useful after a rebuild
 // to confirm the module loads, threads start and the client answers.
 //
-//   node scripts/pm3-wasm-offline-check.cjs [--wasm-dir <dir>] [--command "<cmd>"]... [--expect "<text>"]...
+//   node scripts/pm3-wasm-offline-check.cjs [--wasm-dir <dir>] [--resources [<dir>]]
+//       [--command "<cmd>"]... [--expect "<text>"]...
+//
+// --resources installs the public/pm3-resources pack into ~/.proxmark3 the way
+// the web app does, so dictionary, Lua and resource-file lookups can be tested.
 //
 // Note: device-gated commands (e.g. the Proxmark5-only `hw qc_pm5`) are hidden
 // from `help` while offline; check for them with `strings proxmark3.wasm`.
@@ -18,6 +22,7 @@ const options = {
   timeoutMs: Number(process.env.PM3_SMOKE_TIMEOUT_MS || 30000),
   idleMs: 1500,
   quiet: false,
+  resourcesDir: null,
 };
 
 const argv = process.argv.slice(2);
@@ -28,7 +33,12 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === "--expect") options.expect.push(argv[++i]);
   else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
   else if (arg === "--quiet") options.quiet = true;
-  else {
+  else if (arg === "--resources") {
+    options.resourcesDir =
+      argv[i + 1] && !argv[i + 1].startsWith("--")
+        ? path.resolve(argv[++i])
+        : path.join(repoRoot, "public", "pm3-resources");
+  } else {
     console.error(`unknown argument: ${arg}`);
     process.exit(1);
   }
@@ -73,6 +83,21 @@ function pushStdin(text) {
   }
 }
 
+function installResources() {
+  if (!options.resourcesDir) return;
+  const fs = require("fs");
+  const FS = globalThis.FS || globalThis.Module?.FS;
+  if (!FS?.writeFile) throw new Error("Emscripten FS is not available in this build");
+  const manifest = JSON.parse(fs.readFileSync(path.join(options.resourcesDir, "manifest.json")));
+  const bundle = fs.readFileSync(path.join(options.resourcesDir, manifest.bundle));
+  for (const file of manifest.files) {
+    const target = `/home/web_user/.proxmark3/${file.path}`;
+    FS.mkdirTree(path.posix.dirname(target));
+    FS.writeFile(target, new Uint8Array(bundle.subarray(file.offset, file.offset + file.size)));
+  }
+  log(`[offline-check] installed ${manifest.files.length} resource files`);
+}
+
 function runCommands() {
   const queue = [...options.commands, "quit"];
   const next = () => {
@@ -102,6 +127,7 @@ globalThis.Module = {
   locateFile: (file) => path.join(options.wasmDir, file),
   onRuntimeInitialized: () => {
     log("[offline-check] runtime initialised");
+    installResources();
     runCommands();
   },
   print: (...args) => log(args.join(" ")),
