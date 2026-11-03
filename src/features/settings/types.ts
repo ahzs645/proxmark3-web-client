@@ -7,6 +7,10 @@ export interface SettingsState {
   operationProfile: "fast" | "recommended" | "thorough";
   nativePm3BinaryPath: string;
   nativePm3Port: string;
+  /** Custom BLE UART bridge; all blank means only the built-in profiles. */
+  bleCustomServiceUuid: string;
+  bleCustomWriteUuid: string;
+  bleCustomNotifyUuid: string;
 }
 
 export const DEFAULT_SETTINGS: SettingsState = {
@@ -18,4 +22,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   operationProfile: "recommended",
   nativePm3BinaryPath: "",
   nativePm3Port: "",
+  bleCustomServiceUuid: "",
+  bleCustomWriteUuid: "",
+  bleCustomNotifyUuid: "",
 };

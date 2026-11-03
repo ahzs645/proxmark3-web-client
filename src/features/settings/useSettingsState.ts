@@ -69,6 +69,18 @@ export function useSettingsState() {
     (value: string) => updateSetting("nativePm3Port", value),
     [updateSetting],
   );
+  const setBleCustomUuids = useCallback(
+    (value: { service: string; write: string; notify: string }) => {
+      setSettings((prev) => ({
+        ...prev,
+        bleCustomServiceUuid: value.service,
+        bleCustomWriteUuid: value.write,
+        bleCustomNotifyUuid: value.notify,
+      }));
+      setSaved(true);
+    },
+    [],
+  );
 
   const exportSettings = useCallback(() => {
     exportSettingsToFile(settings);
@@ -116,6 +128,7 @@ export function useSettingsState() {
     setOperationProfile,
     setNativePm3BinaryPath,
     setNativePm3Port,
+    setBleCustomUuids,
     exportSettings,
     importSettings,
     resetSettings,

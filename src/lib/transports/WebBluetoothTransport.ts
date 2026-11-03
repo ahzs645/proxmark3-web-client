@@ -1,5 +1,6 @@
 /**
- * Web Bluetooth (BLE) transport for the Proxmark5 Battery/Wireless Module.
+ * Web Bluetooth (BLE) transport for the Proxmark5 Battery/Wireless Module and
+ * BLE UART add-ons (see ./bleUart for the profiles).
  *
  * The BWM's ESP32 exposes a NimBLE "SPP" service (see
  * RfidResearchGroup/Proxmark5_BWM_esp32, components/app_ble_spp):
@@ -9,16 +10,16 @@
  *   - no pairing, plaintext GATT
  * Bytes written to the characteristic reach the PM5 UART; device output arrives
  * as notifications. That is a plain byte pipe, so the same ring buffers used by
- * the serial transports carry the PM3 protocol unchanged.
+ * the serial transports carry the PM3 protocol unchanged. Nordic UART and HM-10
+ * bridges are the same pipe on different UUIDs.
  */
 
+import { loadSettingsFromStorage } from "@/features/settings/storage";
 import { uartShared } from "../pm3WebUSB";
+import { bleRequestOptions, bleUartProfiles, type BleUartProfile } from "./bleUart";
 import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from "./types";
 
-export const PM5_BLE_SERVICE_UUID = 0xae86;
-export const PM5_BLE_DATA_CHARACTERISTIC_UUID = 0xae88;
 export const PM5_BLE_BATTERY_SERVICE_UUID = 0x180f;
-export const PM5_BLE_NAME_PREFIX = "Proxmark5";
 
 /**
  * Web Bluetooth does not expose the negotiated ATT MTU. The BWM negotiates
@@ -44,6 +45,7 @@ const WRITE_CHUNK_SIZES = [244, 128, 20] as const;
  *       the WASM ring buffer bridge, not Bluetooth, is at fault.
  */
 export interface BleLinkStats {
+  profile: BleUartProfile["id"] | null;
   properties: string[];
   chunkSize: number;
   txWrites: number;
@@ -58,6 +60,7 @@ export interface BleLinkStats {
 const TRACE_FRAME_LIMIT = 8;
 
 const stats: BleLinkStats = {
+  profile: null,
   properties: [],
   chunkSize: WRITE_CHUNK_SIZES[0],
   txWrites: 0,
@@ -74,6 +77,7 @@ export function getBleLinkStats(): BleLinkStats {
 }
 
 function resetStats(): void {
+  stats.profile = null;
   stats.properties = [];
   stats.chunkSize = WRITE_CHUNK_SIZES[0];
   stats.txWrites = 0;
@@ -98,7 +102,9 @@ export class WebBluetoothTransport implements Transport {
   readonly type: TransportType = "webbluetooth";
 
   private device: BluetoothDevice | null = null;
-  private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  /** Same object as `notifyCharacteristic` on single-characteristic bridges. */
+  private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private notifyCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private _isConnected = false;
   private txLoopRunning = false;
   private eventHandlers: TransportEventHandlers = {};
@@ -128,7 +134,8 @@ export class WebBluetoothTransport implements Transport {
     if (!this._isConnected) return;
     this._isConnected = false;
     this.txLoopRunning = false;
-    this.characteristic = null;
+    this.writeCharacteristic = null;
+    this.notifyCharacteristic = null;
     this.eventHandlers.onDisconnect?.();
   };
 
@@ -145,17 +152,16 @@ export class WebBluetoothTransport implements Transport {
   }
 
   async listDevices(): Promise<TransportDevice[]> {
-    // Chrome only lists devices the user has already granted; the picker runs
-    // during connect() when nothing is remembered.
+    // Chrome only lists devices the user has already granted (and the picker
+    // only offers supported bridges); the picker runs during connect() when
+    // nothing is remembered.
     const known = await navigator.bluetooth?.getDevices?.().catch(() => []);
-    return (known ?? [])
-      .filter((entry) => entry.name?.startsWith(PM5_BLE_NAME_PREFIX))
-      .map((entry) => ({
-        id: entry.id,
-        name: entry.name ?? PM5_BLE_NAME_PREFIX,
-        type: this.type,
-        address: entry.id,
-      }));
+    return (known ?? []).map((entry) => ({
+      id: entry.id,
+      name: entry.name ?? "Bluetooth device",
+      type: this.type,
+      address: entry.id,
+    }));
   }
 
   async connect(device?: TransportDevice): Promise<boolean> {
@@ -170,33 +176,44 @@ export class WebBluetoothTransport implements Transport {
         const known = await navigator.bluetooth?.getDevices?.().catch(() => []);
         target = known?.find((entry) => entry.id === (device.address || device.id));
       }
-      target ??= await navigator.bluetooth!.requestDevice({
-        filters: [{ services: [PM5_BLE_SERVICE_UUID] }, { namePrefix: PM5_BLE_NAME_PREFIX }],
-        optionalServices: [PM5_BLE_SERVICE_UUID, PM5_BLE_BATTERY_SERVICE_UUID],
+      const settings = loadSettingsFromStorage();
+      const profiles = bleUartProfiles({
+        service: settings.bleCustomServiceUuid,
+        write: settings.bleCustomWriteUuid,
+        notify: settings.bleCustomNotifyUuid,
       });
+      target ??= await navigator.bluetooth!.requestDevice(
+        bleRequestOptions(profiles, [PM5_BLE_BATTERY_SERVICE_UUID]),
+      );
       if (!target.gatt) throw new Error("Selected device does not expose GATT");
 
       const server = await target.gatt.connect();
-      const service = await server.getPrimaryService(PM5_BLE_SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(PM5_BLE_DATA_CHARACTERISTIC_UUID);
-      await characteristic.startNotifications();
-      characteristic.addEventListener("characteristicvaluechanged", this.onNotification);
+      const link = await this.openUart(server, profiles);
+      if (!link) {
+        throw new Error(
+          `${target.name ?? "The device"} has no supported BLE UART service ` +
+            `(tried ${profiles.map((profile) => profile.label).join(", ")}). ` +
+            "Set its UUIDs under Settings → Bluetooth UART.",
+        );
+      }
+      const { profile, write, notify } = link;
+      await notify.startNotifications();
+      notify.addEventListener("characteristicvaluechanged", this.onNotification);
       target.addEventListener("gattserverdisconnected", this.onGattDisconnected);
 
       resetStats();
-      const props = characteristic.properties;
+      stats.profile = profile.id;
       stats.properties = [
-        props.write ? "write" : null,
-        props.writeWithoutResponse ? "writeWithoutResponse" : null,
-        props.notify ? "notify" : null,
-        props.indicate ? "indicate" : null,
+        write.properties.write ? "write" : null,
+        write.properties.writeWithoutResponse ? "writeWithoutResponse" : null,
+        notify.properties.notify ? "notify" : null,
+        notify.properties.indicate ? "indicate" : null,
       ].filter((name): name is string => name !== null);
       console.info(
-        `[WebBluetooth] connected to ${target.name ?? "(unnamed)"}; ` +
-          `char ${PM5_BLE_DATA_CHARACTERISTIC_UUID.toString(16)} properties: ` +
-          `${stats.properties.join(", ") || "(none)"}`,
+        `[WebBluetooth] connected to ${target.name ?? "(unnamed)"} via ${profile.label}; ` +
+          `properties: ${stats.properties.join(", ") || "(none)"}`,
       );
-      if (!characteristic.properties.notify && !characteristic.properties.indicate) {
+      if (!notify.properties.notify && !notify.properties.indicate) {
         console.warn(
           "[WebBluetooth] data characteristic advertises neither notify nor indicate; " +
             "device output cannot reach the client",
@@ -204,7 +221,8 @@ export class WebBluetoothTransport implements Transport {
       }
 
       this.device = target;
-      this.characteristic = characteristic;
+      this.writeCharacteristic = write;
+      this.notifyCharacteristic = notify;
       this.chunkSizeIndex = 0;
       this.rxQueue = [];
       this._isConnected = true;
@@ -224,10 +242,36 @@ export class WebBluetoothTransport implements Transport {
     }
   }
 
+  /** First profile whose service and characteristics the device actually has. */
+  private async openUart(
+    server: BluetoothRemoteGATTServer,
+    profiles: readonly BleUartProfile[],
+  ): Promise<{
+    profile: BleUartProfile;
+    write: BluetoothRemoteGATTCharacteristic;
+    notify: BluetoothRemoteGATTCharacteristic;
+  } | null> {
+    for (const profile of profiles) {
+      try {
+        const service = await server.getPrimaryService(profile.service);
+        const write = await service.getCharacteristic(profile.write);
+        const notify =
+          profile.notify === profile.write
+            ? write
+            : await service.getCharacteristic(profile.notify);
+        return { profile, write, notify };
+      } catch {
+        // Not this bridge; try the next profile.
+      }
+    }
+    return null;
+  }
+
   private async teardown(): Promise<void> {
-    const characteristic = this.characteristic;
+    const characteristic = this.notifyCharacteristic;
     const device = this.device;
-    this.characteristic = null;
+    this.writeCharacteristic = null;
+    this.notifyCharacteristic = null;
     this.device = null;
     if (characteristic) {
       characteristic.removeEventListener("characteristicvaluechanged", this.onNotification);
@@ -321,7 +365,7 @@ export class WebBluetoothTransport implements Transport {
     const tmp = new Uint8Array(4096);
 
     while (this.txLoopRunning && this._isConnected) {
-      const characteristic = this.characteristic;
+      const characteristic = this.writeCharacteristic;
       if (!characteristic) break;
       const n = uartShared.popTx(tmp.length, tmp);
       if (n === 0) {
@@ -358,11 +402,11 @@ export class WebBluetoothTransport implements Transport {
   }
 
   getName(): string {
-    return "Bluetooth LE (Proxmark5)";
+    return "Bluetooth LE";
   }
 
   getDescription(): string {
-    return "Connect to a Proxmark5 Battery/Wireless Module over Web Bluetooth";
+    return "Connect to a Proxmark5 Battery/Wireless Module or a BLE UART add-on (Nordic UART, HM-10) over Web Bluetooth";
   }
 }
 

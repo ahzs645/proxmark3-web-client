@@ -4,6 +4,7 @@ import { PanelHeader } from "@/components/panels/shared/PanelHeader";
 import { Settings, Check } from "lucide-react";
 import type { Theme } from "@/hooks/useTheme";
 import { AppearanceSection } from "@/features/settings/components/AppearanceSection";
+import { BluetoothUartSection } from "@/features/settings/components/BluetoothUartSection";
 import { BehaviorSection } from "@/features/settings/components/BehaviorSection";
 import { DataManagementSection } from "@/features/settings/components/DataManagementSection";
 import { DefaultsSection } from "@/features/settings/components/DefaultsSection";
@@ -48,6 +49,7 @@ export function SettingsPanel({
     setOperationProfile,
     setNativePm3BinaryPath,
     setNativePm3Port,
+    setBleCustomUuids,
     exportSettings,
     importSettings,
     resetSettings,
@@ -99,6 +101,15 @@ export function SettingsPanel({
           onDisconnectApplication={onDisconnectApplication}
           onReconnectApplication={onReconnectApplication}
           onLog={onFirmwareLog}
+        />
+
+        <BluetoothUartSection
+          value={{
+            service: settings.bleCustomServiceUuid,
+            write: settings.bleCustomWriteUuid,
+            notify: settings.bleCustomNotifyUuid,
+          }}
+          onChange={setBleCustomUuids}
         />
 
         <NativeRuntimeSection
