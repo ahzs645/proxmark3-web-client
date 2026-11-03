@@ -20,11 +20,24 @@ interface TerminalPaneProps {
   onRunQuickCommand: () => void;
   onCommand: (cmd: string) => void;
   onInput: (char: string) => void;
+  /** Earlier commands, oldest first, for Up/Down recall in the terminal. */
+  commandHistory: readonly string[];
   libraryKeyMode: LibraryKeyMode;
   onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
   /** When provided, shows a collapse button to hide the terminal dock. */
   onCollapse?: () => void;
 }
+
+// Keys a phone keyboard lacks. Shown only on touch screens.
+const TOUCH_KEYS: Array<{ label: string; title: string; data: string }> = [
+  { label: "↑", title: "Previous command", data: "\x1b[A" },
+  { label: "↓", title: "Next command", data: "\x1b[B" },
+  { label: "←", title: "Cursor left", data: "\x1b[D" },
+  { label: "→", title: "Cursor right", data: "\x1b[C" },
+  { label: "Home", title: "Start of line", data: "\x01" },
+  { label: "End", title: "End of line", data: "\x05" },
+  { label: "^C", title: "Clear line, or stop the running command", data: "\x03" },
+];
 
 const SHORTCUTS: Array<{ label: string; command: string }> = [
   { label: "Tune", command: "hw tune" },
@@ -42,6 +55,7 @@ export function TerminalPane({
   onRunQuickCommand,
   onCommand,
   onInput,
+  commandHistory,
   libraryKeyMode,
   onLibraryKeyModeChange,
   onCollapse,
@@ -189,14 +203,34 @@ export function TerminalPane({
           ))}
         </div>
       </CardHeader>
-      <CardContent className="min-h-[7rem] flex-1 overflow-hidden p-0">
+      <CardContent className="flex min-h-[7rem] flex-1 flex-col overflow-hidden p-0">
         <Terminal
           ref={terminalRef}
           onCommand={onCommand}
           onInput={onInput}
+          onInterrupt={activeJob ? stopActive : undefined}
+          history={commandHistory}
+          passthrough={Boolean(activeJob)}
           rawMode={true}
-          className="h-full"
+          className="min-h-0 flex-1"
         />
+        <div className="hidden shrink-0 gap-1 overflow-x-auto border-t border-border/60 p-1.5 scrollbar-hide pointer-coarse:flex">
+          {TOUCH_KEYS.map((key) => (
+            <Button
+              key={key.label}
+              size="sm"
+              variant="secondary"
+              className="h-8 min-w-10 shrink-0 font-mono"
+              title={key.title}
+              aria-label={key.title}
+              // Keep focus (and the on-screen keyboard) on the terminal.
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => terminalRef.current?.input(key.data)}
+            >
+              {key.label}
+            </Button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

@@ -124,6 +124,7 @@ export function WorkbenchHome({
             onRunQuickCommand={onRunQuickCommand}
             onCommand={onCommand}
             onInput={onInput}
+            commandHistory={commandHistory}
             libraryKeyMode={libraryKeyMode}
             onLibraryKeyModeChange={onLibraryKeyModeChange}
             onCollapse={panelOpen ? onCollapseTerminal : undefined}

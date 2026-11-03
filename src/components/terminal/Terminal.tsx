@@ -8,7 +8,8 @@ import {
   TERMINAL_FONT_SIZE,
   TERMINAL_THEME,
 } from "@/features/terminal/config";
-import { handleTerminalKey } from "@/features/terminal/keyboard";
+import { LineEditor } from "@/features/terminal/lineEditor";
+import { createSeverityColorizer } from "@/features/terminal/severity";
 import { useTerminalWriteQueue } from "@/features/terminal/queue";
 import { writeTerminalWelcome } from "@/features/terminal/welcome";
 import type { TerminalHandle, TerminalProps } from "@/features/terminal/types";
@@ -16,26 +17,36 @@ import type { TerminalHandle, TerminalProps } from "@/features/terminal/types";
 export type { TerminalHandle, TerminalProps } from "@/features/terminal/types";
 
 export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
-  ({ onInput, onCommand, className, rawMode = false }, ref) => {
+  (
+    { onInput, onCommand, onInterrupt, history, passthrough = false, className, rawMode = false },
+    ref,
+  ) => {
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<XTerm | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
-    const inputBufferRef = useRef("");
+    const editorRef = useRef<LineEditor | null>(null);
+    const colorizeRef = useRef(createSeverityColorizer());
     const onInputRef = useRef(onInput);
     const onCommandRef = useRef(onCommand);
+    const onInterruptRef = useRef(onInterrupt);
+    const historyRef = useRef(history);
+    const passthroughRef = useRef(passthrough);
     const rawModeRef = useRef(rawMode);
     const { scheduleWrite, clearPendingWrites } = useTerminalWriteQueue(xtermRef);
 
     onInputRef.current = onInput;
     onCommandRef.current = onCommand;
+    onInterruptRef.current = onInterrupt;
+    historyRef.current = history;
+    passthroughRef.current = passthrough;
     rawModeRef.current = rawMode;
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
-        scheduleWrite(data);
+        scheduleWrite(colorizeRef.current(data));
       },
       writeln: (data: string) => {
-        scheduleWrite(`${data}\r\n`);
+        scheduleWrite(colorizeRef.current(`${data}\r\n`));
       },
       clear: () => {
         clearPendingWrites();
@@ -49,6 +60,10 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
           scheduleWrite(`\r\n[pm3] ${cmd}\r\n`);
           onCommand?.(cmd);
         }
+      },
+      input: (data: string) => {
+        editorRef.current?.handleData(data);
+        xtermRef.current?.focus();
       },
     }));
 
@@ -81,18 +96,35 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 
       writeTerminalWelcome(term, rawMode);
 
-      term.onKey((event) => {
-        handleTerminalKey(
-          {
-            term,
-            inputBufferRef,
-            rawModeRef,
-            onInputRef,
-            onCommandRef,
+      const editor = new LineEditor(
+        {
+          write: (data) => term.write(data),
+          submit: (line) => {
+            // While a command runs, the line is that command's stdin: sims,
+            // sniffs and `hw tune` stop on Enter, and some prompts read a reply.
+            if (passthroughRef.current) {
+              for (const char of `${line}\n`) onInputRef.current?.(char);
+              return;
+            }
+            const command = line.trim();
+            if (command) onCommandRef.current?.(command);
+            if (!rawModeRef.current) term.write("\x1b[32m[pm3]\x1b[0m ");
           },
-          event,
-        );
-      });
+          interrupt: () => onInterruptRef.current?.(),
+          clearScreen: () => term.clear(),
+          columns: () => term.cols,
+          cursorColumn: () => term.buffer.active.cursorX,
+          copySelection: () => {
+            if (!term.hasSelection()) return false;
+            void navigator.clipboard?.writeText(term.getSelection());
+            term.clearSelection();
+            return true;
+          },
+        },
+        () => historyRef.current ?? [],
+      );
+      editorRef.current = editor;
+      term.onData((data) => editor.handleData(data));
 
       const resizeObserver = new ResizeObserver(() => {
         try {
@@ -111,6 +143,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
         clearPendingWrites();
         resizeObserver.disconnect();
         fitAddonRef.current = null;
+        editorRef.current = null;
         xtermRef.current = null;
         term.dispose();
       };
