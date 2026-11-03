@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, Download, RefreshCw, Settings, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { useAppSettings } from "@/features/settings/useAppSettings";
 import type { LFConfig } from "../types";
 import { buildLfConfigCommand } from "../commands";
@@ -28,21 +29,21 @@ export function LFAdvancedSection({
   const [showAdvanced, setShowAdvanced] = useState(showAdvancedOptions);
 
   return (
-    <div className="border-t">
+    // Same box as a PanelSection, with the title row doubling as the toggle.
+    <section className="overflow-hidden rounded-xl border bg-card/40">
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 transition-colors hover:bg-secondary/30"
       >
-        <div className="flex items-center gap-2">
-          <Sliders className="h-3 w-3 text-amber-500" />
-          <span className="font-medium">Advanced Configuration</span>
-        </div>
+        <SectionLabel icon={<Sliders className="h-3 w-3 text-amber-500" />}>
+          Advanced Configuration
+        </SectionLabel>
         <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
       </button>
 
       {showAdvanced && (
-        <div className="space-y-3 bg-secondary/20 p-3">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3 border-t bg-secondary/20 p-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">Bits per Sample</label>
               <Input
@@ -101,18 +102,23 @@ export function LFAdvancedSection({
             <span>Enable Averaging</span>
           </label>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"
               onClick={onGetConfig}
               disabled={disabled}
-              className="flex-1 gap-1"
+              className="flex-1 gap-1 sm:flex-none"
             >
               <Download className="h-3 w-3" />
               Get Config
             </Button>
-            <Button size="sm" onClick={onSetConfig} disabled={disabled} className="flex-1 gap-1">
+            <Button
+              size="sm"
+              onClick={onSetConfig}
+              disabled={disabled}
+              className="flex-1 gap-1 sm:flex-none"
+            >
               <Settings className="h-3 w-3" />
               Apply
             </Button>
@@ -129,6 +135,6 @@ export function LFAdvancedSection({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

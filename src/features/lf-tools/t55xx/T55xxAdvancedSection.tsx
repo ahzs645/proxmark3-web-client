@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Upload, ChevronDown, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SectionLabel } from "@/components/panels/shared/SectionLabel";
 import { useAppSettings } from "@/features/settings/useAppSettings";
 
 interface T55xxAdvancedSectionProps {
@@ -28,20 +29,20 @@ export function T55xxAdvancedSection({
   const [showAdvanced, setShowAdvanced] = useState(showAdvancedOptions);
 
   return (
-    <div className="border-t">
+    // Same box as a PanelSection, with the title row doubling as the toggle.
+    <section className="overflow-hidden rounded-xl border bg-card/40">
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 transition-colors hover:bg-secondary/30"
       >
-        <div className="flex items-center gap-2">
-          <Cpu className="h-3 w-3 text-amber-500" />
-          <span className="font-medium">Block Read/Write</span>
-        </div>
+        <SectionLabel icon={<Cpu className="h-3 w-3 text-amber-500" />}>
+          Block Read/Write
+        </SectionLabel>
         <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
       </button>
 
       {showAdvanced && (
-        <div className="space-y-3 bg-secondary/20 p-3">
+        <div className="space-y-3 border-t bg-secondary/20 p-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">Block (0-7)</label>
@@ -95,6 +96,6 @@ export function T55xxAdvancedSection({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

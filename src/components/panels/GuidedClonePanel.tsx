@@ -35,65 +35,95 @@ export function GuidedClonePanel({
     <Card className="flex h-full flex-col overflow-hidden">
       <PanelHeader icon={Wand2} title="Guided Clone" tag="LF workflow" />
       <CardContent className="flex-1 overflow-auto p-4">
-        <div className="mx-auto max-w-4xl space-y-4">
-          <div className="rounded-xl border bg-muted/20 p-4">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {STEPS.map((step, index) => (
-                <div key={step} className="flex items-center gap-1.5">
-                  <span className="rounded-full border bg-background px-2.5 py-1 text-[11px] font-medium">
-                    {index + 1}. {step}
-                  </span>
-                  {index < STEPS.length - 1 ? (
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  ) : null}
-                </div>
-              ))}
+        {/* Wide screens: the overview, scan and result in a left column with the
+            write form beside them. The left wrapper is display:contents on
+            narrow screens, so the sections stack in their original order. */}
+        <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] xl:items-start">
+          <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-4">
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {STEPS.map((step, index) => (
+                  <div key={step} className="flex items-center gap-1.5">
+                    <span className="rounded-full border bg-background px-2.5 py-1 text-[11px] font-medium">
+                      {index + 1}. {step}
+                    </span>
+                    {index < STEPS.length - 1 ? (
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                The first guided path supports decoded HID Prox and EM410x credentials on validated
+                T55xx carriers. Other formats stay in the expert workbench until they have parser,
+                command-builder, blank-compatibility, and verification fixtures.
+              </p>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              The first guided path supports decoded HID Prox and EM410x credentials on validated
-              T55xx carriers. Other formats stay in the expert workbench until they have parser,
-              command-builder, blank-compatibility, and verification fixtures.
-            </p>
+
+            <section className="rounded-xl border p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="flex items-center gap-2 text-sm font-semibold">
+                    <Radio className="h-4 w-4 text-primary" />
+                    1–2. Scan and decode the source
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Keep the source credential on the LF antenna until the scan finishes. Recognized
+                    credentials are saved locally and selected in the write form below.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => onCommand("lf search")}
+                  disabled={disabled}
+                  className="gap-1"
+                >
+                  <Radio className="h-3.5 w-3.5" />
+                  Scan source
+                </Button>
+              </div>
+
+              {newestSource ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-green-500/40 bg-green-500/10 p-3 text-xs">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <strong>{newestSource.name}</strong>
+                  <Badge variant="secondary">{newestSource.tech.toUpperCase()}</Badge>
+                  {newestSource.raw ? <code>{newestSource.raw}</code> : null}
+                </div>
+              ) : (
+                <div className="mt-3 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  No decoded LF source is saved yet. Scan a supported source to continue.
+                </div>
+              )}
+            </section>
+
+            {latestVerifiedWrite ? (
+              <section className="order-last rounded-xl border p-4 xl:order-none">
+                <div className="flex flex-wrap items-center gap-2">
+                  <ShieldCheck
+                    className={`h-4 w-4 ${latestVerifiedWrite.verified ? "text-green-600" : "text-destructive"}`}
+                  />
+                  <h2 className="text-sm font-semibold">Latest guided result</h2>
+                  <Badge variant={latestVerifiedWrite.verified ? "success" : "destructive"}>
+                    {latestVerifiedWrite.verified ? "verified" : "failed verification"}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {latestVerifiedWrite.summary ?? latestVerifiedWrite.status}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => onOpenTab("library")}
+                >
+                  Open audit report
+                </Button>
+              </section>
+            ) : null}
           </div>
 
-          <section className="rounded-xl border p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <Radio className="h-4 w-4 text-primary" />
-                  1–2. Scan and decode the source
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Keep the source credential on the LF antenna until the scan finishes. Recognized
-                  credentials are saved locally and selected in the write form below.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onCommand("lf search")}
-                disabled={disabled}
-                className="gap-1"
-              >
-                <Radio className="h-3.5 w-3.5" />
-                Scan source
-              </Button>
-            </div>
-
-            {newestSource ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-green-500/40 bg-green-500/10 p-3 text-xs">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <strong>{newestSource.name}</strong>
-                <Badge variant="secondary">{newestSource.tech.toUpperCase()}</Badge>
-                {newestSource.raw ? <code>{newestSource.raw}</code> : null}
-              </div>
-            ) : (
-              <div className="mt-3 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                No decoded LF source is saved yet. Scan a supported source to continue.
-              </div>
-            )}
-          </section>
-
-          <section className="overflow-hidden rounded-xl border">
+          <section className="min-w-0 overflow-hidden rounded-xl border">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-4 py-3">
               <div>
                 <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -110,31 +140,6 @@ export function GuidedClonePanel({
             </div>
             <LFWriteSection onCommand={onCommand} disabled={disabled || !newestSource} />
           </section>
-
-          {latestVerifiedWrite ? (
-            <section className="rounded-xl border p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <ShieldCheck
-                  className={`h-4 w-4 ${latestVerifiedWrite.verified ? "text-green-600" : "text-destructive"}`}
-                />
-                <h2 className="text-sm font-semibold">Latest guided result</h2>
-                <Badge variant={latestVerifiedWrite.verified ? "success" : "destructive"}>
-                  {latestVerifiedWrite.verified ? "verified" : "failed verification"}
-                </Badge>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {latestVerifiedWrite.summary ?? latestVerifiedWrite.status}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-3"
-                onClick={() => onOpenTab("library")}
-              >
-                Open audit report
-              </Button>
-            </section>
-          ) : null}
         </div>
       </CardContent>
     </Card>

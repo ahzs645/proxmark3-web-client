@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Key, Shuffle, Copy, Zap } from "lucide-react";
@@ -52,9 +52,7 @@ export function MagicUidSection({
   );
 
   return (
-    <div className="space-y-3 p-3">
-      <SectionLabel icon={<Key className="h-3 w-3" />}>Write UID / identity only</SectionLabel>
-
+    <PanelSection title="Write UID / identity only" icon={<Key className="h-3 w-3" />}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="space-y-2">
           <label className="text-[10px] text-muted-foreground">UID (4/7/10 bytes)</label>
@@ -164,6 +162,6 @@ export function MagicUidSection({
         <Zap className="h-4 w-4" />
         Write UID
       </Button>
-    </div>
+    </PanelSection>
   );
 }

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import { Input } from "@/components/ui/input";
 import { Target } from "lucide-react";
 import type { KeyType } from "../types";
@@ -18,9 +18,9 @@ export function TargetKeySection({
   onTargetKeyTypeChange,
 }: TargetKeySectionProps) {
   return (
-    <div className="space-y-3">
-      <SectionLabel icon={<Target className="h-3 w-3" />}>Target Key</SectionLabel>
-      <div className="grid grid-cols-2 gap-2">
+    <PanelSection title="Target Key" icon={<Target className="h-3 w-3" />}>
+      {/* Same column grid as the known key, so Block and Key Type line up. */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">Block</label>
           <Input
@@ -52,6 +52,6 @@ export function TargetKeySection({
           </div>
         </div>
       </div>
-    </div>
+    </PanelSection>
   );
 }

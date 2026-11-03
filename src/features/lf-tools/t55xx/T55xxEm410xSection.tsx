@@ -4,7 +4,7 @@ import { Copy, Download, Upload } from "lucide-react";
 import { CHIP_TYPES, CLOCK_RATES } from "../commands";
 import { copyText } from "../clipboard";
 import type { ChipType } from "../types";
-import { SectionLabel } from "../shared";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import { cn } from "@/lib/utils";
 
 interface T55xxEm410xSectionProps {
@@ -33,9 +33,7 @@ export function T55xxEm410xSection({
   disabled = false,
 }: T55xxEm410xSectionProps) {
   return (
-    <div className="p-3 space-y-3">
-      <SectionLabel icon={<Upload className="h-3 w-3" />}>EM410x Clone</SectionLabel>
-
+    <PanelSection title="EM410x Clone" icon={<Upload className="h-3 w-3" />}>
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={onRead} disabled={disabled} className="gap-1">
           <Download className="h-3 w-3" />
@@ -62,7 +60,7 @@ export function T55xxEm410xSection({
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Target:</span>
           <div className="flex overflow-hidden rounded-md border">
@@ -102,6 +100,6 @@ export function T55xxEm410xSection({
         <Upload className="h-4 w-4" />
         Clone to {CHIP_TYPES[chipType].label}
       </Button>
-    </div>
+    </PanelSection>
   );
 }

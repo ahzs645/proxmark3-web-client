@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { ChevronDown, Copy, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { KeyType, MagicCardType } from "../types";
@@ -60,10 +59,10 @@ export function MagicBlock0Section({
   onWriteBlock0,
 }: MagicBlock0SectionProps) {
   return (
-    <div className="border-t">
+    <section className="overflow-hidden rounded-xl border bg-card/40">
       <button
         onClick={onToggleBlock0Builder}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-secondary/30"
+        className="flex w-full items-center justify-between p-4 text-xs transition-colors hover:bg-secondary/30"
       >
         <div className="flex items-center gap-2">
           <Shield className="h-3 w-3 text-amber-500" />
@@ -75,7 +74,7 @@ export function MagicBlock0Section({
       </button>
 
       {showBlock0Builder ? (
-        <div className="space-y-3 bg-secondary/20 p-3">
+        <div className="space-y-3 border-t bg-secondary/20 p-4">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <div className="space-y-1">
               <label className="text-[10px] text-muted-foreground">UID (4 bytes)</label>
@@ -272,7 +271,6 @@ export function MagicBlock0Section({
           </Button>
         </div>
       ) : null}
-      <Separator />
-    </div>
+    </section>
   );
 }

@@ -157,7 +157,7 @@ export function MainPanelRouter({
   if (activeWorkspace === "guided") {
     panel = (
       <div className="flex-1 overflow-hidden p-4">
-        <div className="mx-auto h-full max-w-5xl">
+        <div className="h-full w-full">
           <GuidedClonePanel
             onCommand={onCommand}
             onOpenTab={onOpenTab}
@@ -186,7 +186,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "hex") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-4xl mx-auto">
+        <div className="h-full w-full">
           <HexAsciiViewer dumps={cachedAssets} activeDump={activeDump} />
         </div>
       </div>
@@ -194,7 +194,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "attacks") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-2xl mx-auto">
+        <div className="h-full w-full">
           <MifareAttacksPanel
             onCommand={onCommand}
             disabled={!canRunCommands}
@@ -209,7 +209,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "magic") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-2xl mx-auto">
+        <div className="h-full w-full">
           <MagicCardPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
@@ -217,7 +217,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "type2") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-6xl mx-auto">
+        <div className="h-full w-full">
           <Type2NdefPanel
             activeDump={activeDump}
             onDumpLoad={onDumpLoad}
@@ -229,7 +229,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "lfops") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-2xl mx-auto">
+        <div className="h-full w-full">
           <LFOperationsPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
@@ -237,7 +237,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "t55xx") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-2xl mx-auto">
+        <div className="h-full w-full">
           <T55xxPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
@@ -245,7 +245,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "traffic") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-4xl mx-auto">
+        <div className="h-full w-full">
           <TrafficCapturePanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
@@ -253,7 +253,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "library") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-5xl mx-auto">
+        <div className="h-full w-full">
           <LibraryPanel
             activeDump={activeDump}
             onDumpLoad={onDumpLoad}
@@ -267,7 +267,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "utilities") {
     panel = (
       <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-5xl mx-auto">
+        <div className="h-full w-full">
           <UtilitiesPanel />
         </div>
       </div>
@@ -275,7 +275,7 @@ export function MainPanelRouter({
   } else if (activeWorkspace === "device") {
     panel = (
       <div className="flex-1 overflow-hidden p-4">
-        <div className="mx-auto h-full max-w-4xl">
+        <div className="h-full w-full">
           <DeviceProfilePanel />
         </div>
       </div>

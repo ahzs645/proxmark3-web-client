@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Activity, Download, Radio, Search, Volume2 } from "lucide-react";
-import { SectionLabel } from "../shared";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 
 interface LFOperationsSectionProps {
   samples: string;
@@ -23,10 +23,9 @@ export function LFOperationsSection({
   disabled = false,
 }: LFOperationsSectionProps) {
   return (
-    <div className="p-3 space-y-3">
-      <SectionLabel icon={<Activity className="h-3 w-3" />}>Operations</SectionLabel>
-
-      <div className="grid grid-cols-2 gap-2">
+    <PanelSection title="Operations" icon={<Activity className="h-3 w-3" />}>
+      {/* Four across once there is room; two by two on a phone. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Button
           size="lg"
           onClick={onSearch}
@@ -87,6 +86,6 @@ export function LFOperationsSection({
           step={1000}
         />
       </div>
-    </div>
+    </PanelSection>
   );
 }

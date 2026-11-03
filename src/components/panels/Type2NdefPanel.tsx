@@ -458,118 +458,125 @@ export function Type2NdefPanel({ activeDump, onDumpLoad, disabled = false }: Typ
       />
       <CardContent className="min-h-0 flex-1 overflow-auto p-4">
         <Tabs defaultValue="editor">
-          <TabsList>
+          <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="editor">Editor</TabsTrigger>
             <TabsTrigger value="read">Decoded NDEF</TabsTrigger>
             <TabsTrigger value="report">Checks & report</TabsTrigger>
             <TabsTrigger value="history">Vault history</TabsTrigger>
           </TabsList>
-          <TabsContent value="editor" className="space-y-4">
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+          {/* Wide screens: the fields on the left, status and write actions in a
+              column beside them. Narrow screens keep the stacked order. */}
+          <TabsContent
+            value="editor"
+            className="space-y-4 xl:grid xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-start xl:gap-4 xl:space-y-0"
+          >
+            <div className="rounded-md border bg-muted/30 p-3 text-sm xl:col-start-2 xl:row-start-1">
               <div className="font-medium">{status}</div>
               {error ? <div className="mt-1 text-destructive">{error}</div> : null}
             </div>
-            <div className="space-y-2">
-              {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="grid gap-2 rounded-md border p-2 md:grid-cols-[4rem_9rem_1fr_auto_auto] md:items-center"
-                >
-                  <Badge variant="outline">{index + 1}</Badge>
-                  <Input
-                    value={field.name}
-                    onChange={(event) => updateField(field.id, { name: event.target.value })}
-                    aria-label="Field name"
-                  />
-                  <Input
-                    value={field.value}
-                    onChange={(event) => updateField(field.id, { value: event.target.value })}
-                    aria-label="Field value"
-                  />
-                  <label className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={field.writeName}
-                      disabled={field.kind === "uri"}
-                      onChange={(event) =>
-                        updateField(field.id, { writeName: event.target.checked })
-                      }
+            <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-span-2 xl:row-start-1">
+              <div className="space-y-2">
+                {fields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="grid gap-2 rounded-md border p-2 md:grid-cols-[4rem_9rem_1fr_auto_auto] md:items-center"
+                  >
+                    <Badge variant="outline">{index + 1}</Badge>
+                    <Input
+                      value={field.name}
+                      onChange={(event) => updateField(field.id, { name: event.target.value })}
+                      aria-label="Field name"
                     />
-                    Write name
-                  </label>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => moveField(index, -1)}
-                      disabled={index === 0}
-                    >
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => moveField(index, 1)}
-                      disabled={index === fields.length - 1}
-                    >
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() =>
-                        setFields((current) => current.filter((item) => item.id !== field.id))
-                      }
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <Input
+                      value={field.value}
+                      onChange={(event) => updateField(field.id, { value: event.target.value })}
+                      aria-label="Field value"
+                    />
+                    <label className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={field.writeName}
+                        disabled={field.kind === "uri"}
+                        onChange={(event) =>
+                          updateField(field.id, { writeName: event.target.checked })
+                        }
+                      />
+                      Write name
+                    </label>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => moveField(index, -1)}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => moveField(index, 1)}
+                        disabled={index === fields.length - 1}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          setFields((current) => current.filter((item) => item.id !== field.id))
+                        }
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setFields((current) => [
+                      ...current,
+                      {
+                        id: makeOperationId("field"),
+                        name: "Text",
+                        value: "",
+                        writeName: false,
+                        kind: "text",
+                      },
+                    ])
+                  }
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  Text field
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={fields.some((field) => field.kind === "uri")}
+                  onClick={() =>
+                    setFields((current) => [
+                      ...current,
+                      {
+                        id: makeOperationId("field"),
+                        name: "Link",
+                        value: "https://",
+                        writeName: false,
+                        kind: "uri",
+                      },
+                    ])
+                  }
+                >
+                  <Plus className="mr-1 h-3 w-3" />
+                  URI field
+                </Button>
+                <Badge variant={preview.error ? "destructive" : "secondary"}>
+                  {preview.error ?? `${preview.bytes} bytes · ${preview.remaining} remaining`}
+                </Badge>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setFields((current) => [
-                    ...current,
-                    {
-                      id: makeOperationId("field"),
-                      name: "Text",
-                      value: "",
-                      writeName: false,
-                      kind: "text",
-                    },
-                  ])
-                }
-              >
-                <Plus className="mr-1 h-3 w-3" />
-                Text field
-              </Button>
-              <Button
-                variant="outline"
-                disabled={fields.some((field) => field.kind === "uri")}
-                onClick={() =>
-                  setFields((current) => [
-                    ...current,
-                    {
-                      id: makeOperationId("field"),
-                      name: "Link",
-                      value: "https://",
-                      writeName: false,
-                      kind: "uri",
-                    },
-                  ])
-                }
-              >
-                <Plus className="mr-1 h-3 w-3" />
-                URI field
-              </Button>
-              <Badge variant={preview.error ? "destructive" : "secondary"}>
-                {preview.error ?? `${preview.bytes} bytes · ${preview.remaining} remaining`}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t pt-4">
+            <div className="flex flex-wrap gap-2 border-t pt-4 xl:col-start-2 xl:row-start-2 xl:flex-col xl:items-stretch xl:rounded-md xl:border xl:p-3">
               <Button
                 onClick={() => setPending("write")}
                 disabled={disabled || busy || Boolean(preview.error)}
@@ -597,7 +604,7 @@ export function Type2NdefPanel({ activeDump, onDumpLoad, disabled = false }: Typ
               </Button>
             </div>
           </TabsContent>
-          <TabsContent value="read" className="space-y-3">
+          <TabsContent value="read" className="grid items-start gap-3 xl:grid-cols-2">
             {decoded.length ? (
               decoded.map((record, index) => (
                 <div key={index} className="rounded-md border p-3">
@@ -611,7 +618,7 @@ export function Type2NdefPanel({ activeDump, onDumpLoad, disabled = false }: Typ
                 </div>
               ))
             ) : (
-              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground xl:col-span-2">
                 No decoded NDEF records are loaded.
               </div>
             )}
@@ -650,8 +657,11 @@ export function Type2NdefPanel({ activeDump, onDumpLoad, disabled = false }: Typ
               </div>
             )}
           </TabsContent>
-          <TabsContent value="history" className="space-y-4">
-            <div>
+          <TabsContent
+            value="history"
+            className="space-y-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-4 xl:space-y-0"
+          >
+            <div className="min-w-0">
               <h3 className="mb-2 text-sm font-medium">Recent reports</h3>
               {reports.slice(0, 10).map((item) => (
                 <button
@@ -669,7 +679,7 @@ export function Type2NdefPanel({ activeDump, onDumpLoad, disabled = false }: Typ
                 </button>
               ))}
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="mb-2 text-sm font-medium">Browser backups</h3>
               {backups.slice(0, 10).map((item) => (
                 <div

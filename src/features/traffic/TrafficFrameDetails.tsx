@@ -11,7 +11,9 @@ export function TrafficFrameDetails({ frame, onClose }: TrafficFrameDetailsProps
   if (!frame) return null;
 
   return (
-    <div className="border-t bg-secondary/20 p-3">
+    // Below the table on narrow screens; a side column beside it on wide ones,
+    // so selecting a frame no longer squeezes the table.
+    <div className="border-t bg-secondary/20 p-3 xl:w-80 xl:shrink-0 xl:overflow-y-auto xl:border-l xl:border-t-0">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs font-medium">Frame Details</label>
@@ -19,7 +21,7 @@ export function TrafficFrameDetails({ frame, onClose }: TrafficFrameDetailsProps
             ×
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4 xl:grid-cols-2">
           <div className="rounded bg-background p-2">
             <label className="block text-[10px] text-muted-foreground">Timestamp</label>
             <span className="font-mono">{formatTimestamp(frame.timestamp)}</span>

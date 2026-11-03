@@ -31,10 +31,12 @@ export function TrafficProtocolControls({
   hasFrames,
 }: TrafficProtocolControlsProps) {
   return (
-    <div className="bg-secondary/20 space-y-3 border-b p-3">
-      <div className="flex items-center gap-2">
+    // Protocol picker and actions share one row when there is room, and wrap
+    // onto two on narrow screens.
+    <div className="bg-secondary/20 flex flex-wrap items-center gap-x-6 gap-y-3 border-b p-3">
+      <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs text-muted-foreground">Protocol:</label>
-        <div className="flex overflow-hidden rounded-md border">
+        <div className="flex max-w-full overflow-x-auto rounded-md border">
           {(
             Object.entries(PROTOCOL_CONFIG) as [Protocol, (typeof PROTOCOL_CONFIG)[Protocol]][]
           ).map(([key, cfg]) => (
@@ -52,7 +54,7 @@ export function TrafficProtocolControls({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         {!isCapturing ? (
           <Button size="sm" onClick={onStartSniff} disabled={disabled} className="gap-1">
             <Play className="h-3 w-3" />

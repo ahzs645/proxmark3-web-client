@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
-import { Separator } from "@/components/ui/separator";
-import { CreditCard, Lock, Trash2, Unlock } from "lucide-react";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
+import { CreditCard, Lock, Trash2, Unlock, Wrench } from "lucide-react";
 import type { MagicCardType } from "../types";
 
 interface MagicQuickOperationsSectionProps {
@@ -22,8 +21,7 @@ export function MagicQuickOperationsSection({
   onLoadDump,
 }: MagicQuickOperationsSectionProps) {
   return (
-    <div className="space-y-3 p-3">
-      <SectionLabel>Quick Operations</SectionLabel>
+    <PanelSection title="Quick Operations" icon={<Wrench className="h-3 w-3" />}>
       <div className="grid grid-cols-2 gap-2">
         <Button
           size="sm"
@@ -66,7 +64,6 @@ export function MagicQuickOperationsSection({
           CLI cload
         </Button>
       </div>
-      <Separator />
-    </div>
+    </PanelSection>
   );
 }

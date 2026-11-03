@@ -166,7 +166,8 @@ export function VirtualCardsTab({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        // Two cards per row on wide screens; an expanded card grows in its own column.
+        <div className="grid items-start gap-3 xl:grid-cols-2">
           {cards.map((resolved) => {
             const { record, members } = resolved;
             const isOpen = expanded.has(record.id);

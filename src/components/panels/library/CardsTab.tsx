@@ -83,9 +83,10 @@ export function CardsTab({
         </Button>
       </div>
 
-      <div className="space-y-3">
+      {/* Two entries per row on wide screens. */}
+      <div className="grid items-start gap-3 xl:grid-cols-2">
         {filteredCards.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground xl:col-span-2">
             No cards yet. Add one manually to catalog a card you're analyzing, or save the current
             tag / active dump.
           </div>

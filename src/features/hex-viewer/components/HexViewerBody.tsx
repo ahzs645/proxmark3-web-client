@@ -19,7 +19,7 @@ export function HexViewerBody({
   showOffsetDecimal,
 }: HexViewerBodyProps) {
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="min-h-0 min-w-0 flex-1 overflow-auto">
       {parsed.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground">
           <Grid3X3 className="mb-2 h-8 w-8 opacity-50" />
@@ -27,7 +27,9 @@ export function HexViewerBody({
           <p className="mt-1 text-xs">Hover to highlight byte in both views</p>
         </div>
       ) : (
-        <div className="min-w-fit">
+        // w-fit keeps the byte grid at its natural width instead of stretching
+        // the hex column across a wide viewer; every row shares that width.
+        <div className="w-fit">
           <div className={getGridClass(viewMode)}>
             <span className="text-muted-foreground">Offset</span>
             <span>Hex</span>
@@ -38,7 +40,7 @@ export function HexViewerBody({
             <div
               key={row.offset}
               className={cn(
-                "grid border-b border-border/30 px-3 py-1 text-[11px] font-mono transition-colors hover:bg-secondary/20",
+                "grid gap-x-4 border-b border-border/30 px-3 py-1 text-[11px] font-mono transition-colors hover:bg-secondary/20",
                 viewMode === "32"
                   ? "grid-cols-[70px_1fr_260px]"
                   : viewMode === "8"

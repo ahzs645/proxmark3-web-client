@@ -2,7 +2,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PanelHeader } from "@/components/panels/shared/PanelHeader";
-import { KeyRound, Shield, Sparkles } from "lucide-react";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
+import { KeyRound, Play, Shield, Sparkles } from "lucide-react";
 import type { CachedAsset } from "./KeyCachePanel";
 import { useTarget } from "@/features/target/context";
 import { toAttackCardType } from "@/features/target/classify";
@@ -85,63 +86,69 @@ export function MifareAttacksPanel({
           onActiveAttackChange={attacks.setActiveAttack}
         />
 
-        <div className="space-y-4 p-3">
-          <AttackDescription config={attacks.config} />
+        {/* Wide screens: the attack's inputs on the left, the run controls
+            beside them. Phone width stacks the two columns in the same order. */}
+        <div className="grid items-start gap-4 p-3 xl:grid-cols-2">
+          <div className="min-w-0 space-y-4">
+            <AttackDescription config={attacks.config} />
 
-          {attacks.config.requiresKnownKey ? (
-            <KnownKeySection
-              knownBlock={attacks.knownBlock}
-              knownKeyType={attacks.knownKeyType}
-              knownKey={attacks.knownKey}
-              onKnownBlockChange={attacks.handleKnownBlockChange}
-              onKnownKeyTypeChange={attacks.setKnownKeyType}
-              onKnownKeyChange={attacks.handleKnownKeyChange}
-              defaultKeys={attacks.defaultKeys}
+            {attacks.config.requiresKnownKey ? (
+              <KnownKeySection
+                knownBlock={attacks.knownBlock}
+                knownKeyType={attacks.knownKeyType}
+                knownKey={attacks.knownKey}
+                onKnownBlockChange={attacks.handleKnownBlockChange}
+                onKnownKeyTypeChange={attacks.setKnownKeyType}
+                onKnownKeyChange={attacks.handleKnownKeyChange}
+                defaultKeys={attacks.defaultKeys}
+              />
+            ) : null}
+
+            {attacks.config.requiresTargetBlock ? (
+              <TargetKeySection
+                targetBlock={attacks.targetBlock}
+                targetKeyType={attacks.targetKeyType}
+                onTargetBlockChange={attacks.handleTargetBlockChange}
+                onTargetKeyTypeChange={attacks.setTargetKeyType}
+              />
+            ) : null}
+
+            {attacks.showKeyFileSection ? (
+              <KeyDictionarySection
+                keyFiles={attacks.keyFiles}
+                selectedKeyFile={attacks.selectedKeyFile}
+                onSelectedKeyFileChange={attacks.setSelectedKeyFile}
+                libraryKeyMode={libraryKeyMode}
+                matchingKeyCount={target.savedKeyCount}
+                libraryKeyCount={target.libraryKeyCount}
+                onLibraryKeyModeChange={onLibraryKeyModeChange}
+              />
+            ) : null}
+          </div>
+
+          {/* Run column: the command preview, the launch button, and any
+              per-attack warnings stay together beside the inputs. */}
+          <PanelSection title="Run Attack" icon={<Play className="h-3 w-3" />} className="min-w-0">
+            <AdvancedOptionsSection
+              activeAttack={attacks.activeAttack}
+              slowMode={attacks.slowMode}
+              showAdvanced={attacks.showAdvanced}
+              onToggleAdvanced={attacks.toggleAdvanced}
+              onSlowModeChange={attacks.setSlowMode}
+              buildCommand={attacks.buildCommand}
             />
-          ) : null}
 
-          {attacks.config.requiresTargetBlock ? (
-            <TargetKeySection
-              targetBlock={attacks.targetBlock}
-              targetKeyType={attacks.targetKeyType}
-              onTargetBlockChange={attacks.handleTargetBlockChange}
-              onTargetKeyTypeChange={attacks.setTargetKeyType}
-            />
-          ) : null}
-
-          {attacks.showKeyFileSection ? (
-            <KeyDictionarySection
-              keyFiles={attacks.keyFiles}
-              selectedKeyFile={attacks.selectedKeyFile}
-              onSelectedKeyFileChange={attacks.setSelectedKeyFile}
-              libraryKeyMode={libraryKeyMode}
-              matchingKeyCount={target.savedKeyCount}
-              libraryKeyCount={target.libraryKeyCount}
-              onLibraryKeyModeChange={onLibraryKeyModeChange}
-            />
-          ) : null}
-
-          <AdvancedOptionsSection
-            activeAttack={attacks.activeAttack}
-            slowMode={attacks.slowMode}
-            showAdvanced={attacks.showAdvanced}
-            onToggleAdvanced={attacks.toggleAdvanced}
-            onSlowModeChange={attacks.setSlowMode}
-            buildCommand={attacks.buildCommand}
-          />
-
-          <div className="flex items-center gap-2">
             <Button
               size="lg"
               onClick={() => onCommand(attacks.buildCommand())}
               disabled={disabled || !attacks.isValid}
-              className="flex-1 gap-2"
+              className="w-full gap-2"
             >
               Run {attacks.config.label}
             </Button>
-          </div>
 
-          <AttackWarnings activeAttack={attacks.activeAttack} />
+            <AttackWarnings activeAttack={attacks.activeAttack} />
+          </PanelSection>
         </div>
       </CardContent>
     </Card>

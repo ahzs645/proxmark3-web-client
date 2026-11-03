@@ -44,7 +44,7 @@ export function DeviceProfilePanel() {
         </Button>
       </CardHeader>
       <CardContent className="flex-1 space-y-5 overflow-auto p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Fact label="Model" value={profile.model ?? "Not observed"} />
           <Fact label="Hardware variant" value={profile.hardwareVariant} />
           <Fact label="Microcontroller" value={profile.microcontroller ?? "Not observed"} />
@@ -55,66 +55,69 @@ export function DeviceProfilePanel() {
           <Fact label="FPGA" value={profile.fpgaVersion ?? "Not observed"} mono />
         </div>
 
-        <section className="rounded-md border border-border/70 p-3">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium">
-            <FirmwareIcon className="h-4 w-4" />
-            Firmware compatibility
-            <Badge
-              variant={
-                profile.firmwareCompatible === true
-                  ? "success"
+        {/* Firmware health beside the feature list on wide screens. */}
+        <div className="grid items-start gap-5 xl:grid-cols-2">
+          <section className="min-w-0 rounded-md border border-border/70 p-3">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <FirmwareIcon className="h-4 w-4" />
+              Firmware compatibility
+              <Badge
+                variant={
+                  profile.firmwareCompatible === true
+                    ? "success"
+                    : profile.firmwareCompatible === false
+                      ? "destructive"
+                      : "outline"
+                }
+              >
+                {profile.firmwareCompatible === true
+                  ? "matched"
                   : profile.firmwareCompatible === false
-                    ? "destructive"
-                    : "outline"
-              }
-            >
-              {profile.firmwareCompatible === true
-                ? "matched"
-                : profile.firmwareCompatible === false
-                  ? "mismatch"
-                  : "unknown"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {profile.firmwareHealth.summary}. The probe is read-only and never assumes an unknown
-            component is healthy.
-          </p>
-          {profile.firmwareHealth.issues.length > 0 ? (
-            <div className="mt-3 space-y-2">
-              {profile.firmwareHealth.issues.map((finding) => (
+                    ? "mismatch"
+                    : "unknown"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {profile.firmwareHealth.summary}. The probe is read-only and never assumes an unknown
+              component is healthy.
+            </p>
+            {profile.firmwareHealth.issues.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {profile.firmwareHealth.issues.map((finding) => (
+                  <div
+                    key={finding.code}
+                    className={`rounded-md border p-2 text-xs ${finding.level === "critical" ? "border-destructive/40 bg-destructive/10" : "border-amber-500/40 bg-amber-500/10"}`}
+                  >
+                    <p className="flex items-center gap-1 font-medium">
+                      <AlertTriangle className="h-3 w-3" /> {finding.summary}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">{finding.action}</p>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      {finding.evidence}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          <section className="min-w-0 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Hardware features
+            </h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {Object.entries(profile.features).map(([name, value]) => (
                 <div
-                  key={finding.code}
-                  className={`rounded-md border p-2 text-xs ${finding.level === "critical" ? "border-destructive/40 bg-destructive/10" : "border-amber-500/40 bg-amber-500/10"}`}
+                  key={name}
+                  className="flex items-center justify-between rounded border px-3 py-2 text-xs"
                 >
-                  <p className="flex items-center gap-1 font-medium">
-                    <AlertTriangle className="h-3 w-3" /> {finding.summary}
-                  </p>
-                  <p className="mt-1 text-muted-foreground">{finding.action}</p>
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    {finding.evidence}
-                  </p>
+                  <span>{name.replace(/([A-Z])/g, " $1")}</span>
+                  <SupportBadge value={value} />
                 </div>
               ))}
             </div>
-          ) : null}
-        </section>
-
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Hardware features
-          </h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {Object.entries(profile.features).map(([name, value]) => (
-              <div
-                key={name}
-                className="flex items-center justify-between rounded border px-3 py-2 text-xs"
-              >
-                <span>{name.replace(/([A-Z])/g, " $1")}</span>
-                <SupportBadge value={value} />
-              </div>
-            ))}
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

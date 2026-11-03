@@ -58,9 +58,10 @@ export function LfCardsTab({ onCommand, onGuidedWrite }: LfCardsTabProps) {
         />
       </div>
 
-      <div className="space-y-3">
+      {/* Two entries per row on wide screens. */}
+      <div className="grid items-start gap-3 xl:grid-cols-2">
         {filtered.length === 0 ? (
-          <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground xl:col-span-2">
             No LF cards yet. Run <code>lf search</code> or <code>lf hid reader</code> with a card on
             the LF antenna and it will be saved here automatically.
           </div>

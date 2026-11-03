@@ -27,7 +27,7 @@ export function HexViewerHeader({
 }: HexViewerHeaderProps) {
   return (
     <CardHeader className="border-b pb-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2 text-sm">
           <FileCode2 className="h-4 w-4 text-primary" />
           Hex/ASCII Viewer

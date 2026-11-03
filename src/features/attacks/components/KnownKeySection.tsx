@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import { Input } from "@/components/ui/input";
 import { Key } from "lucide-react";
 import type { KeyType } from "../types";
@@ -24,8 +24,7 @@ export function KnownKeySection({
   defaultKeys,
 }: KnownKeySectionProps) {
   return (
-    <div className="space-y-3">
-      <SectionLabel icon={<Key className="h-3 w-3" />}>Known Key (Source)</SectionLabel>
+    <PanelSection title="Known Key (Source)" icon={<Key className="h-3 w-3" />}>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="space-y-1">
           <label className="text-[10px] text-muted-foreground">Block</label>
@@ -82,6 +81,6 @@ export function KnownKeySection({
           </Button>
         ))}
       </div>
-    </div>
+    </PanelSection>
   );
 }

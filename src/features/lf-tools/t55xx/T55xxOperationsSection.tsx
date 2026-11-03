@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Key, Trash2, Search, Download, RefreshCw } from "lucide-react";
 import { DEFAULT_PASSWORDS } from "../commands";
-import { SectionLabel } from "../shared";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 
 interface T55xxOperationsSectionProps {
   password: string;
@@ -30,9 +30,7 @@ export function T55xxOperationsSection({
   disabled = false,
 }: T55xxOperationsSectionProps) {
   return (
-    <div className="p-3 space-y-3">
-      <SectionLabel icon={<Key className="h-3 w-3" />}>T55xx Operations</SectionLabel>
-
+    <PanelSection title="T55xx Operations" icon={<Key className="h-3 w-3" />}>
       <div className="flex items-center gap-2">
         <label className="flex items-center gap-2 text-xs cursor-pointer">
           <input
@@ -80,7 +78,7 @@ export function T55xxOperationsSection({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Button
           size="sm"
           variant="outline"
@@ -110,6 +108,6 @@ export function T55xxOperationsSection({
           Info
         </Button>
       </div>
-    </div>
+    </PanelSection>
   );
 }

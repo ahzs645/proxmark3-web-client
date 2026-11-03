@@ -284,8 +284,8 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
     <Card className="flex h-full flex-col overflow-hidden">
       <MagicHeader disabled={disabled} onDetect={handleDetect} />
       <CardContent className="flex-1 overflow-auto p-0">
-        {detectedMagic && (
-          <div className="px-3 pt-3">
+        <div className="space-y-4 p-4">
+          {detectedMagic && (
             <div
               className={cn(
                 "rounded-md border p-2 text-xs",
@@ -300,9 +300,8 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
                     detectedMagic.label ? ` (${detectedMagic.label})` : ""
                   }. Writing a UID needs a magic card.`}
             </div>
-          </div>
-        )}
-        <div className="px-3 pt-3">
+          )}
+
           <div className="rounded-md border border-border/70 bg-muted/20 p-3 text-xs">
             <p className="font-medium text-foreground">What do you want to write?</p>
             <ul className="mt-1.5 space-y-1 text-muted-foreground">
@@ -327,90 +326,108 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
               </li>
             </ul>
           </div>
+
+          {/* The whole-card pipeline spans the full width; its own steps already
+              lay out across the row. */}
+          {target.dump ? (
+            <MagicRestorePipeline activeDump={target.dump} disabled={disabled} />
+          ) : null}
+
+          {/* Wide screens: the four control groups sit two to a row, keeping the
+              existing top-to-bottom order; phone width stacks them. */}
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <MagicCardTypeSection
+              cardType={cardType}
+              onCardTypeChange={setCardType}
+              typeConfig={typeConfig}
+            />
+
+            <div className="min-w-0 space-y-2">
+              <MagicUidSection
+                disabled={disabled || uidWriteBusy}
+                cardType={cardType}
+                uid={uid}
+                uidValidation={uidValidation}
+                onUidChange={handleUidChange}
+                onRandomUid={handleRandomUid}
+                onCopyUid={copyToClipboard}
+                atqa={atqa}
+                onAtqaChange={setAtqa}
+                sak={sak}
+                onSakChange={setSak}
+                gen4Password={gen4Password}
+                onGen4PasswordChange={setGen4Password}
+                onWriteUid={() => void handleSetUid()}
+              />
+              {uidWriteStatus ? (
+                <div
+                  className={`rounded-md border p-2 text-xs ${
+                    uidWritePassed === true
+                      ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300"
+                      : uidWritePassed === false
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "border-border bg-muted/30 text-muted-foreground"
+                  }`}
+                >
+                  {uidWriteStatus}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="min-w-0 space-y-2">
+              <MagicBlock0Section
+                disabled={disabled || blockWriteBusy}
+                cardType={cardType}
+                showBlock0Builder={showBlock0Builder}
+                onToggleBlock0Builder={() => setShowBlock0Builder((prev) => !prev)}
+                block0Uid={block0Uid}
+                onBlock0UidChange={setBlock0Uid}
+                block0Bcc={block0Bcc}
+                onBlock0BccChange={setBlock0Bcc}
+                calculatedBcc={calculatedBcc}
+                block0Sak={block0Sak}
+                onBlock0SakChange={setBlock0Sak}
+                block0Atqa={block0Atqa}
+                onBlock0AtqaChange={setBlock0Atqa}
+                block0Manufacturer={block0Manufacturer}
+                onBlock0ManufacturerChange={setBlock0Manufacturer}
+                block0Preview={block0Preview}
+                authKey={authKey}
+                onAuthKeyChange={setAuthKey}
+                authKeyType={authKeyType}
+                onAuthKeyTypeChange={setAuthKeyType}
+                gen4Password={gen4Password}
+                onGen4PasswordChange={setGen4Password}
+                onCopyBlock0Preview={copyToClipboard}
+                onWriteBlock0={() => void handleWriteBlock0()}
+              />
+              {blockWriteStatus ? (
+                <div
+                  className={`rounded-md border p-2 text-xs ${
+                    blockWritePassed === true
+                      ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300"
+                      : blockWritePassed === false
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "border-border bg-muted/30 text-muted-foreground"
+                  }`}
+                >
+                  {blockWriteStatus}
+                </div>
+              ) : null}
+            </div>
+
+            <MagicQuickOperationsSection
+              disabled={disabled}
+              cardType={cardType}
+              onUnlock={handleUnlock}
+              onViewCard={handleViewCard}
+              onWipe={handleWipe}
+              onLoadDump={handleLoadDump}
+            />
+          </div>
+
+          <MagicWarningSection />
         </div>
-        {target.dump ? <MagicRestorePipeline activeDump={target.dump} disabled={disabled} /> : null}
-        <MagicCardTypeSection
-          cardType={cardType}
-          onCardTypeChange={setCardType}
-          typeConfig={typeConfig}
-        />
-        <MagicUidSection
-          disabled={disabled || uidWriteBusy}
-          cardType={cardType}
-          uid={uid}
-          uidValidation={uidValidation}
-          onUidChange={handleUidChange}
-          onRandomUid={handleRandomUid}
-          onCopyUid={copyToClipboard}
-          atqa={atqa}
-          onAtqaChange={setAtqa}
-          sak={sak}
-          onSakChange={setSak}
-          gen4Password={gen4Password}
-          onGen4PasswordChange={setGen4Password}
-          onWriteUid={() => void handleSetUid()}
-        />
-        {uidWriteStatus ? (
-          <div
-            className={`mx-3 mb-3 rounded-md border p-2 text-xs ${
-              uidWritePassed === true
-                ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300"
-                : uidWritePassed === false
-                  ? "border-destructive/40 bg-destructive/10 text-destructive"
-                  : "border-border bg-muted/30 text-muted-foreground"
-            }`}
-          >
-            {uidWriteStatus}
-          </div>
-        ) : null}
-        <MagicBlock0Section
-          disabled={disabled || blockWriteBusy}
-          cardType={cardType}
-          showBlock0Builder={showBlock0Builder}
-          onToggleBlock0Builder={() => setShowBlock0Builder((prev) => !prev)}
-          block0Uid={block0Uid}
-          onBlock0UidChange={setBlock0Uid}
-          block0Bcc={block0Bcc}
-          onBlock0BccChange={setBlock0Bcc}
-          calculatedBcc={calculatedBcc}
-          block0Sak={block0Sak}
-          onBlock0SakChange={setBlock0Sak}
-          block0Atqa={block0Atqa}
-          onBlock0AtqaChange={setBlock0Atqa}
-          block0Manufacturer={block0Manufacturer}
-          onBlock0ManufacturerChange={setBlock0Manufacturer}
-          block0Preview={block0Preview}
-          authKey={authKey}
-          onAuthKeyChange={setAuthKey}
-          authKeyType={authKeyType}
-          onAuthKeyTypeChange={setAuthKeyType}
-          gen4Password={gen4Password}
-          onGen4PasswordChange={setGen4Password}
-          onCopyBlock0Preview={copyToClipboard}
-          onWriteBlock0={() => void handleWriteBlock0()}
-        />
-        {blockWriteStatus ? (
-          <div
-            className={`mx-3 mb-3 rounded-md border p-2 text-xs ${
-              blockWritePassed === true
-                ? "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300"
-                : blockWritePassed === false
-                  ? "border-destructive/40 bg-destructive/10 text-destructive"
-                  : "border-border bg-muted/30 text-muted-foreground"
-            }`}
-          >
-            {blockWriteStatus}
-          </div>
-        ) : null}
-        <MagicQuickOperationsSection
-          disabled={disabled}
-          cardType={cardType}
-          onUnlock={handleUnlock}
-          onViewCard={handleViewCard}
-          onWipe={handleWipe}
-          onLoadDump={handleLoadDump}
-        />
-        <MagicWarningSection />
       </CardContent>
       <ConfirmDialog
         open={confirmWipeOpen}

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 
 interface T55xxQuickCommandsSectionProps {
   onCommand: (cmd: string) => void;
@@ -11,8 +11,7 @@ export function T55xxQuickCommandsSection({
   disabled = false,
 }: T55xxQuickCommandsSectionProps) {
   return (
-    <div className="p-3 space-y-2">
-      <SectionLabel>Quick Commands</SectionLabel>
+    <PanelSection title="Quick Commands" className="space-y-3">
       <div className="flex flex-wrap gap-1">
         <Button
           size="sm"
@@ -51,6 +50,6 @@ export function T55xxQuickCommandsSection({
           LF Search
         </Button>
       </div>
-    </div>
+    </PanelSection>
   );
 }

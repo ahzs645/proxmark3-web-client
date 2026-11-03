@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Activity } from "lucide-react";
 import { FREQUENCY_PRESETS, clampDivisor } from "../commands";
-import { SectionLabel } from "../shared";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import type { LFConfig } from "../types";
 
 interface LFFrequencySectionProps {
@@ -19,24 +19,21 @@ export function LFFrequencySection({
   onFrequencyPreset,
 }: LFFrequencySectionProps) {
   return (
-    <div className="bg-secondary/20 border-b p-3 space-y-3">
-      <div className="flex items-center justify-between">
-        <SectionLabel icon={<Activity className="h-3 w-3" />}>Frequency</SectionLabel>
-        <div className="flex gap-1">
-          {FREQUENCY_PRESETS.map((preset) => (
-            <Button
-              key={preset.label}
-              size="sm"
-              variant={config.divisor === preset.divisor ? "default" : "outline"}
-              onClick={() => onFrequencyPreset(preset.divisor)}
-              className="h-6 px-2 text-[10px]"
-            >
-              {preset.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-
+    <PanelSection
+      title="Frequency"
+      icon={<Activity className="h-3 w-3" />}
+      actions={FREQUENCY_PRESETS.map((preset) => (
+        <Button
+          key={preset.label}
+          size="sm"
+          variant={config.divisor === preset.divisor ? "default" : "outline"}
+          onClick={() => onFrequencyPreset(preset.divisor)}
+          className="h-6 px-2 text-[10px]"
+        >
+          {preset.label}
+        </Button>
+      ))}
+    >
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Divisor</span>
@@ -67,6 +64,6 @@ export function LFFrequencySection({
         />
         <span className="text-xs text-muted-foreground">= {frequency.toFixed(3)} kHz</span>
       </div>
-    </div>
+    </PanelSection>
   );
 }

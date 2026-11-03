@@ -106,113 +106,116 @@ export function KeysTab({
           dictionary, or add one by hand.
         </div>
       ) : (
-        keyGroups.map((group) => {
-          const kind = KIND_BADGE[group.kind];
-          const GroupIcon = group.kind === "common" ? Globe : KeyRound;
+        // Two groups per row on wide screens.
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          {keyGroups.map((group) => {
+            const kind = KIND_BADGE[group.kind];
+            const GroupIcon = group.kind === "common" ? Globe : KeyRound;
 
-          return (
-            <section key={group.id} className="rounded-xl border bg-card/40">
-              <header className="flex flex-wrap items-center gap-2 border-b border-border/60 p-3">
-                <GroupIcon className="h-4 w-4 shrink-0 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate text-sm font-semibold">{group.title}</h3>
-                    <Badge variant={kind.variant}>{kind.label}</Badge>
-                    <Badge variant="outline">
-                      {group.keys.length} key{group.keys.length === 1 ? "" : "s"}
-                    </Badge>
+            return (
+              <section key={group.id} className="rounded-xl border bg-card/40">
+                <header className="flex flex-wrap items-center gap-2 border-b border-border/60 p-3">
+                  <GroupIcon className="h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold">{group.title}</h3>
+                      <Badge variant={kind.variant}>{kind.label}</Badge>
+                      <Badge variant="outline">
+                        {group.keys.length} key{group.keys.length === 1 ? "" : "s"}
+                      </Badge>
+                    </div>
+                    {group.subtitle ? (
+                      <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                        {group.subtitle}
+                      </p>
+                    ) : null}
                   </div>
-                  {group.subtitle ? (
-                    <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-                      {group.subtitle}
-                    </p>
-                  ) : null}
-                </div>
 
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {group.sourceDumpId ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1"
-                      onClick={() => onOpenDump(group.sourceDumpId as string)}
-                      title="Load this session's dump as the active card"
-                    >
-                      <FolderOpen className="h-3 w-3" />
-                      Open dump
-                    </Button>
-                  ) : null}
-                  {group.uid ? (
-                    <Button
-                      size="sm"
-                      className="h-7 gap-1"
-                      onClick={() => onWriteCard(group)}
-                      title="Clone / write this card using these keys"
-                    >
-                      <Upload className="h-3 w-3" />
-                      Write card
-                    </Button>
-                  ) : null}
-                </div>
-              </header>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {group.sourceDumpId ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1"
+                        onClick={() => onOpenDump(group.sourceDumpId as string)}
+                        title="Load this session's dump as the active card"
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        Open dump
+                      </Button>
+                    ) : null}
+                    {group.uid ? (
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1"
+                        onClick={() => onWriteCard(group)}
+                        title="Clone / write this card using these keys"
+                      >
+                        <Upload className="h-3 w-3" />
+                        Write card
+                      </Button>
+                    ) : null}
+                  </div>
+                </header>
 
-              <ul className="divide-y divide-border/50">
-                {group.keys.map((key) => (
-                  <li key={key.id} className="flex items-center gap-3 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <code className="font-mono text-sm text-foreground">{key.value}</code>
-                        {keyKindBadge(key.kind)}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                        <span className="truncate">{key.label || "Key"}</span>
-                        {group.kind === "common" && key.uidFilter ? (
+                <ul className="divide-y divide-border/50">
+                  {group.keys.map((key) => (
+                    <li key={key.id} className="flex items-center gap-3 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <code className="font-mono text-sm text-foreground">{key.value}</code>
+                          {keyKindBadge(key.kind)}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                          <span className="truncate">{key.label || "Key"}</span>
+                          {group.kind === "common" && key.uidFilter ? (
+                            <span className="flex items-center gap-1">
+                              <Layers className="h-3 w-3" />
+                              {key.uidFilter}
+                            </span>
+                          ) : null}
                           <span className="flex items-center gap-1">
-                            <Layers className="h-3 w-3" />
-                            {key.uidFilter}
+                            <Clock className="h-3 w-3" />
+                            {relativeTime(key.updatedAt)}
                           </span>
-                        ) : null}
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {relativeTime(key.updatedAt)}
-                        </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() => copyText(key.value)}
-                        title="Copy key"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() => onOpenKeyEditor(key)}
-                        title="Edit key"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
-                        onClick={() => onDeleteKey(key.id)}
-                        aria-label="Delete key"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => copyText(key.value)}
+                          title="Copy key"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => onOpenKeyEditor(key)}
+                          title="Edit key"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
+                          onClick={() => onDeleteKey(key.id)}
+                          aria-label="Delete key"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );

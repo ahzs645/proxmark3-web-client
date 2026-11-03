@@ -43,7 +43,7 @@ export function isPrintable(byte: number): boolean {
 
 export function getGridClass(viewMode: "16" | "32" | "8") {
   return cn(
-    "grid bg-secondary/50 px-3 py-2 text-[10px] font-semibold sticky top-0 border-b",
+    "grid gap-x-4 bg-secondary/50 px-3 py-2 text-[10px] font-semibold sticky top-0 border-b",
     viewMode === "32"
       ? "grid-cols-[70px_1fr_260px]"
       : viewMode === "8"

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { T55xxPanelHeader } from "@/features/lf-tools/t55xx/T55xxPanelHeader";
@@ -68,46 +67,51 @@ export function T55xxPanel({ onCommand, disabled = false }: T55xxPanelProps) {
     <Card className="flex flex-col h-full overflow-hidden">
       <T55xxPanelHeader disabled={disabled} onDetect={handleDetect} />
       <CardContent className="flex-1 overflow-auto p-0">
-        <LFWriteSection onCommand={onCommand} disabled={disabled} />
-        <Separator />
-        <T55xxEm410xSection
-          emId={emId}
-          chipType={chipType}
-          clockRate={clockRate}
-          isEmIdValid={isEmIdValid}
-          onEmIdChange={setEmIdFromInput}
-          onChipTypeChange={setChipType}
-          onClockRateChange={setClockRate}
-          onRead={handleReadEM410x}
-          onClone={handleCloneEM410x}
-          disabled={disabled}
-        />
-        <Separator />
-        <T55xxOperationsSection
-          password={password}
-          usePassword={usePassword}
-          onPasswordChange={setPasswordFromInput}
-          onUsePasswordChange={setUsePassword}
-          onDetect={handleDetect}
-          onDump={handleDump}
-          onWipe={handleWipe}
-          onInfo={handleInfo}
-          onTryPasswords={handleTryPasswords}
-          disabled={disabled}
-        />
-        <Separator />
-        <T55xxAdvancedSection
-          blockNumber={blockNumber}
-          blockData={blockData}
-          onBlockNumberChange={setBlockNumber}
-          onBlockDataChange={setBlockDataFromInput}
-          onReadBlock={handleReadBlock}
-          onWriteBlock={handleWriteBlock}
-          disabled={disabled}
-        />
-        <Separator />
-        <T55xxQuickCommandsSection onCommand={onCommand} disabled={disabled} />
-        <T55xxWarningSection />
+        {/* Wide screens: the step-by-step clone flow in its own column, with the
+            EM410x shortcut and the raw T55xx tools beside it. */}
+        <div className="grid items-start gap-4 p-4 xl:grid-cols-2">
+          {/* p-1 plus the section's own p-3 matches the PanelSection padding. */}
+          <div className="min-w-0 rounded-xl border bg-card/40 p-1">
+            <LFWriteSection onCommand={onCommand} disabled={disabled} />
+          </div>
+          <div className="min-w-0 space-y-4">
+            <T55xxEm410xSection
+              emId={emId}
+              chipType={chipType}
+              clockRate={clockRate}
+              isEmIdValid={isEmIdValid}
+              onEmIdChange={setEmIdFromInput}
+              onChipTypeChange={setChipType}
+              onClockRateChange={setClockRate}
+              onRead={handleReadEM410x}
+              onClone={handleCloneEM410x}
+              disabled={disabled}
+            />
+            <T55xxOperationsSection
+              password={password}
+              usePassword={usePassword}
+              onPasswordChange={setPasswordFromInput}
+              onUsePasswordChange={setUsePassword}
+              onDetect={handleDetect}
+              onDump={handleDump}
+              onWipe={handleWipe}
+              onInfo={handleInfo}
+              onTryPasswords={handleTryPasswords}
+              disabled={disabled}
+            />
+            <T55xxAdvancedSection
+              blockNumber={blockNumber}
+              blockData={blockData}
+              onBlockNumberChange={setBlockNumber}
+              onBlockDataChange={setBlockDataFromInput}
+              onReadBlock={handleReadBlock}
+              onWriteBlock={handleWriteBlock}
+              disabled={disabled}
+            />
+            <T55xxQuickCommandsSection onCommand={onCommand} disabled={disabled} />
+            <T55xxWarningSection />
+          </div>
+        </div>
       </CardContent>
       <ConfirmDialog
         open={confirmWipeOpen}

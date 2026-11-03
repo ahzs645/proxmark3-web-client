@@ -83,20 +83,22 @@ export function TrafficCapturePanel({ onCommand, disabled = false }: TrafficCapt
           onToggleAnnotations={() => setShowAnnotations(!showAnnotations)}
         />
 
-        <div className="flex-1 overflow-auto">
-          <TrafficFrameTable
-            frames={filteredFrames}
-            protocol={protocol}
-            showAnnotations={showAnnotations}
-            selectedFrame={selectedFrame}
-            onSelectFrame={setSelectedFrame}
+        <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+            <TrafficFrameTable
+              frames={filteredFrames}
+              protocol={protocol}
+              showAnnotations={showAnnotations}
+              selectedFrame={selectedFrame}
+              onSelectFrame={setSelectedFrame}
+            />
+          </div>
+
+          <TrafficFrameDetails
+            frame={frames.find((f) => f.id === selectedFrame) ?? null}
+            onClose={() => setSelectedFrame(null)}
           />
         </div>
-
-        <TrafficFrameDetails
-          frame={frames.find((f) => f.id === selectedFrame) ?? null}
-          onClose={() => setSelectedFrame(null)}
-        />
       </CardContent>
     </Card>
   );

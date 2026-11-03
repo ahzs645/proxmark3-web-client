@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 import { FileKey } from "lucide-react";
 import type { CachedAsset } from "@/components/panels/KeyCachePanel";
 import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
@@ -24,8 +24,7 @@ export function KeyDictionarySection({
   onLibraryKeyModeChange,
 }: KeyDictionarySectionProps) {
   return (
-    <div className="space-y-2">
-      <SectionLabel icon={<FileKey className="h-3 w-3" />}>Key Dictionary (Optional)</SectionLabel>
+    <PanelSection title="Key Dictionary (Optional)" icon={<FileKey className="h-3 w-3" />}>
       <div className="flex flex-wrap gap-1">
         <Button
           size="sm"
@@ -80,6 +79,6 @@ export function KeyDictionarySection({
           );
         })}
       </div>
-    </div>
+    </PanelSection>
   );
 }

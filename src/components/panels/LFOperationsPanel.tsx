@@ -1,5 +1,4 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { LFPanelHeader } from "@/features/lf-tools/lf/LFPanelHeader";
 import { LFFrequencySection } from "@/features/lf-tools/lf/LFFrequencySection";
 import { LFOperationsSection } from "@/features/lf-tools/lf/LFOperationsSection";
@@ -48,32 +47,42 @@ export function LFOperationsPanel({ onCommand, disabled = false }: LFOperationsP
     <Card className="flex flex-col h-full overflow-hidden">
       <LFPanelHeader frequency={frequency} />
       <CardContent className="flex-1 overflow-auto p-0">
-        <LFFrequencySection
-          config={config}
-          frequency={frequency}
-          onDivisorChange={setDivisor}
-          onFrequencyPreset={setDivisor}
-        />
-        <LFOperationsSection
-          samples={samples}
-          onSamplesChange={setSamples}
-          onSearch={handleSearch}
-          onTune={handleTune}
-          onRead={handleRead}
-          onSniff={handleSniff}
-          disabled={disabled}
-        />
-        <Separator />
-        <LFAdvancedSection
-          config={config}
-          onConfigChange={setConfigValue}
-          onGetConfig={handleGetConfig}
-          onSetConfig={handleSetConfig}
-          onResetConfig={handleResetConfig}
-          disabled={disabled}
-        />
-        <Separator />
-        <LFQuickCommandsSection onCommand={onCommand} disabled={disabled} />
+        {/* Two columns on wide screens: frequency beside the capture buttons,
+            then configuration beside the shortcuts. One column on a phone. */}
+        <div className="grid items-start gap-4 p-4 xl:grid-cols-2">
+          <div className="min-w-0">
+            <LFFrequencySection
+              config={config}
+              frequency={frequency}
+              onDivisorChange={setDivisor}
+              onFrequencyPreset={setDivisor}
+            />
+          </div>
+          <div className="min-w-0">
+            <LFOperationsSection
+              samples={samples}
+              onSamplesChange={setSamples}
+              onSearch={handleSearch}
+              onTune={handleTune}
+              onRead={handleRead}
+              onSniff={handleSniff}
+              disabled={disabled}
+            />
+          </div>
+          <div className="min-w-0">
+            <LFAdvancedSection
+              config={config}
+              onConfigChange={setConfigValue}
+              onGetConfig={handleGetConfig}
+              onSetConfig={handleSetConfig}
+              onResetConfig={handleResetConfig}
+              disabled={disabled}
+            />
+          </div>
+          <div className="min-w-0">
+            <LFQuickCommandsSection onCommand={onCommand} disabled={disabled} />
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

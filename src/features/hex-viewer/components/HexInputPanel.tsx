@@ -20,12 +20,14 @@ export function HexInputPanel({
   activeDump,
 }: HexInputPanelProps) {
   return (
-    <div className="space-y-2 border-b p-3">
+    // A column beside the byte grid on wide screens, with the textarea taking
+    // its full height; above the grid on narrow ones.
+    <div className="space-y-2 border-b p-3 xl:flex xl:w-80 xl:shrink-0 xl:flex-col xl:border-b-0 xl:border-r">
       <textarea
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
         placeholder="Paste hex dump here (e.g., 3DD6CCC2E5088400...)&#10;&#10;Or load from a cached dump below"
-        className="min-h-[80px] w-full resize-none rounded-md border border-border bg-secondary/30 p-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+        className="min-h-[80px] w-full resize-none xl:flex-1 rounded-md border border-border bg-secondary/30 p-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-primary"
       />
       {activeDump || dumps.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">

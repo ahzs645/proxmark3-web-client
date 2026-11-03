@@ -81,21 +81,23 @@ export function HexAsciiViewer({ dumps, activeDump }: HexAsciiViewerProps) {
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <HexInputPanel
-          dumps={dumpChoices}
-          input={input}
-          onInputChange={setInput}
-          onLoadDump={loadFromCache}
-          activeDump={activeDumpSource}
-        />
+        <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
+          <HexInputPanel
+            dumps={dumpChoices}
+            input={input}
+            onInputChange={setInput}
+            onLoadDump={loadFromCache}
+            activeDump={activeDumpSource}
+          />
 
-        <HexViewerBody
-          parsed={parsed}
-          viewMode={viewMode}
-          hoverIndex={hoverIndex}
-          onHoverIndexChange={setHoverIndex}
-          showOffsetDecimal={showOffsetDecimal}
-        />
+          <HexViewerBody
+            parsed={parsed}
+            viewMode={viewMode}
+            hoverIndex={hoverIndex}
+            onHoverIndexChange={setHoverIndex}
+            showOffsetDecimal={showOffsetDecimal}
+          />
+        </div>
 
         <HexStatsBar totalBytes={totalBytes} rowCount={parsed.length} />
       </div>
