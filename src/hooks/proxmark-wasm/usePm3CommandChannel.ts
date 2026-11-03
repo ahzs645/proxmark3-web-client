@@ -28,6 +28,7 @@ interface UsePm3CommandChannelParams {
   isReady: boolean;
   isReadyRef: MutableRefObject<boolean>;
   onErrorRef: MutableRefObject<((error: Error) => void) | undefined>;
+  onDeviceLostRef: MutableRefObject<(() => void) | undefined>;
   setActiveTransportType: Dispatch<SetStateAction<TransportType | null>>;
   setIsDeviceConnected: Dispatch<SetStateAction<boolean>>;
   setIsClientAttached: Dispatch<SetStateAction<boolean>>;
@@ -39,6 +40,7 @@ export function usePm3CommandChannel({
   isReady,
   isReadyRef,
   onErrorRef,
+  onDeviceLostRef,
   setActiveTransportType,
   setIsDeviceConnected,
   setIsClientAttached,
@@ -55,12 +57,13 @@ export function usePm3CommandChannel({
         setIsDeviceConnected(true);
         setActiveTransportType(transportManager.activeTransportType);
       },
-      onDisconnect: () => {
+      onDisconnect: (reason) => {
         pendingDevicePathRef.current = null;
         setIsDeviceConnected(false);
         setIsClientAttached(false);
         setIsAttaching(false);
         setActiveTransportType(null);
+        if (reason === "lost") onDeviceLostRef.current?.();
       },
       onError: (err) => {
         console.error("Transport error:", err);
@@ -68,6 +71,7 @@ export function usePm3CommandChannel({
       },
     });
   }, [
+    onDeviceLostRef,
     onErrorRef,
     setActiveTransportType,
     setIsAttaching,

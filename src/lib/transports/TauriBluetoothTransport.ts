@@ -168,7 +168,7 @@ export class TauriBluetoothTransport implements Transport {
           if (!connected) {
             this._isConnected = false;
             this.readLoopRunning = false;
-            this.eventHandlers.onDisconnect?.();
+            this.eventHandlers.onDisconnect?.("lost");
             break;
           }
         } catch {

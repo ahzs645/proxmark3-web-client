@@ -22,6 +22,14 @@ async function settleDisconnectStep(operation: Promise<unknown>): Promise<void> 
   }
 }
 
+/** Read errors after which the port stays open and can be read again (WebSerial spec). */
+const NON_FATAL_READ_ERRORS = new Set([
+  "BufferOverrunError",
+  "BreakError",
+  "FramingError",
+  "ParityError",
+]);
+
 export class WebSerialTransport implements Transport {
   readonly type: TransportType = "webserial";
 
@@ -41,6 +49,7 @@ export class WebSerialTransport implements Transport {
       // read loop can move them into the WASM ring buffer.
       await port.open({ baudRate: 115200, bufferSize: 64 * 1024 });
       this.device = port;
+      port.addEventListener("disconnect", this.onPortLost);
       return true;
     } catch {
       return false;
@@ -147,7 +156,18 @@ export class WebSerialTransport implements Transport {
     }
   }
 
-  async disconnect(): Promise<void> {
+  /**
+   * The port vanished (cable pulled, reader reset). Chrome fires `disconnect`
+   * on the port and fails the pending read; either one lands here. Without it
+   * the transport kept reporting a live link the client could no longer reach.
+   */
+  private readonly onPortLost = () => {
+    if (!this._isConnected) return;
+    console.warn("[WebSerial] serial port lost");
+    void this.disconnect("lost");
+  };
+
+  async disconnect(reason?: "lost"): Promise<void> {
     this.stopReadLoop();
     this.stopTxLoop();
     this._isConnected = false;
@@ -178,11 +198,12 @@ export class WebSerialTransport implements Transport {
     }
 
     if (this.device) {
+      this.device.removeEventListener("disconnect", this.onPortLost);
       await settleDisconnectStep(this.device.close());
       this.device = null;
     }
 
-    this.eventHandlers.onDisconnect?.();
+    this.eventHandlers.onDisconnect?.(reason);
   }
 
   startReadLoop(): void {
@@ -197,13 +218,18 @@ export class WebSerialTransport implements Transport {
 
   private async runReadLoop(): Promise<void> {
     if (!this.device || !this.device.readable) return;
+    let restart = false;
 
     try {
       this.reader = this.device.readable.getReader();
 
       while (this.readLoopRunning && this.device && this._isConnected) {
         const { value, done } = await this.reader.read();
-        if (done) break;
+        if (done) {
+          // A stream that ends while we still want data means the port went away.
+          if (this.readLoopRunning) this.onPortLost();
+          break;
+        }
 
         if (value && value.length > 0) {
           await this.pushRxWithBackpressure(value);
@@ -211,8 +237,17 @@ export class WebSerialTransport implements Transport {
         }
       }
     } catch (error) {
-      console.error("WebSerial read loop error:", error);
-      this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
+      if (this.readLoopRunning && this._isConnected) {
+        // Overruns and line errors leave the port open with a fresh readable
+        // stream; anything else means the device is gone.
+        restart = NON_FATAL_READ_ERRORS.has((error as { name?: string } | null)?.name ?? "");
+        if (restart) {
+          console.warn("WebSerial read error, resuming:", error);
+        } else {
+          console.error("WebSerial read loop error:", error);
+          this.onPortLost();
+        }
+      }
     } finally {
       if (this.reader) {
         try {
@@ -222,6 +257,7 @@ export class WebSerialTransport implements Transport {
         }
       }
     }
+    if (restart && this.readLoopRunning && this._isConnected) void this.runReadLoop();
   }
 
   startTxLoop(): void {
@@ -251,8 +287,10 @@ export class WebSerialTransport implements Transport {
         }
       }
     } catch (error) {
-      console.error("WebSerial TX loop error:", error);
-      this.eventHandlers.onError?.(error instanceof Error ? error : new Error(String(error)));
+      if (this.txLoopRunning && this._isConnected) {
+        console.error("WebSerial TX loop error:", error);
+        this.onPortLost();
+      }
     } finally {
       if (this.writer) {
         try {

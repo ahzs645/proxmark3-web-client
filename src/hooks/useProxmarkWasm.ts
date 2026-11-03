@@ -11,6 +11,7 @@ export function useProxmarkWasm({
   onOutput,
   onReady,
   onError,
+  onDeviceLost,
 }: UseProxmarkWasmOptions): UseProxmarkWasmReturn {
   const initialLoaded = getWasmLoaded();
   const [isLoading, setIsLoading] = useState(!initialLoaded);
@@ -24,6 +25,7 @@ export function useProxmarkWasm({
   const onOutputRef = useRef(onOutput);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const onDeviceLostRef = useRef(onDeviceLost);
   const isReadyRef = useRef(initialLoaded);
 
   const transportManager = useMemo(() => getTransportManager(), []);
@@ -36,8 +38,9 @@ export function useProxmarkWasm({
     onOutputRef.current = onOutput;
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
+    onDeviceLostRef.current = onDeviceLost;
     isReadyRef.current = isReady;
-  }, [isReady, onOutput, onReady, onError]);
+  }, [isReady, onOutput, onReady, onError, onDeviceLost]);
 
   const { flushOutput, outputBufferRef, scheduleOutputFlush } = useBufferedOutput(onOutputRef);
 
@@ -59,6 +62,7 @@ export function useProxmarkWasm({
       isReady,
       isReadyRef,
       onErrorRef,
+      onDeviceLostRef,
       setActiveTransportType,
       setIsAttaching,
       setIsClientAttached,

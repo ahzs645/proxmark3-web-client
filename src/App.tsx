@@ -490,6 +490,11 @@ function App() {
     onError: (err) => {
       terminalRef.current?.writeln(`\x1b[31mWASM Error: ${err.message}\x1b[0m`);
     },
+    onDeviceLost: () => {
+      terminalRef.current?.writeln(
+        "\x1b[33mReader connection lost (unplugged, out of range or reset). Click Connect to reconnect.\x1b[0m",
+      );
+    },
   });
 
   // Every command in the session goes through here, so the shell always knows

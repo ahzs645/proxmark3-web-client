@@ -73,6 +73,8 @@ export interface UseProxmarkWasmOptions {
   onOutput: (text: string) => void;
   onReady?: () => void;
   onError?: (error: Error) => void;
+  /** The reader dropped without the user disconnecting (unplugged, out of range, reset). */
+  onDeviceLost?: () => void;
 }
 
 export interface UseProxmarkWasmReturn {

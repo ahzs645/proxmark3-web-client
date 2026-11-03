@@ -144,7 +144,7 @@ export class TauriTcpTransport implements Transport {
         this.readLoopRunning = false;
         this.txLoopRunning = false;
         this.endpoint = null;
-        this.eventHandlers.onDisconnect?.();
+        this.eventHandlers.onDisconnect?.("lost");
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 5));

@@ -32,7 +32,11 @@ export interface TransportInfo {
 
 export interface TransportEventHandlers {
   onConnect?: () => void;
-  onDisconnect?: () => void;
+  /**
+   * `"lost"` when the link dropped on its own (cable pulled, out of range,
+   * reader reset) rather than through disconnect().
+   */
+  onDisconnect?: (reason?: "lost") => void;
   onError?: (error: Error) => void;
   onData?: (data: Uint8Array) => void;
 }

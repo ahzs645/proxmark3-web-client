@@ -136,7 +136,7 @@ export class WebBluetoothTransport implements Transport {
     this.txLoopRunning = false;
     this.writeCharacteristic = null;
     this.notifyCharacteristic = null;
-    this.eventHandlers.onDisconnect?.();
+    this.eventHandlers.onDisconnect?.("lost");
   };
 
   get isConnected(): boolean {
