@@ -1,5 +1,5 @@
-import { parseFirmwareElf } from "./elf";
-import type { ElfSegment, FirmwareEntry, FirmwareManifest } from "./types";
+import { parseElfImage, type ElfImage } from "./elf";
+import type { FirmwareEntry, FirmwareManifest } from "./types";
 
 export const FIRMWARE_SOURCE = "https://proxmark3.app";
 
@@ -50,10 +50,21 @@ async function downloadAndVerify(url: string, expectedSha256: string): Promise<A
   return buffer;
 }
 
-export async function downloadFirmware(entry: FirmwareEntry): Promise<{
-  bootromSegments: ElfSegment[];
-  fullimageSegments: ElfSegment[];
-}> {
+/** A bootrom + fullimage pair ready to flash. */
+export interface FirmwareImages {
+  bootrom: ElfImage;
+  fullimage: ElfImage;
+}
+
+function parseImagePair(bootrom: ArrayBuffer, fullimage: ArrayBuffer): FirmwareImages {
+  const images = { bootrom: parseElfImage(bootrom), fullimage: parseElfImage(fullimage) };
+  if (images.bootrom.segments.length === 0 || images.fullimage.segments.length === 0) {
+    throw new Error("Firmware contains no loadable segments");
+  }
+  return images;
+}
+
+export async function downloadFirmware(entry: FirmwareEntry): Promise<FirmwareImages> {
   // The API routes are stable and prevent a manifest from redirecting the app
   // to an unrelated host while still letting the server organize file storage.
   const root = `${FIRMWARE_SOURCE}/api/firmware/${encodeURIComponent(entry.id)}`;
@@ -61,10 +72,14 @@ export async function downloadFirmware(entry: FirmwareEntry): Promise<{
     downloadAndVerify(`${root}/bootrom.elf`, entry.checksums.bootloader_sha256),
     downloadAndVerify(`${root}/fullimage.elf`, entry.checksums.fullimage_sha256),
   ]);
-  const bootromSegments = parseFirmwareElf(bootrom);
-  const fullimageSegments = parseFirmwareElf(fullimage);
-  if (bootromSegments.length === 0 || fullimageSegments.length === 0) {
-    throw new Error("Downloaded firmware contains no flashable SAM7 segments");
-  }
-  return { bootromSegments, fullimageSegments };
+  return parseImagePair(bootrom, fullimage);
+}
+
+/** Read a locally built `bootrom.elf` / `fullimage.elf` pair (e.g. from `make PLATFORM=PM5`). */
+export async function readLocalFirmware(bootrom: File, fullimage: File): Promise<FirmwareImages> {
+  const [bootromBuffer, fullimageBuffer] = await Promise.all([
+    bootrom.arrayBuffer(),
+    fullimage.arrayBuffer(),
+  ]);
+  return parseImagePair(bootromBuffer, fullimageBuffer);
 }

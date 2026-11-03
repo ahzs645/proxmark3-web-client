@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { downloadFirmware, fetchFirmwareManifest } from "./api";
+import {
+  downloadFirmware,
+  fetchFirmwareManifest,
+  readLocalFirmware,
+  type FirmwareImages,
+} from "./api";
+import { imageFamilyFromMagic, type FlashGeometry } from "./flashDevice";
 import {
   enterBootloader,
   eraseFirmwareEntryPoint,
   flashSegments,
+  flashTargetFor,
   inspectBootloader,
   inspectReader,
   resetReader,
@@ -37,6 +44,58 @@ const PHASE_RANGE: Partial<Record<FirmwarePhase, [number, number]>> = {
   verifying: [96, 100],
   complete: [100, 100],
 };
+
+/** A locally built image pair chosen with the file picker instead of the manifest. */
+export interface LocalFirmware {
+  label: string;
+  images: FirmwareImages;
+  /** Chip family the images were built for, from their version-information magic. */
+  family: "at91" | "at32" | null;
+}
+
+const FAMILY_LABEL = { at91: "Proxmark3 (AT91SAM7)", at32: "Proxmark5 (AT32)" } as const;
+
+/**
+ * Refuse an image pair that doesn't belong on this chip or whose bootrom and
+ * OS parts are swapped, before anything is written. Mirrors upstream's
+ * `CheckInformationMagicAndChipType` + `check_segs`.
+ */
+function assertImagesFit(images: FirmwareImages, geometry: FlashGeometry): void {
+  for (const [name, image] of [
+    ["bootrom", images.bootrom],
+    ["fullimage", images.fullimage],
+  ] as const) {
+    const family = imageFamilyFromMagic(image.magic);
+    if (family !== null && family !== geometry.family) {
+      throw new Error(
+        `The ${name} is built for ${FAMILY_LABEL[family]}, but the reader is ${FAMILY_LABEL[geometry.family]}`,
+      );
+    }
+    // Every PM5 image carries the PM5V magic; one without it is a foreign or very old build.
+    if (family === null && geometry.family === "at32") {
+      throw new Error(
+        `The ${name} has no Proxmark5 version information; rebuild with PLATFORM=PM5`,
+      );
+    }
+  }
+  const inFlash = (image: FirmwareImages["bootrom"]) =>
+    image.segments.filter(
+      (segment) =>
+        segment.address + segment.data.length > geometry.flashStart &&
+        segment.address < geometry.flashEnd,
+    );
+  const bootrom = inFlash(images.bootrom);
+  const fullimage = inFlash(images.fullimage);
+  if (bootrom.length === 0 || fullimage.length === 0) {
+    throw new Error("Firmware has nothing to write inside this reader's flash");
+  }
+  if (bootrom.some((segment) => segment.address + segment.data.length > geometry.bootEnd)) {
+    throw new Error("The bootrom file extends past the bootloader area; are the files swapped?");
+  }
+  if (fullimage.some((segment) => segment.address < geometry.bootEnd)) {
+    throw new Error("The fullimage file overlaps the bootloader area; are the files swapped?");
+  }
+}
 
 function withGlobalProgress(progress: FirmwareProgress): FirmwareProgress {
   const range = PHASE_RANGE[progress.phase];
@@ -72,6 +131,7 @@ export function useFirmwareUpdater({
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [localFirmware, setLocalFirmwareState] = useState<LocalFirmware | null>(null);
   const connectionRef = useRef<FirmwareSerialConnection | null>(null);
 
   const report = useCallback(
@@ -103,6 +163,25 @@ export function useFirmwareUpdater({
     },
     [],
   );
+
+  const loadLocalFirmware = useCallback(
+    async (bootrom: File, fullimage: File) => {
+      setError(null);
+      try {
+        const images = await readLocalFirmware(bootrom, fullimage);
+        const family = imageFamilyFromMagic(images.fullimage.magic);
+        setLocalFirmwareState({ label: `${bootrom.name} + ${fullimage.name}`, images, family });
+        onLog?.(
+          `[Firmware] Loaded local images for ${family ? FAMILY_LABEL[family] : "an unknown chip"}`,
+        );
+      } catch (caught) {
+        setLocalFirmwareState(null);
+        setError(caught instanceof Error ? caught.message : String(caught));
+      }
+    },
+    [onLog],
+  );
+  const clearLocalFirmware = useCallback(() => setLocalFirmwareState(null), []);
 
   const compatibleFirmware = useMemo(() => {
     if (!manifest || !inspection || !isFlashablePlatform(inspection.platform)) return [];
@@ -183,7 +262,9 @@ export function useFirmwareUpdater({
       setInspection(result);
       report({ phase: "idle", percent: 0, message: "Reader inspection complete" });
       await releaseConnection();
-      await reconnectApplication();
+      // The PM3 client cannot talk to a bootloader; reattaching would only
+      // hold the port open and block the flash that usually follows.
+      if (result.mode !== "bootloader") await reconnectApplication();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
@@ -220,14 +301,23 @@ export function useFirmwareUpdater({
   }, [busy, onLog, report, selectedFirmware]);
 
   const flash = useCallback(async () => {
-    if (busy || !selectedFirmware || !inspection) return;
+    if (busy || !inspection || (!selectedFirmware && !localFirmware)) return;
+    // Local files take precedence over the manifest selection while loaded.
+    const manifestEntry = localFirmware ? null : selectedFirmware;
     let writesStarted = false;
     setBusy(true);
     setError(null);
     try {
-      report({ phase: "downloading", percent: 0, message: "Downloading firmware files…" });
-      const images = await downloadFirmware(selectedFirmware);
-      report({ phase: "downloading", percent: 100, message: "Checksums and ELF ranges verified" });
+      let images: FirmwareImages;
+      if (localFirmware) {
+        images = localFirmware.images;
+      } else if (manifestEntry) {
+        report({ phase: "downloading", percent: 0, message: "Downloading firmware files…" });
+        images = await downloadFirmware(manifestEntry);
+        report({ phase: "downloading", percent: 100, message: "Checksums verified" });
+      } else {
+        return;
+      }
 
       let connection = await prepareExclusiveSerial();
       const current = await inspectReader(connection);
@@ -236,13 +326,11 @@ export function useFirmwareUpdater({
         throw new Error("Hardware platform could not be verified; flashing is blocked for safety");
       }
       if (!isFlashablePlatform(current.platform)) {
-        throw new Error(
-          `${current.platform} uses a different flash layout; this updater only writes Proxmark3 boards`,
-        );
+        throw new Error(`${current.platform} cannot be flashed from the browser`);
       }
-      if (current.platform !== selectedFirmware.platform) {
+      if (manifestEntry && current.platform !== manifestEntry.platform) {
         throw new Error(
-          `Firmware is for ${selectedFirmware.platform}, but the reader reports ${current.platform}`,
+          `Firmware is for ${manifestEntry.platform}, but the reader reports ${current.platform}`,
         );
       }
 
@@ -262,10 +350,22 @@ export function useFirmwareUpdater({
         );
       }
 
+      const bootromTarget = flashTargetFor(bootloader, images.bootrom.magic);
+      assertImagesFit(images, bootromTarget.geometry);
+      onLog?.(
+        `[Firmware] ${FAMILY_LABEL[bootromTarget.geometry.family]} flash 0x${bootromTarget.geometry.flashStart.toString(16)}–0x${bootromTarget.geometry.flashEnd.toString(16)}, ${bootromTarget.geometry.blockSize}-byte blocks`,
+      );
+
       writesStarted = true;
       report({ phase: "flashing_bootrom", percent: 0, message: "Preparing bootloader flash…" });
-      await flashSegments(connection, images.bootromSegments, "flashing_bootrom", report);
-      await eraseFirmwareEntryPoint(connection);
+      await flashSegments(
+        connection,
+        images.bootrom.segments,
+        "flashing_bootrom",
+        report,
+        bootromTarget,
+      );
+      await eraseFirmwareEntryPoint(connection, bootromTarget);
       report({
         phase: "rebooting_bootloader",
         percent: 30,
@@ -286,7 +386,13 @@ export function useFirmwareUpdater({
       if (!newBootloader.inBootloader) throw new Error("New bootloader did not start correctly");
 
       report({ phase: "flashing_fullimage", percent: 0, message: "Preparing firmware flash…" });
-      await flashSegments(connection, images.fullimageSegments, "flashing_fullimage", report);
+      await flashSegments(
+        connection,
+        images.fullimage.segments,
+        "flashing_fullimage",
+        report,
+        flashTargetFor(newBootloader, images.fullimage.magic),
+      );
       report({ phase: "rebooting", percent: 50, message: "Firmware written; restarting reader…" });
       await resetReader(connection);
       await releaseConnection();
@@ -297,19 +403,20 @@ export function useFirmwareUpdater({
       connectionRef.current = connection;
       const verified = await inspectReader(connection);
       setInspection(verified);
-      if (
-        !verified.firmware?.version ||
-        !firmwareVersionsMatch(verified.firmware.version, selectedFirmware.version)
-      ) {
+      const installedVersion = verified.firmware?.version;
+      if (!installedVersion) {
+        throw new Error("Verification failed: the reader did not report a firmware version");
+      }
+      if (manifestEntry && !firmwareVersionsMatch(installedVersion, manifestEntry.version)) {
         throw new Error(
-          `Verification expected ${selectedFirmware.version}, received ${verified.firmware?.version || "unknown"}`,
+          `Verification expected ${manifestEntry.version}, received ${installedVersion}`,
         );
       }
       await releaseConnection();
       report({
         phase: "complete",
         percent: 100,
-        message: `Firmware ${selectedFirmware.version} verified`,
+        message: `Firmware ${installedVersion} verified`,
       });
       await reconnectApplication();
     } catch (caught) {
@@ -334,6 +441,8 @@ export function useFirmwareUpdater({
   }, [
     busy,
     inspection,
+    localFirmware,
+    onLog,
     prepareExclusiveSerial,
     progress.percent,
     reconnectApplication,
@@ -352,6 +461,9 @@ export function useFirmwareUpdater({
     selectedFirmwareId,
     packageVerified: Boolean(selectedFirmware && verifiedPackageId === selectedFirmware.id),
     setSelectedFirmwareId,
+    localFirmware,
+    loadLocalFirmware,
+    clearLocalFirmware,
     progress,
     error,
     busy,

@@ -1,12 +1,10 @@
 /**
- * PM3GENERIC / PM3RDV4 are the AT91SAM7 boards this flasher can write.
- * PM5 (Proxmark5, AT32F437) is recognised so the UI can identify it, but its
- * flash layout differs and no verified image source exists yet, so it is
- * never flashed from here.
+ * PM3GENERIC / PM3RDV4 are AT91SAM7 boards; PM5 (Proxmark5) is an AT32F435/437.
+ * The flash layout for each comes from the bootloader (see `flashTargetFor`).
  */
 export type FirmwarePlatform = "PM3GENERIC" | "PM3RDV4" | "PM5";
 
-export const FLASHABLE_PLATFORMS: readonly FirmwarePlatform[] = ["PM3GENERIC", "PM3RDV4"];
+export const FLASHABLE_PLATFORMS: readonly FirmwarePlatform[] = ["PM3GENERIC", "PM3RDV4", "PM5"];
 
 export function isFlashablePlatform(platform: FirmwarePlatform | "unknown"): boolean {
   return FLASHABLE_PLATFORMS.includes(platform as FirmwarePlatform);

@@ -1,9 +1,12 @@
 import { describe, expect, test } from "vite-plus/test";
+import { VERSION_INFORMATION_MAGIC_PM5V } from "./flashDevice";
 import {
   decodeLegacyResponse,
   encodeLegacyCommand,
   encodeNgCommand,
+  eraseFirmwareEntryPoint,
   flashSegments,
+  flashTargetFor,
   isAt32ChipId,
   isProxmarkUsbId,
   parseCapabilities,
@@ -18,6 +21,28 @@ import {
 function legacyAck(command = PM3_COMMAND.ACK): Uint8Array {
   return encodeLegacyCommand(BigInt(command));
 }
+
+function recordingIo(): { io: FirmwareIo; writes: ReturnType<typeof decodeLegacyResponse>[] } {
+  const writes: ReturnType<typeof decodeLegacyResponse>[] = [];
+  return {
+    writes,
+    io: {
+      write: (packet) => {
+        writes.push(decodeLegacyResponse(packet));
+        return Promise.resolve();
+      },
+      readChunk: () => Promise.resolve(legacyAck()),
+    },
+  };
+}
+
+// Bootloader of the AT32F435RGT7 Proxmark5 (1 MB flash, 2K erase/write unit).
+const PM5_BOOTLOADER = {
+  inBootloader: true,
+  bootloaderType: "iceman" as const,
+  chipId: 0x70083347,
+  chipFamily: "at32" as const,
+};
 
 describe("firmware protocol", () => {
   test("uses the Proxmark3 USB identifiers exposed by Chrome", () => {
@@ -103,5 +128,81 @@ describe("firmware protocol", () => {
     expect(block.cmd).toBe(BigInt(PM3_COMMAND.FINISH_WRITE));
     expect(block.data.slice(0, 5)).toEqual(Uint8Array.of(1, 2, 3, 0xff, 0xff));
     expect(progress).toEqual([100]);
+  });
+
+  test("derives the Proxmark5 flash layout from its bootloader", () => {
+    const target = flashTargetFor(PM5_BOOTLOADER, VERSION_INFORMATION_MAGIC_PM5V);
+    expect(target.geometry).toEqual({
+      family: "at32",
+      flashStart: 0x08000000,
+      flashEnd: 0x08100000,
+      bootEnd: 0x08004000,
+      blockSize: 0x800,
+    });
+    expect(target.magic).toBe(VERSION_INFORMATION_MAGIC_PM5V);
+  });
+
+  test("writes a Proxmark5 bootrom as 2K units of four tagged 512-byte packets", async () => {
+    const { io, writes } = recordingIo();
+    const target = flashTargetFor(PM5_BOOTLOADER, VERSION_INFORMATION_MAGIC_PM5V);
+
+    await flashSegments(
+      io,
+      [{ address: 0x08000000, data: new Uint8Array(0x900).fill(0xaa) }],
+      "flashing_bootrom",
+      () => undefined,
+      target,
+    );
+
+    const [boundary, ...packets] = writes;
+    expect(boundary.cmd).toBe(BigInt(PM3_COMMAND.START_FLASH));
+    expect(boundary.arg0).toBe(0x08000000n);
+    expect(boundary.arg1).toBe(0x08001000n);
+    expect(boundary.arg2).toBe(0x54494f44n); // bootloader unlock
+    expect(packets).toHaveLength(8);
+    expect(packets.map((packet) => [packet.arg0, packet.arg2])).toEqual([
+      [0x08000000n, 0n],
+      [0x08000000n, 512n],
+      [0x08000000n, 1024n],
+      [0x08000000n, 1536n],
+      [0x08000800n, 0n],
+      [0x08000800n, 512n],
+      [0x08000800n, 1024n],
+      [0x08000800n, 1536n],
+    ]);
+    expect(packets.every((packet) => packet.arg1 === BigInt(VERSION_INFORMATION_MAGIC_PM5V))).toBe(
+      true,
+    );
+    // 0x900 bytes of data, then 0xff padding to the end of the second unit.
+    expect(packets[4].data[0x100 - 1]).toBe(0xaa);
+    expect(packets[4].data[0x100]).toBe(0xff);
+  });
+
+  test("blanks the Proxmark5 OS entry so the bootrom stays in flash mode", async () => {
+    const { io, writes } = recordingIo();
+    await eraseFirmwareEntryPoint(
+      io,
+      flashTargetFor(PM5_BOOTLOADER, VERSION_INFORMATION_MAGIC_PM5V),
+    );
+    expect(writes[0].arg0).toBe(0x08004000n);
+    expect(writes[0].arg2).toBe(0n); // OS area: no unlock
+    expect(writes.slice(1)).toHaveLength(4);
+    expect(writes.slice(1).every((packet) => packet.data.every((byte) => byte === 0xff))).toBe(
+      true,
+    );
+  });
+
+  test("refuses a segment that runs past the reader's flash", async () => {
+    const { io, writes } = recordingIo();
+    await expect(
+      flashSegments(
+        io,
+        [{ address: 0x080ff000, data: new Uint8Array(0x2000) }],
+        "flashing_fullimage",
+        () => undefined,
+        flashTargetFor(PM5_BOOTLOADER, VERSION_INFORMATION_MAGIC_PM5V),
+      ),
+    ).rejects.toThrow(/does not fit/);
+    expect(writes).toHaveLength(0);
   });
 });

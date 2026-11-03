@@ -7,11 +7,16 @@ import { VERSION_INFORMATION_MAGIC_PM5V } from "./flashDevice";
  * `.version_information` section (with magic) reachable through a `.shstrtab`,
  * so the section-header path in the parser is genuinely exercised.
  */
-function elfWithVersion(segmentAddress: number, magic: number): ArrayBuffer {
+function elfWithVersion(segmentAddress: number, magic: number, asBootrom = false): ArrayBuffer {
   const segData = Uint8Array.of(0xaa, 0xbb, 0xcc, 0xdd);
-  const strtab = new TextEncoder().encode("\0.version_information\0.shstrtab\0");
+  // A bootrom carries no `.version_information`; its `.bootphase1` ends with a
+  // pointer to the version block inside that section.
+  const versionSection = asBootrom ? ".bootphase1" : ".version_information";
+  const strtab = new TextEncoder().encode(`\0${versionSection}\0.shstrtab\0`);
   const nameVersion = 1;
-  const nameShstrtab = 1 + ".version_information".length + 1;
+  const nameShstrtab = 1 + versionSection.length + 1;
+  const bootphaseSize = 0x20;
+  const bootphaseMagicOffset = 0x8;
 
   const segOffset = 0x100;
   const versionOffset = 0x120;
@@ -37,13 +42,19 @@ function elfWithVersion(segmentAddress: number, magic: number): ArrayBuffer {
   view.setUint32(68, segData.length, true);
   bytes.set(segData, segOffset);
 
-  view.setUint32(versionOffset, magic, true);
+  if (asBootrom) {
+    view.setUint32(versionOffset + bootphaseMagicOffset, magic, true);
+    view.setUint32(versionOffset + bootphaseSize - 4, segmentAddress + bootphaseMagicOffset, true);
+  } else {
+    view.setUint32(versionOffset, magic, true);
+  }
   bytes.set(strtab, strtabOffset);
 
   // Section headers: [0] null, [1] .version_information, [2] .shstrtab
   view.setUint32(shOffset + 40 + 0, nameVersion, true);
+  view.setUint32(shOffset + 40 + 12, segmentAddress, true);
   view.setUint32(shOffset + 40 + 16, versionOffset, true);
-  view.setUint32(shOffset + 40 + 20, 4, true);
+  view.setUint32(shOffset + 40 + 20, asBootrom ? bootphaseSize : 4, true);
   view.setUint32(shOffset + 80 + 0, nameShstrtab, true);
   view.setUint32(shOffset + 80 + 16, strtabOffset, true);
   view.setUint32(shOffset + 80 + 20, strtab.length, true);
@@ -99,5 +110,10 @@ describe("parseElfImage", () => {
     const image = parseElfImage(elfWithVersion(0x00100000, 0x56334d50));
     expect(image.segments[0].address).toBe(0x00100000);
     expect(image.magic).toBe(0x56334d50);
+  });
+
+  test("finds a bootrom's magic through the pointer at the end of .bootphase1", () => {
+    const image = parseElfImage(elfWithVersion(0x08000000, VERSION_INFORMATION_MAGIC_PM5V, true));
+    expect(image.magic).toBe(VERSION_INFORMATION_MAGIC_PM5V);
   });
 });

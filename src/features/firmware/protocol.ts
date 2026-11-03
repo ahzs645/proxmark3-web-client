@@ -1,4 +1,10 @@
-import { chipFamilyFromType, MAIN_CHIP_TYPE, type ChipFamily } from "./flashDevice";
+import {
+  chipFamilyFromType,
+  flashGeometry,
+  MAIN_CHIP_TYPE,
+  type ChipFamily,
+  type FlashGeometry,
+} from "./flashDevice";
 import type { ElfSegment, FirmwareProgress, ReaderInspection } from "./types";
 
 export const PM3_USB_VENDOR_ID = 0x9ac4;
@@ -22,8 +28,8 @@ const NG_COMMAND_MAGIC = 0x61334d50;
 const NG_RESPONSE_MAGIC = 0x62334d50;
 const NG_POSTAMBLE_MAGIC = 0x3361;
 const LEGACY_PACKET_SIZE = 544;
-const FLASH_BLOCK_SIZE = 512;
-const BOOTLOADER_END = 0x102000;
+/** Payload of one FINISH_WRITE packet (PM3_CMD_DATA_SIZE_OLD). */
+const WRITE_PACKET_SIZE = 512;
 const BOOTLOADER_UNLOCK_MAGIC = 0x54494f44;
 const BOOTLOADER_FLAG = 4n; // DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM (1<<2)
 const ICEMAN_BOOTLOADER_FLAG = 64n; // DEVICE_INFO_FLAG_UNDERSTANDS_VERSION (1<<6)
@@ -263,7 +269,7 @@ export function isAt32ChipId(chipId: number): boolean {
   return chipId >>> 16 === 0x7008;
 }
 
-function flashSizeKb(chipId: number): number {
+export function flashSizeKb(chipId: number): number {
   if (isAt32ChipId(chipId)) {
     // AT32 IDCODE encodes the flash class in bits 8..15: 0x45 -> 4032 KB, 0x33 -> 1024 KB, 0x32 -> 256 KB.
     const flashClass = (chipId >> 8) & 0xff;
@@ -418,26 +424,85 @@ export async function enterBootloader(io: FirmwareIo): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 2_000));
 }
 
-function blockifySegments(segments: ElfSegment[]): ElfSegment[] {
-  if (segments.length === 0) return [];
+/** Flash window and image magic that a write is checked and tagged against. */
+export interface FlashTarget {
+  geometry: FlashGeometry;
+  /** The ELF's `.version_information` magic, forwarded so the bootrom can refuse a foreign image. */
+  magic: number;
+}
+
+/** Proxmark3 layout used when the bootloader reports no chip details (legacy bootroms). */
+export const DEFAULT_FLASH_TARGET: FlashTarget = {
+  geometry: flashGeometry("at91", 512),
+  magic: 0,
+};
+
+/** Flash layout for the connected bootloader, mirroring upstream `flash_dev_*_init`. */
+export function flashTargetFor(bootloader: BootloaderInfo, magic: number | null): FlashTarget {
+  const family = bootloader.chipFamily ?? "at91";
+  const flashKB = bootloader.chipId !== null ? flashSizeKb(bootloader.chipId) : 0;
+  return {
+    geometry: flashGeometry(family, flashKB > 0 ? flashKB : family === "at32" ? 1024 : 512),
+    magic: magic ?? 0,
+  };
+}
+
+function blockifySegments(segments: ElfSegment[], geometry: FlashGeometry): ElfSegment[] {
+  const { flashStart, flashEnd, blockSize } = geometry;
   let first = Number.POSITIVE_INFINITY;
   let last = 0;
+  const inWindow: ElfSegment[] = [];
   for (const segment of segments) {
     if (segment.data.length === 0) continue;
+    const end = segment.address + segment.data.length;
+    // Segments wholly outside flash (e.g. RAM-only sections) are not written.
+    if (end <= flashStart || segment.address >= flashEnd) continue;
+    if (segment.address < flashStart || end > flashEnd) {
+      throw new Error(
+        `Firmware segment 0x${segment.address.toString(16)}–0x${end.toString(16)} does not fit this reader's flash`,
+      );
+    }
+    inWindow.push(segment);
     first = Math.min(first, segment.address);
-    last = Math.max(last, segment.address + segment.data.length);
+    last = Math.max(last, end);
   }
-  if (!Number.isFinite(first)) return [];
-  const start = first & ~(FLASH_BLOCK_SIZE - 1);
-  const length = ((last + FLASH_BLOCK_SIZE - 1) & ~(FLASH_BLOCK_SIZE - 1)) - start;
+  if (inWindow.length === 0) return [];
+  const start = first & ~(blockSize - 1);
+  const length = ((last + blockSize - 1) & ~(blockSize - 1)) - start;
   const image = new Uint8Array(length);
   image.fill(0xff);
-  for (const segment of segments) image.set(segment.data, segment.address - start);
+  for (const segment of inWindow) image.set(segment.data, segment.address - start);
   const blocks: ElfSegment[] = [];
-  for (let offset = 0; offset < image.length; offset += FLASH_BLOCK_SIZE) {
-    blocks.push({ address: start + offset, data: image.slice(offset, offset + FLASH_BLOCK_SIZE) });
+  for (let offset = 0; offset < image.length; offset += blockSize) {
+    blocks.push({ address: start + offset, data: image.slice(offset, offset + blockSize) });
   }
   return blocks;
+}
+
+/**
+ * Write one erase/write unit the way upstream `write_block` does: 512-byte
+ * packets that all carry the unit's address, the image magic in arg1 and the
+ * byte offset within the unit in arg2. Older bootroms ignore arg2 and append
+ * packets until a unit is full, so both generations assemble the same block.
+ */
+async function writeBlock(io: FirmwareIo, block: ElfSegment, magic: number): Promise<void> {
+  for (let offset = 0; offset < block.data.length; offset += WRITE_PACKET_SIZE) {
+    const response = await sendLegacyCommand(
+      io,
+      PM3_COMMAND.FINISH_WRITE,
+      block.address,
+      magic,
+      offset,
+      block.data.slice(offset, offset + WRITE_PACKET_SIZE),
+      10_000,
+    );
+    if (Number(response.cmd & 0xffffn) === PM3_COMMAND.NACK) {
+      // Newer bootroms put a PM3_E* code in arg1 (e.g. -2 for an image built for other hardware).
+      const code = Number(BigInt.asIntN(32, response.arg1));
+      const reason = code !== 0 ? ` (bootrom error ${code})` : "";
+      throw new Error(`Flash write failed at 0x${block.address.toString(16)}${reason}`);
+    }
+  }
 }
 
 export async function flashSegments(
@@ -445,12 +510,14 @@ export async function flashSegments(
   segments: ElfSegment[],
   phase: "flashing_bootrom" | "flashing_fullimage",
   onProgress: (progress: FirmwareProgress) => void,
+  target: FlashTarget = DEFAULT_FLASH_TARGET,
 ): Promise<void> {
-  const blocks = blockifySegments(segments);
-  if (blocks.length === 0) return;
+  const { geometry, magic } = target;
+  const blocks = blockifySegments(segments, geometry);
+  if (blocks.length === 0) throw new Error("Firmware image has nothing to write to this reader");
   const start = blocks[0].address;
-  const end = blocks[blocks.length - 1].address + FLASH_BLOCK_SIZE;
-  const unlock = start < BOOTLOADER_END ? BOOTLOADER_UNLOCK_MAGIC : 0;
+  const end = blocks[blocks.length - 1].address + geometry.blockSize;
+  const unlock = start < geometry.bootEnd ? BOOTLOADER_UNLOCK_MAGIC : 0;
   const boundary = await sendLegacyCommand(
     io,
     PM3_COMMAND.START_FLASH,
@@ -468,18 +535,7 @@ export async function flashSegments(
 
   for (let index = 0; index < blocks.length; index++) {
     const block = blocks[index];
-    const response = await sendLegacyCommand(
-      io,
-      PM3_COMMAND.FINISH_WRITE,
-      block.address,
-      0,
-      0,
-      block.data,
-      10_000,
-    );
-    if (Number(response.cmd & 0xffffn) === PM3_COMMAND.NACK) {
-      throw new Error(`Flash write failed at 0x${block.address.toString(16)}`);
-    }
+    await writeBlock(io, block, magic);
     const percent = Math.round(((index + 1) / blocks.length) * 100);
     onProgress({
       phase,
@@ -489,12 +545,21 @@ export async function flashSegments(
   }
 }
 
-export async function eraseFirmwareEntryPoint(io: FirmwareIo): Promise<void> {
+/**
+ * Blank the first OS block so the bootrom stays in flash mode on the next boot
+ * (it does when the word at the OS entry reads 0xffffffff).
+ */
+export async function eraseFirmwareEntryPoint(
+  io: FirmwareIo,
+  target: FlashTarget = DEFAULT_FLASH_TARGET,
+): Promise<void> {
+  const { geometry } = target;
   await flashSegments(
     io,
-    [{ address: BOOTLOADER_END, data: new Uint8Array(FLASH_BLOCK_SIZE).fill(0xff) }],
+    [{ address: geometry.bootEnd, data: new Uint8Array(geometry.blockSize).fill(0xff) }],
     "flashing_fullimage",
     () => undefined,
+    target,
   );
 }
 

@@ -78,11 +78,24 @@ function readVersionMagic(buffer: ArrayBuffer): number | null {
 
   for (let index = 0; index < sectionCount; index++) {
     const header = sectionOffset + index * sectionEntrySize;
-    const nameOffset = view.getUint32(header, true);
-    if (readName(nameOffset) !== ".version_information") continue;
+    const name = readName(view.getUint32(header, true));
+    const sectionAddress = view.getUint32(header + 12, true);
     const dataOffset = view.getUint32(header + 16, true);
-    if (dataOffset + 4 > buffer.byteLength) return null;
-    return view.getUint32(dataOffset, true);
+    const sectionSize = view.getUint32(header + 20, true);
+    if (name === ".version_information") {
+      if (dataOffset + 4 > buffer.byteLength) return null;
+      return view.getUint32(dataOffset, true);
+    }
+    // A bootrom has no such section: the last word of `.bootphase1` holds the
+    // address of its version information inside that same section.
+    if (name === ".bootphase1") {
+      if (sectionSize < 4 || dataOffset + sectionSize > buffer.byteLength) return null;
+      const pointer = view.getUint32(dataOffset + sectionSize - 4, true);
+      if (pointer < sectionAddress) return null;
+      const offset = pointer - sectionAddress;
+      if (offset + 4 > sectionSize) return null;
+      return view.getUint32(dataOffset + offset, true);
+    }
   }
   return null;
 }

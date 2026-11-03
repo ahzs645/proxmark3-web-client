@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Cpu, Loader2, RefreshCw, Usb, Zap } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cpu,
+  FileUp,
+  Loader2,
+  RefreshCw,
+  Usb,
+  X,
+  Zap,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +54,8 @@ export function FirmwareUpdateSection({
 }: FirmwareUpdateSectionProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
+  const [localBootrom, setLocalBootrom] = useState<File | null>(null);
+  const [localFullimage, setLocalFullimage] = useState<File | null>(null);
   const updater = useFirmwareUpdater({
     isDeviceConnected,
     activeTransportType,
@@ -53,6 +65,20 @@ export function FirmwareUpdateSection({
   });
   const isComplete = updater.progress.phase === "complete";
   const isActive = updater.busy || isComplete || updater.progress.phase === "error";
+  const isPm5 = updater.inspection?.platform === "PM5";
+  const flashLabel = updater.localFirmware
+    ? `local build (${updater.localFirmware.label})`
+    : updater.selectedFirmware?.display_name;
+  const canFlash = updater.localFirmware
+    ? Boolean(updater.inspection)
+    : Boolean(updater.selectedFirmware && updater.packageVerified);
+  const pickLocalFile = (kind: "bootrom" | "fullimage", file: File | null) => {
+    const bootrom = kind === "bootrom" ? file : localBootrom;
+    const fullimage = kind === "fullimage" ? file : localFullimage;
+    setLocalBootrom(bootrom);
+    setLocalFullimage(fullimage);
+    if (bootrom && fullimage) void updater.loadLocalFirmware(bootrom, fullimage);
+  };
   const destructivePhase = !["idle", "inspecting", "downloading", "error", "complete"].includes(
     updater.progress.phase,
   );
@@ -204,11 +230,66 @@ export function FirmwareUpdateSection({
             </p>
           ) : updater.inspection && !isFlashablePlatform(updater.inspection.platform) ? (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
-              Proxmark5 detected. Its AT32 flash layout differs from the Proxmark3 boards this
-              updater writes, and no verified Proxmark5 images are published yet, so flashing from
-              the browser is disabled. Use <code>pm3-flash-fullimage</code> from an upstream build
-              made with <code>PLATFORM=PM5</code>.
+              This hardware cannot be flashed from the browser.
             </p>
+          ) : isPm5 && !updater.localFirmware ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+              Proxmark5 detected. No Proxmark5 images are published yet; choose the{" "}
+              <code>bootrom.elf</code> and <code>fullimage.elf</code> from an upstream build made
+              with <code>PLATFORM=PM5</code> below.
+            </p>
+          ) : null}
+
+          {updater.inspection && isFlashablePlatform(updater.inspection.platform) ? (
+            <div className="space-y-2 rounded-md border p-3 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1 font-medium">
+                  <FileUp className="h-3 w-3" /> Local build
+                </span>
+                {updater.localFirmware ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setLocalBootrom(null);
+                      setLocalFullimage(null);
+                      updater.clearLocalFirmware();
+                    }}
+                    disabled={updater.busy}
+                  >
+                    <X className="h-3 w-3" /> Clear
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground">
+                Flash your own <code>make</code> output instead of a published package. The chip
+                family in each file is checked against the reader before anything is written.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(["bootrom", "fullimage"] as const).map((kind) => (
+                  <label key={kind} className="space-y-1">
+                    <span className="text-muted-foreground">{kind}.elf</span>
+                    <Input
+                      type="file"
+                      accept=".elf"
+                      className="h-8 text-xs"
+                      disabled={updater.busy}
+                      onChange={(event) => pickLocalFile(kind, event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                ))}
+              </div>
+              {updater.localFirmware ? (
+                <p className="text-emerald-700 dark:text-emerald-400">
+                  Ready: {updater.localFirmware.label} ·{" "}
+                  {updater.localFirmware.family === "at32"
+                    ? "Proxmark5 image"
+                    : updater.localFirmware.family === "at91"
+                      ? "Proxmark3 image"
+                      : "no chip marker"}
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           {isActive ? (
@@ -239,8 +320,9 @@ export function FirmwareUpdateSection({
             <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
               <p>{updater.error}</p>
               <p>
-                Recovery: unplug USB, hold the Proxmark3 button, reconnect USB, release the button,
-                then use Inspect Reader again.
+                {isPm5
+                  ? "Recovery: unplug USB, hold the button while plugging into the port beside it until LEDs B and D stay lit, then use Inspect Reader again. If it will not enter Boot Mode, recover with dfu-util as described in the Proxmark5 guide."
+                  : "Recovery: unplug USB, hold the Proxmark3 button, reconnect USB, release the button, then use Inspect Reader again."}
               </p>
             </div>
           ) : null}
@@ -277,7 +359,7 @@ export function FirmwareUpdateSection({
                   setConfirmation("");
                   setConfirmOpen(true);
                 }}
-                disabled={!updater.selectedFirmware || !updater.packageVerified || updater.busy}
+                disabled={!canFlash || updater.busy}
               >
                 <Zap className="h-3 w-3" /> Flash Firmware…
               </Button>
@@ -289,7 +371,7 @@ export function FirmwareUpdateSection({
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Flash {updater.selectedFirmware?.display_name}?</DialogTitle>
+            <DialogTitle>Flash {flashLabel}?</DialogTitle>
             <DialogDescription>
               This writes both the bootloader and firmware. A power loss or disconnect during the
               write can leave the reader requiring bootloader recovery.
