@@ -1122,6 +1122,7 @@ var ___assert_fail = (condition, filename, line, func) =>
         func ? UTF8ToString(func) : "unknown function",
       ],
   );
+var ___call_sighandler = (fp, sig) => ((a1) => dynCall_vi(fp, a1))(sig);
 var ___handle_stack_overflow = (requested) => {
   var base = _emscripten_stack_get_base();
   var end = _emscripten_stack_get_end();
@@ -5018,6 +5019,10 @@ var __emscripten_receive_on_main_thread_js = (
   assert(typeof rtn != "bigint");
   return rtn;
 };
+var __emscripten_runtime_keepalive_clear = () => {
+  noExitRuntime = false;
+  runtimeKeepaliveCounter = 0;
+};
 var __emscripten_system = (command) => {
   if (ENVIRONMENT_IS_NODE) {
     if (!command) return 1;
@@ -6566,8 +6571,8 @@ var ___set_stack_limits = (Module["___set_stack_limits"] =
   makeInvalidEarlyAccess("___set_stack_limits"));
 var dynCall_ii = makeInvalidEarlyAccess("dynCall_ii");
 var dynCall_i = makeInvalidEarlyAccess("dynCall_i");
-var dynCall_iiii = makeInvalidEarlyAccess("dynCall_iiii");
 var dynCall_iii = makeInvalidEarlyAccess("dynCall_iii");
+var dynCall_iiii = makeInvalidEarlyAccess("dynCall_iiii");
 var dynCall_iiiiiiii = makeInvalidEarlyAccess("dynCall_iiiiiiii");
 var dynCall_vi = makeInvalidEarlyAccess("dynCall_vi");
 var dynCall_iiiiii = makeInvalidEarlyAccess("dynCall_iiiiii");
@@ -6743,8 +6748,8 @@ function assignWasmExports(wasmExports) {
   );
   assert(typeof wasmExports["dynCall_ii"] != "undefined", "missing Wasm export: dynCall_ii");
   assert(typeof wasmExports["dynCall_i"] != "undefined", "missing Wasm export: dynCall_i");
-  assert(typeof wasmExports["dynCall_iiii"] != "undefined", "missing Wasm export: dynCall_iiii");
   assert(typeof wasmExports["dynCall_iii"] != "undefined", "missing Wasm export: dynCall_iii");
+  assert(typeof wasmExports["dynCall_iiii"] != "undefined", "missing Wasm export: dynCall_iiii");
   assert(
     typeof wasmExports["dynCall_iiiiiiii"] != "undefined",
     "missing Wasm export: dynCall_iiiiiiii",
@@ -6965,12 +6970,12 @@ function assignWasmExports(wasmExports) {
   );
   dynCall_ii = dynCalls["ii"] = createExportWrapper("dynCall_ii", wasmExports["dynCall_ii"], 2);
   dynCall_i = dynCalls["i"] = createExportWrapper("dynCall_i", wasmExports["dynCall_i"], 1);
+  dynCall_iii = dynCalls["iii"] = createExportWrapper("dynCall_iii", wasmExports["dynCall_iii"], 3);
   dynCall_iiii = dynCalls["iiii"] = createExportWrapper(
     "dynCall_iiii",
     wasmExports["dynCall_iiii"],
     4,
   );
-  dynCall_iii = dynCalls["iii"] = createExportWrapper("dynCall_iii", wasmExports["dynCall_iii"], 3);
   dynCall_iiiiiiii = dynCalls["iiiiiiii"] = createExportWrapper(
     "dynCall_iiiiiiii",
     wasmExports["dynCall_iiiiiiii"],
@@ -7060,6 +7065,7 @@ var wasmImports;
 function assignWasmImports() {
   wasmImports = {
     __assert_fail: ___assert_fail,
+    __call_sighandler: ___call_sighandler,
     __handle_stack_overflow: ___handle_stack_overflow,
     __pthread_create_js: ___pthread_create_js,
     __syscall_accept4: ___syscall_accept4,
@@ -7092,6 +7098,7 @@ function assignWasmImports() {
     _emscripten_init_main_thread_js: __emscripten_init_main_thread_js,
     _emscripten_notify_mailbox_postmessage: __emscripten_notify_mailbox_postmessage,
     _emscripten_receive_on_main_thread_js: __emscripten_receive_on_main_thread_js,
+    _emscripten_runtime_keepalive_clear: __emscripten_runtime_keepalive_clear,
     _emscripten_system: __emscripten_system,
     _emscripten_thread_cleanup: __emscripten_thread_cleanup,
     _emscripten_thread_mailbox_await: __emscripten_thread_mailbox_await,
@@ -7124,6 +7131,7 @@ function assignWasmImports() {
     getaddrinfo: _getaddrinfo,
     invoke_vii,
     memory: wasmMemory,
+    proc_exit: _proc_exit,
   };
 }
 function invoke_vii(index, a1, a2) {
