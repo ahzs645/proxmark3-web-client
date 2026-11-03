@@ -45,3 +45,6 @@ card-dumps/
 # individual filenames -- a renamed or added artifact would otherwise be
 # silently dropped and break the deploy.
 !public/wasm/**
+
+# Locally built device firmware (upload to the firmware server, never commit)
+firmware-builds/

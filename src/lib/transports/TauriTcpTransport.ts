@@ -2,7 +2,7 @@
  * Tauri TCP transport - talks to a PM3 protocol endpoint over a plain socket.
  *
  * Primary use: the Proxmark5 Battery/Wireless Module in Wi-Fi station mode.
- * `hw bwmwifi --ssid <ssid> --pwd <pwd> [--port 7777]` (run over USB or BLE)
+ * `hw bwm wifi --ssid <ssid> --pwd <pwd> [--port 18888]` (run over USB or BLE)
  * joins a network and starts a TCP server; the upstream client then connects
  * with `pm3 -p tcp:<ip>:<port>`. The same socket also works with the upstream
  * `pm5_ble_bridge.py --tcp` relay or any `socat` serial-to-TCP bridge.
@@ -13,8 +13,8 @@ import { isTauri, invoke } from "../tauri";
 import type { Transport, TransportType, TransportDevice, TransportEventHandlers } from "./types";
 
 export const TCP_ENDPOINT_STORAGE_KEY = "pm3-tcp-endpoint";
-/** Matches the default port of upstream `hw bwmwifi`. */
-export const DEFAULT_TCP_ENDPOINT = "192.168.1.100:7777";
+/** Matches the default port of upstream `hw bwm wifi`. */
+export const DEFAULT_TCP_ENDPOINT = "192.168.1.100:18888";
 
 const ENDPOINT_PATTERN = /^\s*(?:tcp:)?(\[[0-9a-f:.]+\]|[^\s:\][]+):(\d{1,5})\s*$/i;
 
@@ -45,7 +45,7 @@ export class TauriTcpTransport implements Transport {
     return this._isConnected;
   }
 
-  /** Endpoint of the live connection, e.g. `192.168.1.42:7777`. */
+  /** Endpoint of the live connection, e.g. `192.168.1.42:18888`. */
   get connectedEndpoint(): string | null {
     return this.endpoint;
   }

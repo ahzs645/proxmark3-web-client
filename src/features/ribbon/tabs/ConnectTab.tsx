@@ -1,5 +1,5 @@
 import { FlaskConical, HelpCircle, Power, PowerOff, RefreshCw, Settings, Zap } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 import { ConnectControl } from "@/components/ribbon/ConnectControl";
 import { Input } from "@/components/ui/input";
 import { DeviceProfileContext } from "@/features/device/context";
@@ -39,18 +39,14 @@ export function ConnectTab({
   const isConnected = connectionStatus === "connected";
   const isConnecting = connectionStatus === "connecting";
 
-  // `hw bwmautooff` only exists on a PM5 built with the BWM extras. Reading the
+  // `hw bwm autooff` only exists on a PM5 built with the BWM extras. Reading the
   // context rather than taking a prop keeps the ribbon's plumbing unchanged; a
   // tab rendered outside the provider simply hides the control.
   const isPm5 = useContext(DeviceProfileContext)?.profile.hardwareVariant === "pm5";
-  // The firmware flag is runtime-only and boots back to enabled, so this tracks
-  // what this session last sent rather than a value read back from the device —
-  // there is no query for it. Assume the firmware default again once the link
-  // drops, since the board may have power-cycled in the meantime.
+  // The firmware stores the switch on the BWM, so it survives reboots. This
+  // tracks what this session last sent, starting from the firmware default;
+  // `hw bwm autooff` with no argument prints the stored value.
   const [autoOffEnabled, setAutoOffEnabled] = useState(true);
-  useEffect(() => {
-    if (!isConnected) setAutoOffEnabled(true);
-  }, [isConnected]);
   const hasTransport = availableTransports.length > 0;
   const isTcp = selectedTransport === "tauri-tcp";
   const tcpEndpointValid = !isTcp || normalizeTcpEndpoint(tcpEndpoint) !== null;
@@ -91,15 +87,15 @@ export function ConnectTab({
             <Input
               value={tcpEndpoint}
               onChange={(event) => onTcpEndpointChange(event.target.value)}
-              placeholder="192.168.1.100:7777"
+              placeholder="192.168.1.100:18888"
               spellCheck={false}
               disabled={isConnected || isConnecting}
               aria-invalid={!tcpEndpointValid}
               className={`h-7 w-44 font-mono text-xs ${tcpEndpointValid ? "" : "border-destructive"}`}
-              title="Proxmark5 BWM Wi-Fi server (hw bwmwifi, default port 7777) or a PM3 TCP bridge"
+              title="Proxmark5 BWM Wi-Fi server (hw bwm wifi, default port 18888) or a PM3 TCP bridge"
             />
             <div className="text-[9px] text-muted-foreground px-1">
-              {isConnected ? "Disconnect to change" : "host:port from `hw bwmwifi --status`"}
+              {isConnected ? "Disconnect to change" : "host:port from `hw bwm wifi status`"}
             </div>
           </div>
         </>
@@ -159,13 +155,13 @@ export function ConnectTab({
             onClick={() => {
               const next = !autoOffEnabled;
               setAutoOffEnabled(next);
-              onCommand(`hw bwmautooff ${next ? "--on" : "--off"}`);
+              onCommand(`hw bwm autooff ${next ? "on" : "off"}`);
             }}
             disabled={!commandsEnabled}
             title={
               autoOffEnabled
-                ? "The PM5 powers itself down when USB is unplugged. Turn this off before going wireless, or the board dies while the BWM keeps advertising. Resets to on at every boot."
-                : "The PM5 stays powered after USB is unplugged, so it can be used over BLE on battery. Resets to on at every boot."
+                ? "The PM5 powers itself down when USB is unplugged. Turn this off before going wireless, or the board dies while the BWM keeps advertising. Stored on the module."
+                : "The PM5 stays powered after USB is unplugged, so it can be used over BLE on battery. Stored on the module."
             }
           />
         ) : null}

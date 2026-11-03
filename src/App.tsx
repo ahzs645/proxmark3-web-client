@@ -966,7 +966,7 @@ function App() {
         );
       } else if (transportType === "tauri-tcp") {
         terminalRef.current?.writeln(
-          `\x1b[90mOpening tcp:${tcpEndpoint} (start the Proxmark5 server with \`hw bwmwifi\` over USB/BLE first).\x1b[0m`,
+          `\x1b[90mOpening tcp:${tcpEndpoint} (start the Proxmark5 server with \`hw bwm wifi\` over USB/BLE first).\x1b[0m`,
         );
       }
 
