@@ -25,5 +25,3 @@ export const TERMINAL_THEME = {
 } as const;
 
 export const TERMINAL_FONT_FAMILY = '"JetBrains Mono", "Fira Code", monospace';
-
-export const TERMINAL_FONT_SIZE = 13;

@@ -89,7 +89,7 @@ export function FirmwareUpdateSection({
         <div className="space-y-3 rounded-lg border bg-secondary/20 p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium">Proxmark3 firmware updater</p>
+              <p className="text-sm font-medium">Proxmark3 / Proxmark5 firmware updater</p>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Identifies the connected hardware, selects only compatible firmware, verifies both
                 SHA-256 checksums and ELF flash ranges, then verifies the installed version.
@@ -336,7 +336,7 @@ export function FirmwareUpdateSection({
             >
               Firmware source: proxmark3.app
             </a>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"

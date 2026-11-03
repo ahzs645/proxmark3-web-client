@@ -30,7 +30,7 @@ export function DataManagementSection({
   return (
     <>
       <SettingsSection icon={<Trash2 className="h-3 w-3" />} title="Data Management">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={onExportSettings} className="gap-1">
             <Download className="h-3 w-3" />
             Export Settings
@@ -105,7 +105,8 @@ export function DataManagementSection({
           <strong>Storage:</strong> Settings are saved in browser localStorage
         </p>
         <p>
-          <strong>Note:</strong> Some settings may require a page refresh to take effect
+          <strong>Note:</strong> Changes apply immediately. The theme is stored separately and is
+          not part of export, import or reset
         </p>
       </div>
 

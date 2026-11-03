@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { T55xxPanelHeader } from "@/features/lf-tools/t55xx/T55xxPanelHeader";
 import { T55xxEm410xSection } from "@/features/lf-tools/t55xx/T55xxEm410xSection";
 import { T55xxOperationsSection } from "@/features/lf-tools/t55xx/T55xxOperationsSection";
@@ -16,6 +18,7 @@ import {
   buildT55xxWriteBlockCommand,
   buildT55xxWipeCommand,
 } from "@/features/lf-tools/commands";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 
 interface T55xxPanelProps {
   onCommand: (cmd: string) => void;
@@ -40,6 +43,8 @@ export function T55xxPanel({ onCommand, disabled = false }: T55xxPanelProps) {
     setPasswordFromInput,
     setBlockDataFromInput,
   } = useT55xxPanelState();
+  const { confirmDestructiveOps } = useAppSettings();
+  const [confirmWipeOpen, setConfirmWipeOpen] = useState(false);
 
   const handleDetect = () => onCommand(buildT55xxDetectCommand(usePassword, password));
   const handleDump = () => onCommand(buildT55xxDumpCommand(usePassword, password));
@@ -49,7 +54,8 @@ export function T55xxPanel({ onCommand, disabled = false }: T55xxPanelProps) {
     const cmd = buildT55xxWriteBlockCommand(blockNumber, blockData, usePassword, password);
     if (cmd) onCommand(cmd);
   };
-  const handleWipe = () => onCommand(buildT55xxWipeCommand(usePassword, password));
+  const runWipe = () => onCommand(buildT55xxWipeCommand(usePassword, password));
+  const handleWipe = () => (confirmDestructiveOps ? setConfirmWipeOpen(true) : runWipe());
   const handleTryPasswords = () => onCommand("lf t55xx chk");
   const handleCloneEM410x = () => {
     const cmd = buildEm410xCloneCommand(emId);
@@ -103,6 +109,15 @@ export function T55xxPanel({ onCommand, disabled = false }: T55xxPanelProps) {
         <T55xxQuickCommandsSection onCommand={onCommand} disabled={disabled} />
         <T55xxWarningSection />
       </CardContent>
+      <ConfirmDialog
+        open={confirmWipeOpen}
+        title="Wipe the T55xx tag?"
+        description="The tag's configuration and data blocks are reset to factory defaults. Anything on the tag now is lost unless you dumped it first."
+        confirmLabel="Wipe"
+        destructive
+        onConfirm={runWipe}
+        onClose={() => setConfirmWipeOpen(false)}
+      />
     </Card>
   );
 }

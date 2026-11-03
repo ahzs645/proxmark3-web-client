@@ -1,4 +1,6 @@
+import { useCallback, useState } from "react";
 import { RibbonStripPicker, RibbonTabNav } from "@/features/ribbon/RibbonTabNav";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ScrollRail } from "@/components/ui/scroll-rail";
 import { RIBBON_ROW_MIN_HEIGHT } from "@/features/ribbon/primitives";
 import { getWorkspace, type RibbonStripId } from "@/features/ribbon/config";
@@ -15,14 +17,17 @@ import { LFOpsTab } from "@/features/ribbon/tabs/LFOpsTab";
 import { LFTab } from "@/features/ribbon/tabs/LFTab";
 import { MagicTab } from "@/features/ribbon/tabs/MagicTab";
 import { MemoryTab } from "@/features/ribbon/tabs/MemoryTab";
-import { SettingsTab } from "@/features/ribbon/tabs/SettingsTab";
 import { T55xxTab } from "@/features/ribbon/tabs/T55xxTab";
 import { ToolsTab } from "@/features/ribbon/tabs/ToolsTab";
 import { TrafficTab } from "@/features/ribbon/tabs/TrafficTab";
 import { UtilitiesTab } from "@/features/ribbon/tabs/UtilitiesTab";
 import { toLegacyStatus } from "@/features/connection/model";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
+
+// Ribbon buttons that erase a card; gated by the "confirm destructive" setting.
+const WIPE_COMMAND = /^(hf mf (cwipe|gdmwipe)|lf t55xx wipe)\b/;
 
 /**
  * Header of the workbench: the workspace switcher on top, and below it the
@@ -66,6 +71,15 @@ export function RibbonToolbar({
   const workspace = getWorkspace(activeWorkspace);
   const { selectedLFCardType, setSelectedLFCardType, selectedHFCardType, setSelectedHFCardType } =
     useRibbonSelections();
+  const { confirmDestructiveOps } = useAppSettings();
+  const [pendingWipe, setPendingWipe] = useState<string | null>(null);
+  const handleCommand = useCallback(
+    (cmd: string) => {
+      if (confirmDestructiveOps && WIPE_COMMAND.test(cmd)) setPendingWipe(cmd);
+      else onCommand(cmd);
+    },
+    [confirmDestructiveOps, onCommand],
+  );
 
   return (
     <div className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
@@ -81,44 +95,56 @@ export function RibbonToolbar({
         isBusy={isBusy}
       />
 
-      <div className="flex items-stretch gap-2 border-t border-border/50 p-2">
-        <RibbonStripPicker
-          strips={workspace.strips}
-          activeStrip={activeStrip}
-          onStripChange={onStripChange}
-        />
-        <StripSurface strip={activeStrip}>
-          {renderStrip(activeStrip, {
-            connectionStatus: toLegacyStatus(connection),
-            onConnect,
-            onDisconnect,
-            onCommand,
-            libraryKeyMode,
-            onLibraryKeyModeChange,
-            commandsEnabled,
-            availableTransports,
-            selectedTransport,
-            onTransportChange,
-            tcpEndpoint,
-            onTcpEndpointChange,
-            simulatedMode,
-            onToggleSimulated,
-            cacheItems,
-            cacheSyncing,
-            onCacheUpload,
-            onCacheUse,
-            onCacheDelete,
-            onCacheSync,
-            cachePathPrefix,
-            onJsonUpload,
-            onWorkspaceChange,
-            selectedHFCardType,
-            onSelectedHFCardTypeChange: setSelectedHFCardType,
-            selectedLFCardType,
-            onSelectedLFCardTypeChange: setSelectedLFCardType,
-          })}
-        </StripSurface>
-      </div>
+      {/* Settings has no commands, so it gets no strip row at all. */}
+      {activeStrip !== "settings" ? (
+        <div className="flex items-stretch gap-2 border-t border-border/50 p-2">
+          <RibbonStripPicker
+            strips={workspace.strips}
+            activeStrip={activeStrip}
+            onStripChange={onStripChange}
+          />
+          <StripSurface strip={activeStrip}>
+            {renderStrip(activeStrip, {
+              connectionStatus: toLegacyStatus(connection),
+              onConnect,
+              onDisconnect,
+              onCommand: handleCommand,
+              libraryKeyMode,
+              onLibraryKeyModeChange,
+              commandsEnabled,
+              availableTransports,
+              selectedTransport,
+              onTransportChange,
+              tcpEndpoint,
+              onTcpEndpointChange,
+              simulatedMode,
+              onToggleSimulated,
+              cacheItems,
+              cacheSyncing,
+              onCacheUpload,
+              onCacheUse,
+              onCacheDelete,
+              onCacheSync,
+              cachePathPrefix,
+              onJsonUpload,
+              onWorkspaceChange,
+              selectedHFCardType,
+              onSelectedHFCardTypeChange: setSelectedHFCardType,
+              selectedLFCardType,
+              onSelectedLFCardTypeChange: setSelectedLFCardType,
+            })}
+          </StripSurface>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={pendingWipe !== null}
+        title="Wipe the card?"
+        description={`"${pendingWipe ?? ""}" resets the card to blank data. Anything on it now is lost unless you dumped it first.`}
+        confirmLabel="Wipe"
+        destructive
+        onConfirm={() => pendingWipe && onCommand(pendingWipe)}
+        onClose={() => setPendingWipe(null)}
+      />
     </div>
   );
 }
@@ -276,8 +302,6 @@ function renderStrip(strip: RibbonStripId, ctx: StripContext) {
       return <LFOpsTab commandsEnabled={ctx.commandsEnabled} onCommand={ctx.onCommand} />;
     case "t55xx":
       return <T55xxTab commandsEnabled={ctx.commandsEnabled} onCommand={ctx.onCommand} />;
-    case "settings":
-      return <SettingsTab />;
     default:
       return null;
   }

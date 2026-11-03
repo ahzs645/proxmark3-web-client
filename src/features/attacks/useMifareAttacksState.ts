@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CachedAsset } from "@/components/panels/KeyCachePanel";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 import { ATTACK_CONFIGS, DEFAULT_KEYS } from "./config";
 import type { AttackType, CardType, KeyType } from "./types";
 
@@ -18,8 +19,9 @@ export function useMifareAttacksState({
   detectedCardType = null,
   detectedUid = null,
 }: UseMifareAttacksStateArgs) {
+  const settings = useAppSettings();
   const [activeAttack, setActiveAttack] = useState<AttackType>("autopwn");
-  const [cardType, setCardType] = useState<CardType>(detectedCardType ?? "1k");
+  const [cardType, setCardType] = useState<CardType>(detectedCardType ?? settings.defaultCardType);
 
   // Adopt the detected card size whenever a *different* card becomes the target,
   // without clobbering a manual 1k/4k toggle the user made for the same card.
@@ -33,12 +35,12 @@ export function useMifareAttacksState({
   }, [detectedCardType, detectedUid]);
   const [knownBlock, setKnownBlock] = useState("0");
   const [knownKeyType, setKnownKeyType] = useState<KeyType>("A");
-  const [knownKey, setKnownKey] = useState("FFFFFFFFFFFF");
+  const [knownKey, setKnownKey] = useState(settings.defaultAuthKey);
   const [targetBlock, setTargetBlock] = useState("4");
   const [targetKeyType, setTargetKeyType] = useState<KeyType>("A");
   const [selectedKeyFile, setSelectedKeyFile] = useState<string | null>(null);
   const [slowMode, setSlowMode] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(settings.showAdvancedOptions);
 
   const keyFiles = useMemo(
     () => cachedAssets.filter((asset) => asset.kind === "keys"),

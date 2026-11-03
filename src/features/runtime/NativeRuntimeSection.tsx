@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Cpu, Loader2, Play, Search, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, MonitorCog, Play, Search, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ export function NativeRuntimeSection({
   };
 
   return (
-    <SettingsSection icon={<Cpu className="h-3 w-3" />} title="Native desktop runtime">
+    <SettingsSection icon={<MonitorCog className="h-3 w-3" />} title="Native desktop runtime">
       <div className="space-y-3 rounded-lg border bg-secondary/20 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">

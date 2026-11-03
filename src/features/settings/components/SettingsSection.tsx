@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { Separator } from "@/components/ui/separator";
-import { SectionLabel } from "@/components/panels/shared/SectionLabel";
+import { PanelSection } from "@/components/panels/shared/PanelSection";
 
 interface SettingsSectionProps {
   icon: ReactNode;
@@ -8,12 +7,11 @@ interface SettingsSectionProps {
   children: ReactNode;
 }
 
+/** One boxed block of the Settings page; the page's section nav jumps between these. */
 export function SettingsSection({ icon, title, children }: SettingsSectionProps) {
   return (
-    <div className="space-y-3">
-      <SectionLabel icon={icon}>{title}</SectionLabel>
+    <PanelSection icon={icon} title={title} className="space-y-3">
       {children}
-      <Separator />
-    </div>
+    </PanelSection>
   );
 }

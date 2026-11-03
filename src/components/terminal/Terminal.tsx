@@ -3,16 +3,14 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { TerminalViewport } from "@/features/terminal/TerminalViewport";
-import {
-  TERMINAL_FONT_FAMILY,
-  TERMINAL_FONT_SIZE,
-  TERMINAL_THEME,
-} from "@/features/terminal/config";
+import { TERMINAL_FONT_FAMILY, TERMINAL_THEME } from "@/features/terminal/config";
 import { LineEditor } from "@/features/terminal/lineEditor";
 import { createSeverityColorizer } from "@/features/terminal/severity";
 import { useTerminalWriteQueue } from "@/features/terminal/queue";
 import { writeTerminalWelcome } from "@/features/terminal/welcome";
 import type { TerminalHandle, TerminalProps } from "@/features/terminal/types";
+import { clampTerminalFontSize } from "@/features/settings/storage";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 
 export type { TerminalHandle, TerminalProps } from "@/features/terminal/types";
 
@@ -33,6 +31,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     const passthroughRef = useRef(passthrough);
     const rawModeRef = useRef(rawMode);
     const { scheduleWrite, clearPendingWrites } = useTerminalWriteQueue(xtermRef);
+    const fontSize = clampTerminalFontSize(useAppSettings().terminalFontSize);
+    const fontSizeRef = useRef(fontSize);
+    fontSizeRef.current = fontSize;
 
     onInputRef.current = onInput;
     onCommandRef.current = onCommand;
@@ -73,7 +74,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       const term = new XTerm({
         theme: TERMINAL_THEME,
         fontFamily: TERMINAL_FONT_FAMILY,
-        fontSize: TERMINAL_FONT_SIZE,
+        fontSize: fontSizeRef.current,
         cursorBlink: true,
         cursorStyle: "block",
         allowProposedApi: true,
@@ -149,6 +150,18 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       };
       // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Apply a font size change from Settings without recreating the terminal.
+    useEffect(() => {
+      const term = xtermRef.current;
+      if (!term || term.options.fontSize === fontSize) return;
+      term.options.fontSize = fontSize;
+      try {
+        fitAddonRef.current?.fit();
+      } catch {
+        // Ignore fit errors while the terminal is hidden
+      }
+    }, [fontSize]);
 
     return (
       <TerminalViewport

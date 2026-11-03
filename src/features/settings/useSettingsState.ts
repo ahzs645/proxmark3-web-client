@@ -4,13 +4,13 @@ import { DEFAULT_SETTINGS } from "./types";
 import type { SettingsState } from "./types";
 import {
   exportSettingsToFile,
-  loadSettingsFromStorage,
+  getSettingsSnapshot,
   parseSettingsFromText,
   saveSettingsToStorage,
 } from "./storage";
 
 export function useSettingsState() {
-  const [settings, setSettings] = useState<SettingsState>(loadSettingsFromStorage);
+  const [settings, setSettings] = useState<SettingsState>(getSettingsSnapshot);
   const [saved, setSaved] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -95,18 +95,22 @@ export function useSettingsState() {
       reader.onload = () => {
         try {
           if (typeof reader.result !== "string") {
-            throw new Error("Unexpected file reader result");
+            throw new Error("The file could not be read as text.");
           }
-          const parsed = parseSettingsFromText(reader.result);
-          persistSettings(parsed);
-        } catch {
-          setImportError("Failed to import settings. The file is not a valid settings JSON.");
+          persistSettings(parseSettingsFromText(reader.result, settings));
+          setImportError(null);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          setImportError(`Failed to import settings. ${reason}`);
         }
+      };
+      reader.onerror = () => {
+        setImportError("Failed to import settings. The file could not be read.");
       };
       reader.readAsText(file);
       e.target.value = "";
     },
-    [persistSettings],
+    [persistSettings, settings],
   );
 
   const clearImportError = useCallback(() => setImportError(null), []);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCommands } from "@/features/commands/context";
 import { useTarget } from "@/features/target/context";
 import { MagicHeader } from "@/features/magic/components/MagicHeader";
@@ -27,12 +28,14 @@ import { putOperation } from "@/features/vault/operations";
 import { cn } from "@/lib/utils";
 import { buildReadBlockCommand } from "@/features/memory/lib/batch";
 import { MagicRestorePipeline } from "@/features/memory/components/MagicRestorePipeline";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 
 export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelProps) {
   // Pull the card to clone from the shared target rather than props, so a scan
   // performed after this panel mounts still flows in.
   const { target } = useTarget();
   const commands = useCommands();
+  const settings = useAppSettings();
   const detectedUid = target.identity?.uid?.replace(/:/g, "") ?? "";
   const detectedAtqa = target.identity?.atqa?.replace(/\s/g, "") ?? "";
   const detectedSak = target.identity?.sak ?? "";
@@ -65,9 +68,10 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
   }, [detectedMagic]);
 
   const [gen4Password, setGen4Password] = useState("00000000");
-  const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
+  const [authKey, setAuthKey] = useState(settings.defaultAuthKey);
   const [authKeyType, setAuthKeyType] = useState<KeyType>("A");
-  const [showBlock0Builder, setShowBlock0Builder] = useState(false);
+  const [showBlock0Builder, setShowBlock0Builder] = useState(settings.showAdvancedOptions);
+  const [confirmWipeOpen, setConfirmWipeOpen] = useState(false);
   const [uidWriteBusy, setUidWriteBusy] = useState(false);
   const [uidWriteStatus, setUidWriteStatus] = useState<string | null>(null);
   const [uidWritePassed, setUidWritePassed] = useState<boolean | null>(null);
@@ -250,12 +254,17 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
     buildUnlockCommands(cardType, gen4Password).forEach((command) => onCommand(command));
   }, [cardType, gen4Password, onCommand]);
 
-  const handleWipe = useCallback(() => {
+  const runWipe = useCallback(() => {
     const command = buildWipeCommand(cardType, gen4Password);
     if (command) {
       onCommand(command);
     }
   }, [cardType, gen4Password, onCommand]);
+
+  const handleWipe = useCallback(() => {
+    if (settings.confirmDestructiveOps) setConfirmWipeOpen(true);
+    else runWipe();
+  }, [runWipe, settings.confirmDestructiveOps]);
 
   const handleDetect = useCallback(() => {
     onCommand(buildDetectCommand());
@@ -403,6 +412,15 @@ export function MagicCardPanel({ onCommand, disabled = false }: MagicCardPanelPr
         />
         <MagicWarningSection />
       </CardContent>
+      <ConfirmDialog
+        open={confirmWipeOpen}
+        title="Wipe the magic card?"
+        description="Every block is reset to blank data and default keys. Anything on the card now is lost unless you dumped it first."
+        confirmLabel="Wipe Card"
+        destructive
+        onConfirm={runWipe}
+        onClose={() => setConfirmWipeOpen(false)}
+      />
     </Card>
   );
 }

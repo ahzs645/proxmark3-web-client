@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Upload, ChevronDown, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 
 interface T55xxAdvancedSectionProps {
   blockNumber: string;
@@ -23,7 +24,8 @@ export function T55xxAdvancedSection({
   onWriteBlock,
   disabled = false,
 }: T55xxAdvancedSectionProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const { showAdvancedOptions } = useAppSettings();
+  const [showAdvanced, setShowAdvanced] = useState(showAdvancedOptions);
 
   return (
     <div className="border-t">

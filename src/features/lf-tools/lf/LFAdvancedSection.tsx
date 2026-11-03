@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, Download, RefreshCw, Settings, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 import type { LFConfig } from "../types";
 import { buildLfConfigCommand } from "../commands";
 
@@ -23,7 +24,8 @@ export function LFAdvancedSection({
   onResetConfig,
   disabled = false,
 }: LFAdvancedSectionProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const { showAdvancedOptions } = useAppSettings();
+  const [showAdvanced, setShowAdvanced] = useState(showAdvancedOptions);
 
   return (
     <div className="border-t">

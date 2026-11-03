@@ -1232,7 +1232,9 @@ function App() {
                 vault={vaultSummary}
                 terminalOpen={terminalDockOpen}
                 onToggleTerminal={
-                  isSessionWorkspace ? undefined : () => setTerminalDockOpen((open) => !open)
+                  isSessionWorkspace || activeWorkspace === "settings"
+                    ? undefined
+                    : () => setTerminalDockOpen((open) => !open)
                 }
                 onCommand={handleCommand}
                 onOpenTab={openWorkspace}

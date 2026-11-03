@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CheckSquare, Eye, RefreshCw, RotateCcw, Upload } from "lucide-react";
 import { useTarget } from "@/features/target/context";
 import { useCommands } from "@/features/commands/context";
+import { useAppSettings } from "@/features/settings/useAppSettings";
 import { DumpCacheBrowser } from "@/features/memory/components/DumpCacheBrowser";
 import { BlockInspector } from "@/features/memory/components/BlockInspector";
 import { MemoryMapHeader } from "@/features/memory/components/MemoryMapHeader";
@@ -94,7 +95,8 @@ export function CardMemoryMap({
     new Set(Array.from({ length: 16 }, (_, i) => i)),
   );
   const [showKeys, setShowKeys] = useState(true);
-  const [authKey, setAuthKey] = useState("FFFFFFFFFFFF");
+  const { defaultAuthKey } = useAppSettings();
+  const [authKey, setAuthKey] = useState(defaultAuthKey);
   const [authKeyType, setAuthKeyType] = useState<"A" | "B">("A");
   const [searchFilter, setSearchFilter] = useState("");
   const [showCachePanel, setShowCachePanel] = useState(false);

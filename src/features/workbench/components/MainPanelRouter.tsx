@@ -282,23 +282,25 @@ export function MainPanelRouter({
     );
   } else if (activeWorkspace === "settings") {
     panel = (
-      <div className="flex-1 p-4 overflow-hidden">
-        <div className="h-full max-w-xl mx-auto">
-          <SettingsPanel
-            theme={theme}
-            onThemeChange={onThemeChange}
-            cacheCount={cachedAssets.length}
-            onClearCache={onClearCache}
-            isDeviceConnected={isDeviceConnected}
-            activeTransportType={activeTransportType}
-            onDisconnectApplication={onDisconnectApplication}
-            onReconnectApplication={onReconnectApplication}
-            onFirmwareLog={onFirmwareLog}
-          />
-        </div>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <SettingsPanel
+          theme={theme}
+          onThemeChange={onThemeChange}
+          cacheCount={cachedAssets.length}
+          onClearCache={onClearCache}
+          isDeviceConnected={isDeviceConnected}
+          activeTransportType={activeTransportType}
+          onDisconnectApplication={onDisconnectApplication}
+          onReconnectApplication={onReconnectApplication}
+          onFirmwareLog={onFirmwareLog}
+        />
       </div>
     );
   }
+
+  // Settings is a full-height page: nothing there needs live output (the
+  // firmware updater shows its own progress), so the dock stays out of the way.
+  const dockVisible = terminalDockOpen && activeWorkspace !== "settings";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -317,8 +319,8 @@ export function MainPanelRouter({
         className={cn(
           "flex min-h-0 flex-col",
           !panel && "flex-1",
-          panel && terminalDockOpen && "terminal-dock shrink-0 basis-[45%] border-t border-border",
-          panel && !terminalDockOpen && "hidden",
+          panel && dockVisible && "terminal-dock shrink-0 basis-[45%] border-t border-border",
+          panel && !dockVisible && "hidden",
         )}
       >
         <WorkbenchHome

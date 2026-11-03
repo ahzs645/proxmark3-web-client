@@ -27,7 +27,7 @@ export function BehaviorSection({
           onChange={(event) =>
             onOperationProfileChange(event.target.value as "fast" | "recommended" | "thorough")
           }
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="fast">Fast — required safety checks only</option>
           <option value="recommended">Recommended — backup and final verification</option>
