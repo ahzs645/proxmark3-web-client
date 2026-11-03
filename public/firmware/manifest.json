@@ -1,0 +1,56 @@
+{
+  "manifest_version": 1,
+  "firmwares": [
+    {
+      "id": "bundled-pm3generic-v4.23346-256-g4ff716a69",
+      "display_name": "RRG/Iceman v4.23346-256-g4ff716a69 (PM3 Easy / Generic)",
+      "version": "4.23346",
+      "description": "RRG/Iceman firmware for PM3 Easy (PM3GENERIC) with LED support. Built to match this app's client.",
+      "platform": "PM3GENERIC",
+      "recommended": true,
+      "build_date": "2026-11-03",
+      "files": {
+        "bootloader": "bundled-pm3generic-v4.23346-256-g4ff716a69/bootrom.elf",
+        "fullimage": "bundled-pm3generic-v4.23346-256-g4ff716a69/fullimage.elf"
+      },
+      "checksums": {
+        "bootloader_sha256": "a5545755d9002e89399b5302f5b3e9d8e7f887b875de8b4eea76daff7c619781",
+        "fullimage_sha256": "26e524c570f8fd56c446d81c92735ccd4670f661de9850da489c279d1085ab10"
+      }
+    },
+    {
+      "id": "bundled-pm3rdv4-v4.23346-256-g4ff716a69",
+      "display_name": "RRG/Iceman v4.23346-256-g4ff716a69 (Proxmark3 RDV4)",
+      "version": "4.23346",
+      "description": "RRG/Iceman firmware for the Proxmark3 RDV4 with smartcard, flash and BT support. Built to match this app's client.",
+      "platform": "PM3RDV4",
+      "recommended": true,
+      "build_date": "2026-11-03",
+      "files": {
+        "bootloader": "bundled-pm3rdv4-v4.23346-256-g4ff716a69/bootrom.elf",
+        "fullimage": "bundled-pm3rdv4-v4.23346-256-g4ff716a69/fullimage.elf"
+      },
+      "checksums": {
+        "bootloader_sha256": "2953083f6682ba6d2859f34d3d191aaa5971b535d2de350fc49e183c5e38b2dd",
+        "fullimage_sha256": "01080e917119ec149bc3fabcfeb7d8657833c8fe7dfa9a0c30030fb5c2121ff0"
+      }
+    },
+    {
+      "id": "bundled-pm5-v4.23346-256-g4ff716a69",
+      "display_name": "RRG/Iceman v4.23346-256-g4ff716a69 (Proxmark5)",
+      "version": "4.23346",
+      "description": "RRG/Iceman firmware for the Proxmark5 with the BLE/Wi-Fi module (BWM). Built to match this app's client.",
+      "platform": "PM5",
+      "recommended": true,
+      "build_date": "2026-11-03",
+      "files": {
+        "bootloader": "bundled-pm5-v4.23346-256-g4ff716a69/bootrom.elf",
+        "fullimage": "bundled-pm5-v4.23346-256-g4ff716a69/fullimage.elf"
+      },
+      "checksums": {
+        "bootloader_sha256": "260d885a7bfbda03ee5053d0ed82a3907e1912f05ac3d76573c1bd106b8b078a",
+        "fullimage_sha256": "f2010972af1b4b56be26370931cc9700dcef8f48132aeb7fc9f27b666bde3d52"
+      }
+    }
+  ]
+}

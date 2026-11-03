@@ -25,13 +25,53 @@ function isFirmwareManifest(value: unknown): value is FirmwareManifest {
   );
 }
 
-export async function fetchFirmwareManifest(): Promise<FirmwareManifest> {
-  const response = await fetch(`${FIRMWARE_SOURCE}/api/firmware/manifest`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Firmware manifest request failed (HTTP ${response.status})`);
+/** Firmware shipped with the app (scripts/bundle-firmware.cjs), relative to the page. */
+export const BUNDLED_FIRMWARE_PATH = "firmware";
+
+async function fetchManifest(url: string, label: string): Promise<FirmwareManifest> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`${label} manifest request failed (HTTP ${response.status})`);
   const manifest: unknown = await response.json();
-  if (!isFirmwareManifest(manifest))
-    throw new Error("Firmware server returned an invalid manifest");
+  if (!isFirmwareManifest(manifest)) throw new Error(`${label} returned an invalid manifest`);
   return manifest;
+}
+
+/**
+ * Bundled firmware comes first and is the recommendation for its platform:
+ * it is built from the same commit as this app's client, so its capabilities
+ * version always matches. Remote packages stay selectable, but no longer claim
+ * "recommended" for a platform that has a bundled build. Either source may be
+ * missing; only both failing is an error.
+ */
+export function mergeFirmwareManifests(
+  bundled: FirmwareManifest | null,
+  remote: FirmwareManifest | null,
+): FirmwareManifest {
+  const local = (bundled?.firmwares ?? []).map((entry) => ({
+    ...entry,
+    source: "bundled" as const,
+  }));
+  const covered = new Set(local.map((entry) => entry.platform));
+  const fromServer = (remote?.firmwares ?? []).map((entry) => ({
+    ...entry,
+    source: "remote" as const,
+    recommended: covered.has(entry.platform) ? false : entry.recommended,
+  }));
+  return { manifest_version: 1, firmwares: [...local, ...fromServer] };
+}
+
+export async function fetchFirmwareManifest(): Promise<FirmwareManifest> {
+  const [bundled, remote] = await Promise.allSettled([
+    fetchManifest(`${BUNDLED_FIRMWARE_PATH}/manifest.json`, "Bundled firmware"),
+    fetchManifest(`${FIRMWARE_SOURCE}/api/firmware/manifest`, "Firmware server"),
+  ]);
+  if (bundled.status === "rejected" && remote.status === "rejected") {
+    throw remote.reason instanceof Error ? remote.reason : new Error(String(remote.reason));
+  }
+  return mergeFirmwareManifests(
+    bundled.status === "fulfilled" ? bundled.value : null,
+    remote.status === "fulfilled" ? remote.value : null,
+  );
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -67,7 +107,11 @@ function parseImagePair(bootrom: ArrayBuffer, fullimage: ArrayBuffer): FirmwareI
 export async function downloadFirmware(entry: FirmwareEntry): Promise<FirmwareImages> {
   // The API routes are stable and prevent a manifest from redirecting the app
   // to an unrelated host while still letting the server organize file storage.
-  const root = `${FIRMWARE_SOURCE}/api/firmware/${encodeURIComponent(entry.id)}`;
+  // Bundled packages live beside the page under the same id-based layout.
+  const root =
+    entry.source === "bundled"
+      ? `${BUNDLED_FIRMWARE_PATH}/${encodeURIComponent(entry.id)}`
+      : `${FIRMWARE_SOURCE}/api/firmware/${encodeURIComponent(entry.id)}`;
   const [bootrom, fullimage] = await Promise.all([
     downloadAndVerify(`${root}/bootrom.elf`, entry.checksums.bootloader_sha256),
     downloadAndVerify(`${root}/fullimage.elf`, entry.checksums.fullimage_sha256),

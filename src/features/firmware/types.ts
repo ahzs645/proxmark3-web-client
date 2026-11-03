@@ -30,6 +30,8 @@ export interface FirmwareEntry {
   build_date?: string;
   files: FirmwareFileSet;
   checksums: FirmwareChecksums;
+  /** Where the files come from: shipped with this app, or the remote server. Set by the client. */
+  source?: "bundled" | "remote";
 }
 
 export interface FirmwareManifest {

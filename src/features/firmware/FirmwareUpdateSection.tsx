@@ -214,6 +214,9 @@ export function FirmwareUpdateSection({
                       </div>
                       <div className="flex shrink-0 gap-1">
                         {firmware.recommended ? <Badge variant="success">Recommended</Badge> : null}
+                        <Badge variant="outline">
+                          {firmware.source === "bundled" ? "Bundled" : "proxmark3.app"}
+                        </Badge>
                         {installed ? <Badge variant="outline">Installed</Badge> : null}
                       </div>
                     </div>
@@ -334,7 +337,7 @@ export function FirmwareUpdateSection({
               rel="noreferrer"
               className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
             >
-              Firmware source: proxmark3.app
+              Firmware: bundled with this app, plus proxmark3.app
             </a>
             <div className="flex flex-wrap items-center gap-2">
               <Button
